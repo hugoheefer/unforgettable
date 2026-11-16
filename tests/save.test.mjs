@@ -6,13 +6,13 @@ const defaults = {
   plan: { keys: { placeId: 'hall', spotId: 'hook' }, wallet: { placeId: 'coat', spotId: 'pocket' } },
   progress: { streaks: {} },
 };
-const spotExists = ({ placeId, spotId }) => ['hall/hook', 'coat/pocket', 'kitchen/counter'].includes(`${placeId}/${spotId}`);
+const locationExists = ({ placeId, spotId }) => ['hall/hook', 'coat/pocket', 'kitchen/counter'].includes(`${placeId}/${spotId}`);
 
 function memoryStorage(initial = {}) {
   const data = new Map(Object.entries(initial));
   return { getItem: (k) => data.get(k) ?? null, setItem: (k, v) => data.set(k, v), data };
 }
-const storeOn = (storage) => createSaveStore(() => storage, { defaults, spotExists });
+const storeOn = (storage) => createSaveStore(() => storage, { defaults, locationExists });
 
 test('with nothing saved the defaults are used', () => {
   assert.deepEqual(storeOn(memoryStorage()).load(), defaults);
@@ -48,7 +48,12 @@ test('streaks that are not whole numbers are dropped', () => {
 
 test('a browser that blocks storage still plays: load gives defaults and save does not throw', () => {
   const blocked = () => { throw new Error('blocked'); };
-  const store = createSaveStore(blocked, { defaults, spotExists });
+  const store = createSaveStore(blocked, { defaults, locationExists });
   assert.deepEqual(store.load(), defaults);
   assert.doesNotThrow(() => store.save(defaults));
+});
+
+test('a saved home spot that is not even an object is replaced by the default one', () => {
+  const storage = memoryStorage({ 'unforgettable-save': JSON.stringify({ plan: { keys: 'hook', wallet: 7 } }) });
+  assert.deepEqual(storeOn(storage).load().plan, defaults.plan);
 });

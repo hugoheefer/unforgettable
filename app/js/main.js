@@ -11,12 +11,13 @@ const app = document.getElementById('app');
 const world = new World(LAYOUT);
 const store = createSaveStore(() => window.localStorage, {
   defaults: { plan: DEFAULT_PLAN, progress: { streaks: {} } },
-  spotExists: (location) => world.hasSpot(location),
+  locationExists: (location) => world.hasLocation(location),
 });
 
 let save = store.load();
 let round = null;
 let message = '';
+let hangingGarmentId = null; // set while the player is choosing where to hang a garment
 
 function show(screen) {
   app.replaceChildren(screen);
@@ -38,6 +39,7 @@ function showSetup() {
 function startRound() {
   round = new Round({ layout: LAYOUT, items: ITEMS, plan: save.plan, random: createRandomSource(), progress: save.progress });
   message = '';
+  hangingGarmentId = null;
   refresh();
 }
 
@@ -48,26 +50,55 @@ function refresh() {
     show(renderDone({ round, onAgain: startRound, onPlan: showSetup }));
     return;
   }
-  show(renderPlay({ round, message, onSpot: tapSpot, onDoor: tapDoor }));
+  show(renderPlay({ round, message, hangingGarmentId, handlers }));
 }
 
-function tapSpot(spotId) {
-  const { phase, findItem } = round.state();
+/** Runs one tap; a refused move (for example a pocket out of reach) shows its reason instead of crashing. */
+function act(move) {
   message = '';
-  if (phase === 'drop') {
-    round.putDown(spotId);
-  } else {
-    const outcome = round.open(spotId);
-    const name = ITEMS.find((item) => item.id === findItem).name;
-    message = outcome.found ? `Found your ${name}!` : 'Not here.';
+  try {
+    move();
+  } catch (error) {
+    message = error.message;
   }
   refresh();
 }
 
-function tapDoor(roomId) {
-  message = '';
-  round.walkTo(roomId);
-  refresh();
+const findingName = () => ITEMS.find((item) => item.id === round.state().findItem)?.name;
+
+function reportLook(outcome, name) {
+  message = outcome.found ? `Found your ${name}!` : 'Not here.';
 }
+
+const handlers = {
+  onSpot: (spotId) => act(() => {
+    if (hangingGarmentId) {
+      const garmentId = hangingGarmentId;
+      hangingGarmentId = null;
+      round.takeOff(garmentId, spotId);
+    } else if (round.state().phase === 'drop') {
+      round.putDown(spotId);
+    } else {
+      const name = findingName();
+      reportLook(round.open(spotId), name);
+    }
+  }),
+  onPocket: (garmentId, pocketId) => act(() => {
+    hangingGarmentId = null;
+    if (round.state().phase === 'drop') {
+      round.putInPocket(garmentId, pocketId);
+    } else {
+      const name = findingName();
+      reportLook(round.openPocket(garmentId, pocketId), name);
+    }
+  }),
+  onDoor: (roomId) => act(() => {
+    hangingGarmentId = null;
+    round.walkTo(roomId);
+  }),
+  onTakeOff: (garmentId) => act(() => { hangingGarmentId = garmentId; }),
+  onCancel: () => act(() => { hangingGarmentId = null; }),
+  onPutOn: (garmentId) => act(() => round.putOn(garmentId)),
+};
 
 showSetup();

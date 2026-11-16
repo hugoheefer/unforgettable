@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { World } from '../app/js/world.js';
+import { World, locationKey, parseLocationKey } from '../app/js/world.js';
 
 const layout = {
   places: [
@@ -57,4 +57,85 @@ test('walking to the room you are in costs nothing, a neighbour one step, two ro
 test('a room nobody can walk to has no distance', () => {
   const lonely = { places: [...layout.places, { id: 'attic', name: 'Attic', icon: '🏚️', spots: [], exits: [] }] };
   assert.equal(new World(lonely).stepsBetween('hall', 'attic'), Infinity);
+});
+
+const withCoat = {
+  ...layout,
+  garments: [
+    { id: 'coat', name: 'Coat', icon: '🧥', startsWorn: true, pockets: [{ id: 'left', name: 'Left pocket', icon: '🫳' }, { id: 'right', name: 'Right pocket', icon: '🫴' }] },
+    { id: 'jacket', name: 'Jacket', icon: '🧥', startsAt: { placeId: 'bedroom', spotId: 'nightstand' }, pockets: [{ id: 'inner', name: 'Inner pocket', icon: '🧷' }] },
+  ],
+};
+
+test('an item that is put in a pocket is found in that pocket', () => {
+  const world = new World(withCoat);
+  world.put('keys', { garmentId: 'coat', pocketId: 'right' });
+  assert.deepEqual(world.whereIs('keys'), { garmentId: 'coat', pocketId: 'right' });
+  assert.deepEqual(world.itemsOn({ garmentId: 'coat', pocketId: 'right' }), ['keys']);
+});
+
+test('putting an item in a pocket that does not exist is refused', () => {
+  const world = new World(withCoat);
+  assert.throws(() => world.put('keys', { garmentId: 'coat', pocketId: 'secret' }), /unknown spot or pocket/i);
+  assert.throws(() => world.put('keys', { garmentId: 'cape', pocketId: 'left' }), /unknown spot or pocket/i);
+});
+
+test('a garment starts worn or lies where it was said to lie', () => {
+  const world = new World(withCoat);
+  assert.equal(world.isWorn('coat'), true);
+  assert.equal(world.isWorn('jacket'), false);
+  assert.deepEqual(world.garmentsOn({ placeId: 'bedroom', spotId: 'nightstand' }), ['jacket']);
+});
+
+test('hanging a worn garment on a spot puts it there and it is no longer worn', () => {
+  const world = new World(withCoat);
+  world.hang('coat', { placeId: 'hall', spotId: 'hook' });
+  assert.equal(world.isWorn('coat'), false);
+  assert.deepEqual(world.garmentsOn({ placeId: 'hall', spotId: 'hook' }), ['coat']);
+});
+
+test('hanging a garment on a spot that does not exist is refused', () => {
+  assert.throws(() => new World(withCoat).hang('coat', { placeId: 'hall', spotId: 'sofa' }), /unknown spot or pocket/i);
+});
+
+test('the things in a pocket stay in the pocket when the garment is moved', () => {
+  const world = new World(withCoat);
+  world.put('keys', { garmentId: 'coat', pocketId: 'left' });
+  world.hang('coat', { placeId: 'kitchen', spotId: 'counter' });
+  assert.deepEqual(world.whereIs('keys'), { garmentId: 'coat', pocketId: 'left' });
+});
+
+test('putting a hanging garment on makes it worn and takes it off its spot', () => {
+  const world = new World(withCoat);
+  world.wear('jacket');
+  assert.equal(world.isWorn('jacket'), true);
+  assert.deepEqual(world.garmentsOn({ placeId: 'bedroom', spotId: 'nightstand' }), []);
+});
+
+test('the worn garments are listed', () => {
+  assert.deepEqual(new World(withCoat).wornGarments(), ['coat']);
+});
+
+test('a location is valid when it is a real spot or a real pocket', () => {
+  const world = new World(withCoat);
+  assert.equal(world.hasLocation({ placeId: 'hall', spotId: 'hook' }), true);
+  assert.equal(world.hasLocation({ garmentId: 'coat', pocketId: 'left' }), true);
+  assert.equal(world.hasLocation({ placeId: 'hall', spotId: 'left' }), false);
+  assert.equal(world.hasLocation({}), false);
+});
+
+test('something that is not a location at all is not a valid location', () => {
+  const world = new World(withCoat);
+  for (const nonsense of ['hook', 7, null, undefined]) assert.equal(world.hasLocation(nonsense), false, String(nonsense));
+});
+
+test('a worn garment is in no room, a hanging one is in the room of its spot', () => {
+  const world = new World(withCoat);
+  assert.equal(world.garmentRoom('coat'), null);
+  assert.equal(world.garmentRoom('jacket'), 'bedroom');
+});
+
+test('a location survives being turned into a key and back, for spots and for pockets', () => {
+  for (const location of [{ placeId: 'hall', spotId: 'hook' }, { garmentId: 'coat', pocketId: 'left' }])
+    assert.deepEqual(parseLocationKey(locationKey(location)), location);
 });

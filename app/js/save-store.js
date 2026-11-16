@@ -3,6 +3,7 @@
 
 const SAVE_KEY = 'unforgettable-save';
 
+const isLocationObject = (value) => typeof value === 'object' && value !== null;
 const isWholeStreak = (value) => Number.isInteger(value) && value >= 0;
 
 function validStreaks(streaks) {
@@ -12,9 +13,9 @@ function validStreaks(streaks) {
 
 /**
  * @param {() => Storage} getStorage
- * @param {{ defaults: { plan: object, progress: object }, spotExists: (location: object) => boolean }} options
+ * @param {{ defaults: { plan: object, progress: object }, locationExists: (location: object) => boolean }} options
  */
-export function createSaveStore(getStorage, { defaults, spotExists }) {
+export function createSaveStore(getStorage, { defaults, locationExists }) {
   function readRaw() {
     try {
       return JSON.parse(getStorage().getItem(SAVE_KEY) ?? 'null');
@@ -26,7 +27,7 @@ export function createSaveStore(getStorage, { defaults, spotExists }) {
   function mergePlan(saved) {
     const plan = { ...defaults.plan };
     for (const itemId of Object.keys(defaults.plan)) {
-      if (saved && spotExists(saved[itemId] ?? {})) plan[itemId] = saved[itemId];
+      if (isLocationObject(saved?.[itemId]) && locationExists(saved[itemId])) plan[itemId] = saved[itemId];
     }
     return plan;
   }

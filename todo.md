@@ -20,6 +20,10 @@
 
 Built in one go: steps 0 to 7 in a first form. `app/` runs as a static page; setup screen (choose home spots), drop phase with pressure and forced drops, distraction, find phase with move costs, result screen, fading hints, saved plan and streaks. Not yet: scenarios away from home (friend, library), progress screen, publishing to my-wiki, a check of the look on a real phone.
 
+## Second version (2026-11-16, after the first try)
+
+Feedback: not always clear what to do; rooms and clothes were mixed. Now: a blue instruction line says what to do and each tile says "Put here" or "Look here"; the house has all common rooms (hall, living, dining, kitchen, toilet, landing, bedroom, bathroom, study, garage, garden, shed, car) with 3 to 5 places each; the player wears a coat and trousers with pockets (shown apart as "You wear"); the coat can be taken off and hung anywhere in the room you stand in (costs a move), and then its pockets are only within reach in that room; scissors added. 100 unit tests.
+
 ## Next (in order; each step: tests red first, then code, then you review)
 
 0. **Project setup**: `package.json` (`type: module`, `test` script), `app/index.html` + `app/css/` + `app/js/main.js` with relative links, a first `tests/*.test.mjs` run with `node --test`, README; smoke check that `app/index.html` loads in Playwright.

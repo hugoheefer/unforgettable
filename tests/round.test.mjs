@@ -185,3 +185,127 @@ test('the distraction never takes you into a coat or a car, only into rooms', ()
   dropAtHome(round);
   assert.notEqual(round.state().roomId, 'coat');
 });
+
+// ---- garments: a coat you wear or hang up, with pockets ----
+const garmentLayout = {
+  ...layout,
+  garments: [
+    { id: 'coat', name: 'Coat', icon: '🧥', startsWorn: true, removable: true, pockets: [{ id: 'left', name: 'Left pocket', icon: '🫳' }, { id: 'right', name: 'Right pocket', icon: '🫴' }] },
+    { id: 'trousers', name: 'Trousers', icon: '👖', startsWorn: true, removable: false, pockets: [{ id: 'front', name: 'Front pocket', icon: '🫳' }] },
+  ],
+};
+const pocketPlan = { keys: { garmentId: 'coat', pocketId: 'right' }, wallet: { placeId: 'bedroom', spotId: 'nightstand' } };
+const lastChoice = { pick: (list) => list[list.length - 1], shuffle: (list) => [...list] };
+const coatRound = (options = {}) => newRound({ layout: garmentLayout, plan: pocketPlan, ...options });
+
+test('an item put in a pocket of the coat you wear counts when that pocket is its home', () => {
+  const round = coatRound();
+  round.putInPocket('coat', 'right');
+  assert.equal(round.results()[0].atHome, true);
+  assert.deepEqual(round.world.whereIs('keys'), { garmentId: 'coat', pocketId: 'right' });
+});
+
+test('putting an item in another pocket of the coat does not count for the habit', () => {
+  const round = coatRound();
+  round.putInPocket('coat', 'left');
+  assert.equal(round.results()[0].atHome, false);
+});
+
+test('taking the coat off hangs it on a spot in this room and costs a move', () => {
+  const round = coatRound();
+  round.takeOff('coat', 'hook');
+  assert.equal(round.world.isWorn('coat'), false);
+  assert.deepEqual(round.world.garmentsOn({ placeId: 'hall', spotId: 'hook' }), ['coat']);
+  assert.equal(round.state().movesLeft, 2);
+});
+
+test('a garment that cannot be taken off stays on', () => {
+  assert.throws(() => coatRound().takeOff('trousers', 'hook'), /cannot be taken off/i);
+});
+
+test('you can only take off what you wear, and hang it on a spot of the room you are in', () => {
+  const round = coatRound();
+  round.takeOff('coat', 'hook');
+  assert.throws(() => round.takeOff('coat', 'shelf'), /not wearing/i);
+  assert.throws(() => coatRound().takeOff('coat', 'counter'), /not in this room/i);
+});
+
+test('you can put the coat on again when it hangs in the room you are in', () => {
+  const round = coatRound();
+  round.takeOff('coat', 'hook');
+  round.putOn('coat');
+  assert.equal(round.world.isWorn('coat'), true);
+});
+
+test('you cannot put on a coat that hangs in another room', () => {
+  const round = coatRound();
+  round.takeOff('coat', 'hook');
+  round.walkTo('kitchen');
+  assert.throws(() => round.putOn('coat'), /not in this room/i);
+});
+
+test('a pocket of a coat that hangs in another room is out of reach', () => {
+  const round = coatRound();
+  round.takeOff('coat', 'hook');
+  round.walkTo('kitchen');
+  assert.throws(() => round.putInPocket('coat', 'right'), /out of reach/i);
+});
+
+test('a pocket of a coat that hangs in this room can be used', () => {
+  const round = coatRound();
+  round.takeOff('coat', 'hook');
+  round.putInPocket('coat', 'right');
+  assert.equal(round.results()[0].atHome, true);
+});
+
+test('taking the coat off when the moves run out leaves the item on the first spot of the room', () => {
+  const round = coatRound({ budget: 1 });
+  round.takeOff('coat', 'hook');
+  assert.equal(round.results()[0].forced, true);
+});
+
+/** Keys in the coat pocket and the coat on the hook, wallet in the bedroom; the distraction ends in the kitchen. */
+function hangCoatWithKeysAndLeaveWallet() {
+  const round = coatRound({ random: lastChoice });
+  round.takeOff('coat', 'hook');
+  round.putInPocket('coat', 'right');
+  round.walkTo('kitchen');
+  round.walkTo('bedroom');
+  round.putDown('nightstand');
+  assert.equal(round.state().roomId, 'kitchen');
+  return round;
+}
+
+test('keys in the pocket of a hanging coat are found by going to the coat and opening the pocket', () => {
+  const round = hangCoatWithKeysAndLeaveWallet();
+  assert.throws(() => round.openPocket('coat', 'right'), /out of reach/i);
+  round.walkTo('hall');
+  const outcome = round.openPocket('coat', 'right');
+  assert.equal(outcome.found, true);
+  assert.equal(round.results()[0].findCost, 2);
+});
+
+test('a pocket of the coat you wear can be opened in any room, for one move', () => {
+  const round = coatRound({ random: lastChoice });
+  round.putInPocket('coat', 'left');
+  round.walkTo('kitchen');
+  round.putDown('drawer');
+  assert.equal(round.state().phase, 'find');
+  const outcome = round.openPocket('coat', 'left');
+  assert.equal(outcome.found, true);
+  assert.equal(round.results()[0].findCost, 1);
+});
+
+test('what is in a pocket stays unseen until you open that pocket', () => {
+  const round = coatRound({ random: lastChoice });
+  round.putInPocket('coat', 'left');
+  round.walkTo('kitchen');
+  round.putDown('drawer');
+  assert.deepEqual(round.seenAt({ garmentId: 'coat', pocketId: 'left' }), []);
+});
+
+test('while dropping you see what you left in a pocket you can reach', () => {
+  const round = coatRound();
+  round.putInPocket('coat', 'left');
+  assert.deepEqual(round.seenAt({ garmentId: 'coat', pocketId: 'left' }), ['keys']);
+});

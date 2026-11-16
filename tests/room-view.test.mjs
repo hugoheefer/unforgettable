@@ -7,60 +7,113 @@ import { LAYOUT, ITEMS, DEFAULT_PLAN } from '../app/js/layout.js';
 const firstChoice = { pick: (list) => list[0], shuffle: (list) => [...list] };
 const newRound = (streaks = {}) =>
   new Round({ layout: LAYOUT, items: ITEMS, plan: DEFAULT_PLAN, random: firstChoice, progress: { streaks } });
-const spotView = (view, id) => view.spots.find((spot) => spot.id === id);
+const tile = (tiles, id) => tiles.find((entry) => entry.id === id);
+
+/** Puts every item in the coat's left pocket, so the search starts at once. */
+function dropEverythingInTheLeftPocket(round) {
+  for (let i = 0; i < ITEMS.length; i += 1) round.putInPocket('coat', 'coat-left');
+}
 
 test('the view shows the room you are in, its spots and the doors you can take', () => {
   const view = describeRoom(newRound());
   assert.equal(view.room.name, 'Hallway');
-  assert.deepEqual(view.spots.map((spot) => spot.id), ['hook', 'shelf', 'shoes']);
-  assert.deepEqual(view.exits.map((exit) => exit.id), ['living', 'kitchen', 'coat', 'car']);
+  assert.ok(view.spots.some((spot) => spot.id === 'hook'));
+  assert.deepEqual(view.exits.map((exit) => exit.id), ['living', 'kitchen', 'toilet', 'landing', 'garden']);
 });
 
-test('while dropping, the items you left on a spot are visible on it', () => {
-  const round = newRound();
-  round.putDown('shelf');
-  assert.deepEqual(spotView(describeRoom(round), 'shelf').seen, ['🔑']);
+test('the view shows what you wear, with its pockets', () => {
+  const view = describeRoom(newRound());
+  assert.deepEqual(view.worn.map((garment) => garment.id), ['coat', 'trousers']);
+  assert.deepEqual(tile(view.worn, 'coat').pockets.map((pocket) => pocket.id), ['coat-left', 'coat-right', 'coat-inside']);
 });
 
-test('while searching, a spot shows its items only after you opened it', () => {
+test('only a coat that can come off, and only while dropping, offers to be taken off', () => {
+  const view = describeRoom(newRound());
+  assert.equal(tile(view.worn, 'coat').canTakeOff, true);
+  assert.equal(tile(view.worn, 'trousers').canTakeOff, false);
+});
+
+test('a coat that hangs in this room is shown there with its pockets, and can be put on', () => {
   const round = newRound();
-  round.putDown('hook');
+  round.takeOff('coat', 'coat-hooks');
+  const view = describeRoom(round);
+  assert.deepEqual(view.worn.map((garment) => garment.id), ['trousers']);
+  assert.equal(tile(view.hanging, 'coat').onSpot, 'coat-hooks');
+  assert.equal(tile(view.hanging, 'coat').pockets.length, 3);
+  assert.equal(tile(view.hanging, 'coat').canPutOn, true);
+});
+
+test('a coat that hangs in another room is not shown here', () => {
+  const round = newRound();
+  round.takeOff('coat', 'coat-hooks');
   round.walkTo('kitchen');
-  round.putDown('counter');
-  round.walkTo('hall');
-  round.putDown('hook');
-  // searching starts in the first other room: the living room; walk to the hallway and look
-  round.walkTo('hall');
-  assert.deepEqual(spotView(describeRoom(round), 'hook').seen, []);
-  round.open('hook');
-  assert.deepEqual(spotView(describeRoom(round), 'hook').seen, []); // the found item was taken in hand
+  assert.deepEqual(describeRoom(round).hanging, []);
+});
+
+test('while dropping, the items you left on a spot or in a pocket are visible there', () => {
+  const round = newRound();
+  round.putDown('shoes');
+  round.putInPocket('coat', 'coat-right');
+  const view = describeRoom(round);
+  assert.deepEqual(tile(view.spots, 'shoes').seen, ['🔑']);
+  assert.deepEqual(tile(tile(view.worn, 'coat').pockets, 'coat-right').seen, ['👛']);
+});
+
+test('while searching, a pocket shows its items only after you opened it', () => {
+  const round = newRound();
+  round.putInPocket('coat', 'coat-left'); // keys, the first thing to find
+  for (let i = 0; i < 3; i += 1) round.putInPocket('coat', 'coat-right'); // the rest
+  const pocket = () => tile(tile(describeRoom(round).worn, 'coat').pockets, 'coat-right');
+  assert.deepEqual(pocket().seen, []);
+  round.openPocket('coat', 'coat-right');
+  assert.deepEqual(pocket().seen, ['👛', '📱', '✂️']);
 });
 
 test('with a short streak the home spot is named and marked', () => {
   const view = describeRoom(newRound());
-  assert.equal(spotView(view, 'hook').hint, 'shown');
+  assert.equal(tile(view.spots, 'hook').hint, 'shown');
   assert.match(view.hintText, /Key hook/);
+});
+
+test('a home pocket of a garment within reach is marked, and named in the hint', () => {
+  const round = newRound({ keys: 5 });
+  round.putDown('hook'); // keys done, now the wallet, whose home is the inside pocket of the coat
+  const view = describeRoom(round);
+  assert.equal(tile(tile(view.worn, 'coat').pockets, 'coat-inside').hint, 'shown');
+  assert.match(view.hintText, /Inside pocket \(Coat\)/);
 });
 
 test('with a middle streak the home spot is only marked, not named', () => {
   const view = describeRoom(newRound({ keys: 2 }));
-  assert.equal(spotView(view, 'hook').hint, 'dimmed');
+  assert.equal(tile(view.spots, 'hook').hint, 'dimmed');
   assert.equal(view.hintText, '');
 });
 
 test('with a long streak nothing is hinted: memory has to do the work', () => {
   const view = describeRoom(newRound({ keys: 4 }));
-  assert.equal(spotView(view, 'hook').hint, 'hidden');
+  assert.equal(tile(view.spots, 'hook').hint, 'hidden');
   assert.equal(view.hintText, '');
 });
 
-test('the home spot is not hinted in the find phase', () => {
+test('nothing is hinted in the find phase', () => {
   const round = newRound();
-  round.putDown('hook');
-  round.walkTo('kitchen');
-  round.putDown('counter');
-  round.walkTo('hall');
-  round.putDown('hook');
-  assert.equal(round.state().phase, 'find');
-  assert.ok(describeRoom(round).spots.every((spot) => spot.hint === 'hidden'));
+  dropEverythingInTheLeftPocket(round);
+  const view = describeRoom(round);
+  assert.ok(view.spots.every((spot) => spot.hint === 'hidden'));
+  assert.equal(view.hintText, '');
+});
+
+test('while dropping the instruction says what to do with the item in hand', () => {
+  const view = describeRoom(newRound());
+  assert.match(view.instruction, /Put your 🔑 keys down/);
+  assert.match(view.instruction, /tap a spot or a pocket/);
+  assert.equal(view.verb, 'Put here');
+});
+
+test('while searching the instruction says what to find and how', () => {
+  const round = newRound();
+  dropEverythingInTheLeftPocket(round);
+  const view = describeRoom(round);
+  assert.match(view.instruction, /Find your 🔑 keys/);
+  assert.equal(view.verb, 'Look here');
 });
