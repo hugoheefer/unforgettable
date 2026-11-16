@@ -34,84 +34,27 @@ Someone who gets only the link can, without help: understand in three screens wh
 - Update `CLAUDE.md` (design decision with its reason), `todo.md` and `README.md` in the same commit. Never touch my-wiki's `main` without the user's go-ahead.
 - After each story: bundle and republish the preview artifact, and tell the user in a few lines what to try.
 
-## Story 0: refactor first (no behaviour change, tests stay green)
+## The stories
 
-The next stories build on these seams.
-- `app-flow.js` switches on `instanceof` to know when a flow ends. Give every flow the same contract (`step()`, `choose()`, `next()`, `isFinished()`) plus an `onFinished` callback passed in by `AppFlow`; remove the `instanceof` checks.
-- `room-view.js` reads `world.garmentPlaces` directly: add `World.garmentSpot(garmentId)` and use it.
-- `play-flow.js` says "You put your coat on" for any garment: use the garment's name.
-- Golden test before touching it: one scripted round through `AppFlow` whose list of `step()` values is compared before and after.
+Written out in `stories.md` (screens, rules, texts, tests, the catalogue of sixteen things). Stories 0 to 3 are complete; 4 to 8 are revisited after the user has played the core.
 
-## Story 0b: texts ready for a second language (English only for now)
-
-User decision 2026-11-16: the screens stay English, but adding Dutch later must be easy; the language choice itself is not built yet.
-- All text the player reads moves out of the logic into one module per language: `app/js/texts/en.js` exports one object with every sentence as a string or a small function of its values (`putAwayQuestion: ({ room, item }) => ...`), including the names of rooms, spots, pockets, garments and things, keyed by their id. `layout.js` keeps ids, icons and structure only.
-- `texts.js` holds the list of languages (a table: code, name, module) and `textsFor(code)`, which falls back to English for an unknown code. The flows get the texts object injected; no module imports `en.js` directly except `texts.js`.
-- Adding Dutch later is then: copy `en.js` to `nl.js`, translate, add one row to the table, and add the choice to the welcome screen. Nothing else changes.
-- First tests: every flow still produces the same English screens (the golden test of story 0); a contract test that will hold for any language: every key of `en.js` exists in each listed language with the same kind (string or function), and every room, spot, pocket, garment and thing id in `layout.js` has a name; `textsFor('xx')` gives English.
-- Mutation check: remove one name from `en.js`; the contract test must name the missing id.
-
-## Story 1: the world persists
-
-- `World.snapshot()` returns plain data (item locations, garment places); `World.restore(layout, snapshot)` rebuilds it. Unknown items, spots or garments in a snapshot are dropped (stale save), never a crash.
-- Save format gets `version: 2` with `world`, `day` (number and index of the next event) and `history` (story 4). An old save keeps its plan and streaks and gets an empty world.
-- First tests: a restored world answers `whereIs` like the original; a coat hung on a spot is still there, with what was in its pockets; a snapshot naming a spot that no longer exists loses only that item; a version 1 save loads with its plan.
-
-## Story 2: days made of events (replaces the round)
-
-Evolve `round.js` into `day.js`; most rules stay (reach of pockets, take off, put on, look).
-- Event kinds, as a table of small objects with one `describe` and one `isDone` each, not a switch: `find` (item is needed; done when found, the item is then in hand), `putAway` (item in hand; done when put down), `moveTo` (the story puts you in a room: "You are in the garden").
-- `scenario.js` (pure, `RandomSource`): builds the events of a day. First day ever: come home with everything in hand, put it away, then two uses. Later days: leave (find 2 or 3 things), come home (put them away, one of them in a hurry at most), two uses. A **use** is `find` + `moveTo` + `putAway`, with its texts and room taken from a table per item in `layout.js` (phone: a call in the garden, a recipe in the kitchen; scissors: wrapping a present in the living room; keys: something from the shed; wallet: paying at the front door).
-- Walking: `walkTo(roomId)` accepts any room and costs `stepsBetween`. In a hurry, rooms further than 1 step are not offered and refused.
-- Every step costs are counted per event; no points, no `movesLeft`, no forced interruption. Remove what becomes dead.
-- After every finished event the world and the day position are saved; reopening the app continues at the next event.
-- `play-flow.js`: the door list shows every room with its distance, nearest first; the room that holds the home spot carries the star while the hint is shown or dimmed.
-- First tests: a thing left on the sofa on day 1 is on the sofa on day 2; a use event ends with the player in the use room holding the item; in a hurry the study (2 steps) is not offered and the hallway (1 step) is; walking two rooms costs two steps; reloading in the middle of a day continues with the same event and the same world; the first day starts with everything in hand.
-- Mutation checks: the world is not restored between days; hurry offers every room.
-
-## Story 3: what a find costs, and the day summary
-
-- `history.js` (pure): one record per find: item, day, steps used, shortest possible (distance to the room where it was, plus one look), and whether it was on its home spot. Stats are computed from the records, never stored. Keep the last 300 records.
-- The result screen becomes the day summary: per thing where it ended the day (home or not), the steps spent searching today, and "With everything on its home spot: N steps". One line of advice, chosen by a table (all home / some away / mostly away).
-- First tests: a thing found on its home spot in the same room records 1 step and 1 possible; searching three spots first records 4; the summary's "possible" is the sum of the shortest ways; a day with nothing searched says so instead of showing zeros.
-
-## Story 4: progress in the player's own numbers
-
-- A "My progress" choice on the welcome screen: average extra steps from the home spot against from anywhere else (only shown once both have at least 3 finds, otherwise "Play a few days first"), share of things put on their home spot per day for the last 7 days, streak per thing.
-- First tests: the two averages come from the right records; with too few records the comparison is withheld; a thing with a broken streak shows 0.
-
-## Story 5: first use and explanation
-
-- First start (no save): three screens, each one command and Next: why things get lost (you put them down without noticing), the idea (one fixed place per thing), how the game works (days, steps, your own places). Then choosing things and home spots, then day 1.
-- "How it works" on the welcome screen repeats them. "Start again" with a confirm step erases the save.
-- Choose which things to train: 3 to 6 from this list (user decision 2026-11-16), each with its use table: keys, wallet, phone, glasses, scissors, remote control, charger, headphones, umbrella, bag, cymbal bag, drumsticks, gate key, car papers, driver's licence, bank card. The list is shown in groups (every day, cards and papers, music, around the house) so one screen stays short. The save stores the chosen ids; an unknown id is dropped on load.
-- First tests: a new player gets the introduction and a returning player does not; choosing fewer than 3 things keeps Next disabled; a day only has events for chosen things; erasing brings back the introduction.
-
-## Story 6: the bridge to real life
-
-- After choosing home spots, one if-then card per thing as a step: "When I come home, my keys go on the key hook in the hallway." with the question "Where is that in your own home?" (optional short text, stored, shown on the card later). This needs a text field as a second kind of step in `screens.js`; keep it one field.
-- Once per real day (a `Clock` port gives the date), before the day starts: "In real life, where are your keys right now?" with "On their home spot", "Somewhere else", "I do not know". One thing per day, in turn. The answers are recorded and shown in My progress as the real-life streak.
-- First tests: the question comes once per date and not again the same date; it rotates through the chosen things; "I do not know" breaks the real-life streak; the text of a card is kept after a reload; a damaged text (not a string, too long) is dropped.
-
-## Story 7: putting things back (the rescue habit)
-
-- Sometimes a day has a quiet moment: "You have five minutes. Is anything not on its home spot?" with "Tidy up" (fetch a thing and bring it home, at normal step cost) and "Leave it".
-- After putting a thing somewhere else than home, one line: "Say it out loud: phone, garden table." (noticing the moment you put something down is what makes a stray place findable).
-- First tests: the quiet moment only appears when something is away from home; tidying moves the thing and counts as a home placement for the streak; leaving it changes nothing.
-
-## Story 8: hand-over
-
-- Look at every screen on a phone width in light and dark, fix wording and spacing; a short `user-manual.md`; README updated.
-- Mirror to my-wiki on the side branch, then ask the user for the go-ahead for `main`.
-- The user plays three days on a real phone; their findings become the next stories.
+| Story | What it adds |
+|---|---|
+| 0 | Refactor: one flow contract, golden test, small encapsulation fixes |
+| 0b | All texts in one module per language, injected (English only) |
+| 1 | The world can be saved and restored; save format version 2 |
+| 2 | Days made of events: things are used, put away, needed again; steps; hurry |
+| 3 | What a find cost, and the day summary. **Then the user plays.** |
+| 4 | My progress |
+| 5 | Introduction, choosing things, suggested home spots, start again |
+| 6 | If-then cards and the daily real-life question |
+| 7 | Quiet moments to tidy up; saying a stray place out loud |
+| 8 | Hand-over |
 
 ## Later, not part of "usable"
 
 Away from home (friend, library, the carry-along rule), a flat floor plan, a 3D view, sound. They stay in `todo.md`.
 
-## Open questions for the user (defaults are used until answered)
+## Answered by the user (2026-11-16)
 
-Answered 2026-11-16: English for now with the code prepared for more languages (story 0b); the list of things is in story 5.
-
-1. Two names were dictated and are interpreted: "symbols, bag" as a drummer's cymbal bag, "port opening key" as the key or remote that opens the gate ("gate key"). Correct them if they are wrong.
-2. The stories are outlines with their first tests, not yet worked out in detail (exact wording of every screen, the full use table per thing, the layout of the progress screen). Each story is detailed just before it is built, and shown to the user first.
+English for now, with the code prepared for more languages (story 0b). The list of things has sixteen entries, including cymbal bag, drumsticks, gate key, car papers, driver's licence and bank card. The stories are detailed by the planning model and built by an implementing agent.
