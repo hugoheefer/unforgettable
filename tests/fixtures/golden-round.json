@@ -1,0 +1,651 @@
+[
+  {
+    "lead": [],
+    "command": "Unforgettable. Learn to always put your things in the same place.",
+    "choices": [
+      {
+        "id": "play",
+        "label": "Start playing"
+      },
+      {
+        "id": "setup",
+        "label": "Choose my home spots"
+      }
+    ],
+    "selected": null
+  },
+  {
+    "lead": [
+      "⏱ Your phone is ringing! 3 moves left.",
+      "Your plan: Key hook (Hallway)"
+    ],
+    "command": "You are in the Hallway. Where do you put your 🔑 keys?",
+    "choices": [
+      {
+        "id": "spots",
+        "label": "Put it in this room (Hallway)"
+      },
+      {
+        "id": "pockets",
+        "label": "Put it in a pocket"
+      },
+      {
+        "id": "doors",
+        "label": "Walk to another room"
+      },
+      {
+        "id": "hang:coat",
+        "label": "Take off my coat"
+      }
+    ],
+    "selected": null
+  },
+  {
+    "lead": [
+      "⏱ Your phone is ringing! 3 moves left.",
+      "Your plan: Key hook (Hallway)"
+    ],
+    "command": "Where do you hang your coat?",
+    "choices": [
+      {
+        "id": "spot:hook",
+        "label": "🪝 Key hook",
+        "mark": "★"
+      },
+      {
+        "id": "spot:coat-hooks",
+        "label": "🧥 Coat hooks"
+      },
+      {
+        "id": "spot:console",
+        "label": "🪑 Console table"
+      },
+      {
+        "id": "spot:shoes",
+        "label": "👟 Shoe rack"
+      },
+      {
+        "id": "spot:umbrella",
+        "label": "☂️ Umbrella stand"
+      },
+      {
+        "id": "back",
+        "label": "↩ Choose something else"
+      }
+    ],
+    "selected": null
+  },
+  {
+    "lead": [
+      "You hung your coat on the Coat hooks.",
+      "⏱ Your phone is ringing! 2 moves left.",
+      "Your plan: Key hook (Hallway)"
+    ],
+    "command": "You are in the Hallway. Where do you put your 🔑 keys?",
+    "choices": [
+      {
+        "id": "spots",
+        "label": "Put it in this room (Hallway)"
+      },
+      {
+        "id": "pockets",
+        "label": "Put it in a pocket"
+      },
+      {
+        "id": "doors",
+        "label": "Walk to another room"
+      },
+      {
+        "id": "puton:coat",
+        "label": "Put my coat on"
+      }
+    ],
+    "selected": null
+  },
+  {
+    "lead": [
+      "⏱ Your phone is ringing! 2 moves left.",
+      "Your plan: Key hook (Hallway)"
+    ],
+    "command": "Which pocket?",
+    "choices": [
+      {
+        "id": "pocket:trousers/trousers-front-left",
+        "label": "🫳 Front pocket, left (Trousers)"
+      },
+      {
+        "id": "pocket:trousers/trousers-front-right",
+        "label": "🫴 Front pocket, right (Trousers)"
+      },
+      {
+        "id": "pocket:trousers/trousers-back",
+        "label": "🍑 Back pocket (Trousers)"
+      },
+      {
+        "id": "pocket:coat/coat-left",
+        "label": "🫳 Left pocket (Coat, hangs here)"
+      },
+      {
+        "id": "pocket:coat/coat-right",
+        "label": "🫴 Right pocket (Coat, hangs here)"
+      },
+      {
+        "id": "pocket:coat/coat-inside",
+        "label": "🧷 Inside pocket (Coat, hangs here)"
+      },
+      {
+        "id": "back",
+        "label": "↩ Choose something else"
+      }
+    ],
+    "selected": null
+  },
+  {
+    "lead": [
+      "You left your 🔑 keys here: Right pocket (Coat). Your plan was: Key hook (Hallway).",
+      "⏱ Your phone is ringing! 3 moves left.",
+      "Your plan: Inside pocket (Coat)"
+    ],
+    "command": "You are in the Hallway. Where do you put your 👛 wallet?",
+    "choices": [
+      {
+        "id": "spots",
+        "label": "Put it in this room (Hallway)"
+      },
+      {
+        "id": "pockets",
+        "label": "Put it in a pocket"
+      },
+      {
+        "id": "doors",
+        "label": "Walk to another room"
+      },
+      {
+        "id": "puton:coat",
+        "label": "Put my coat on"
+      }
+    ],
+    "selected": null
+  },
+  {
+    "lead": [
+      "⏱ Your phone is ringing! 3 moves left.",
+      "Your plan: Inside pocket (Coat)"
+    ],
+    "command": "Which spot in the Hallway?",
+    "choices": [
+      {
+        "id": "spot:hook",
+        "label": "🪝 Key hook"
+      },
+      {
+        "id": "spot:coat-hooks",
+        "label": "🧥 Coat hooks"
+      },
+      {
+        "id": "spot:console",
+        "label": "🪑 Console table"
+      },
+      {
+        "id": "spot:shoes",
+        "label": "👟 Shoe rack"
+      },
+      {
+        "id": "spot:umbrella",
+        "label": "☂️ Umbrella stand"
+      },
+      {
+        "id": "back",
+        "label": "↩ Choose something else"
+      }
+    ],
+    "selected": null
+  },
+  {
+    "lead": [
+      "You left your 👛 wallet here: Shoe rack (Hallway). Your plan was: Inside pocket (Coat).",
+      "⏱ Your phone is ringing! 3 moves left.",
+      "Your plan: Counter (Kitchen)"
+    ],
+    "command": "You are in the Hallway. Where do you put your 📱 phone?",
+    "choices": [
+      {
+        "id": "spots",
+        "label": "Put it in this room (Hallway)"
+      },
+      {
+        "id": "pockets",
+        "label": "Put it in a pocket"
+      },
+      {
+        "id": "doors",
+        "label": "Walk to another room"
+      },
+      {
+        "id": "puton:coat",
+        "label": "Put my coat on"
+      }
+    ],
+    "selected": null
+  },
+  {
+    "lead": [
+      "⏱ Your phone is ringing! 3 moves left.",
+      "Your plan: Counter (Kitchen)"
+    ],
+    "command": "Where do you walk to?",
+    "choices": [
+      {
+        "id": "door:living",
+        "label": "🛋️ Living room"
+      },
+      {
+        "id": "door:kitchen",
+        "label": "🍳 Kitchen"
+      },
+      {
+        "id": "door:toilet",
+        "label": "🚽 Toilet"
+      },
+      {
+        "id": "door:landing",
+        "label": "🪜 Landing"
+      },
+      {
+        "id": "door:garden",
+        "label": "🌳 Garden"
+      },
+      {
+        "id": "back",
+        "label": "↩ Choose something else"
+      }
+    ],
+    "selected": null
+  },
+  {
+    "lead": [
+      "⏱ Your phone is ringing! 2 moves left.",
+      "Your plan: Counter (Kitchen)"
+    ],
+    "command": "You are in the Kitchen. Where do you put your 📱 phone?",
+    "choices": [
+      {
+        "id": "spots",
+        "label": "Put it in this room (Kitchen)"
+      },
+      {
+        "id": "pockets",
+        "label": "Put it in a pocket"
+      },
+      {
+        "id": "doors",
+        "label": "Walk to another room"
+      }
+    ],
+    "selected": null
+  },
+  {
+    "lead": [
+      "⏱ Your phone is ringing! 2 moves left.",
+      "Your plan: Counter (Kitchen)"
+    ],
+    "command": "Which spot in the Kitchen?",
+    "choices": [
+      {
+        "id": "spot:counter",
+        "label": "🔪 Counter",
+        "mark": "★"
+      },
+      {
+        "id": "spot:drawer",
+        "label": "🗃️ Kitchen drawer"
+      },
+      {
+        "id": "spot:fruit-bowl",
+        "label": "🍎 Fruit bowl"
+      },
+      {
+        "id": "spot:fridge-top",
+        "label": "🧊 Fridge top"
+      },
+      {
+        "id": "spot:sink",
+        "label": "🚰 Sink"
+      },
+      {
+        "id": "back",
+        "label": "↩ Choose something else"
+      }
+    ],
+    "selected": null
+  },
+  {
+    "lead": [
+      "✔ Your 📱 phone is on its home spot.",
+      "⏱ Your phone is ringing! 3 moves left.",
+      "Your plan: Desk drawer (Study)"
+    ],
+    "command": "You are in the Kitchen. Where do you put your ✂️ scissors?",
+    "choices": [
+      {
+        "id": "spots",
+        "label": "Put it in this room (Kitchen)"
+      },
+      {
+        "id": "pockets",
+        "label": "Put it in a pocket"
+      },
+      {
+        "id": "doors",
+        "label": "Walk to another room"
+      }
+    ],
+    "selected": null
+  },
+  {
+    "lead": [
+      "⏱ Your phone is ringing! 3 moves left.",
+      "Your plan: Desk drawer (Study)"
+    ],
+    "command": "Which pocket?",
+    "choices": [
+      {
+        "id": "pocket:trousers/trousers-front-left",
+        "label": "🫳 Front pocket, left (Trousers)"
+      },
+      {
+        "id": "pocket:trousers/trousers-front-right",
+        "label": "🫴 Front pocket, right (Trousers)"
+      },
+      {
+        "id": "pocket:trousers/trousers-back",
+        "label": "🍑 Back pocket (Trousers)"
+      },
+      {
+        "id": "back",
+        "label": "↩ Choose something else"
+      }
+    ],
+    "selected": null
+  },
+  {
+    "lead": [
+      "You left your ✂️ scissors here: Back pocket (Trousers). Your plan was: Desk drawer (Study)."
+    ],
+    "command": "The neighbour wants to chat. Time passes...",
+    "choices": [],
+    "selected": null
+  },
+  {
+    "lead": [],
+    "command": "You start the car: find your keys! You are in the Hallway.",
+    "choices": [
+      {
+        "id": "spots",
+        "label": "Look at a spot in this room (Hallway)"
+      },
+      {
+        "id": "pockets",
+        "label": "Look in a pocket"
+      },
+      {
+        "id": "doors",
+        "label": "Walk to another room"
+      }
+    ],
+    "selected": null
+  },
+  {
+    "lead": [],
+    "command": "Which pocket do you look in?",
+    "choices": [
+      {
+        "id": "pocket:trousers/trousers-front-left",
+        "label": "🫳 Front pocket, left (Trousers)"
+      },
+      {
+        "id": "pocket:trousers/trousers-front-right",
+        "label": "🫴 Front pocket, right (Trousers)"
+      },
+      {
+        "id": "pocket:trousers/trousers-back",
+        "label": "🍑 Back pocket (Trousers)"
+      },
+      {
+        "id": "pocket:coat/coat-left",
+        "label": "🫳 Left pocket (Coat, hangs here)"
+      },
+      {
+        "id": "pocket:coat/coat-right",
+        "label": "🫴 Right pocket (Coat, hangs here)"
+      },
+      {
+        "id": "pocket:coat/coat-inside",
+        "label": "🧷 Inside pocket (Coat, hangs here)"
+      },
+      {
+        "id": "back",
+        "label": "↩ Choose something else"
+      }
+    ],
+    "selected": null
+  },
+  {
+    "lead": [
+      "Found your 🔑 keys! It took 1 move."
+    ],
+    "command": "You are at the till: find your wallet! You are in the Hallway.",
+    "choices": [
+      {
+        "id": "spots",
+        "label": "Look at a spot in this room (Hallway)"
+      },
+      {
+        "id": "pockets",
+        "label": "Look in a pocket"
+      },
+      {
+        "id": "doors",
+        "label": "Walk to another room"
+      }
+    ],
+    "selected": null
+  },
+  {
+    "lead": [],
+    "command": "Which spot do you look at in the Hallway?",
+    "choices": [
+      {
+        "id": "spot:hook",
+        "label": "🪝 Key hook"
+      },
+      {
+        "id": "spot:coat-hooks",
+        "label": "🧥 Coat hooks"
+      },
+      {
+        "id": "spot:console",
+        "label": "🪑 Console table"
+      },
+      {
+        "id": "spot:shoes",
+        "label": "👟 Shoe rack"
+      },
+      {
+        "id": "spot:umbrella",
+        "label": "☂️ Umbrella stand"
+      },
+      {
+        "id": "back",
+        "label": "↩ Choose something else"
+      }
+    ],
+    "selected": null
+  },
+  {
+    "lead": [
+      "Found your 👛 wallet! It took 1 move."
+    ],
+    "command": "Someone is calling: find your phone! You are in the Hallway.",
+    "choices": [
+      {
+        "id": "spots",
+        "label": "Look at a spot in this room (Hallway)"
+      },
+      {
+        "id": "pockets",
+        "label": "Look in a pocket"
+      },
+      {
+        "id": "doors",
+        "label": "Walk to another room"
+      }
+    ],
+    "selected": null
+  },
+  {
+    "lead": [],
+    "command": "Where do you walk to?",
+    "choices": [
+      {
+        "id": "door:living",
+        "label": "🛋️ Living room"
+      },
+      {
+        "id": "door:kitchen",
+        "label": "🍳 Kitchen"
+      },
+      {
+        "id": "door:toilet",
+        "label": "🚽 Toilet"
+      },
+      {
+        "id": "door:landing",
+        "label": "🪜 Landing"
+      },
+      {
+        "id": "door:garden",
+        "label": "🌳 Garden"
+      },
+      {
+        "id": "back",
+        "label": "↩ Choose something else"
+      }
+    ],
+    "selected": null
+  },
+  {
+    "lead": [],
+    "command": "Someone is calling: find your phone! You are in the Kitchen.",
+    "choices": [
+      {
+        "id": "spots",
+        "label": "Look at a spot in this room (Kitchen)"
+      },
+      {
+        "id": "pockets",
+        "label": "Look in a pocket"
+      },
+      {
+        "id": "doors",
+        "label": "Walk to another room"
+      }
+    ],
+    "selected": null
+  },
+  {
+    "lead": [],
+    "command": "Which spot do you look at in the Kitchen?",
+    "choices": [
+      {
+        "id": "spot:counter",
+        "label": "🔪 Counter"
+      },
+      {
+        "id": "spot:drawer",
+        "label": "🗃️ Kitchen drawer"
+      },
+      {
+        "id": "spot:fruit-bowl",
+        "label": "🍎 Fruit bowl"
+      },
+      {
+        "id": "spot:fridge-top",
+        "label": "🧊 Fridge top"
+      },
+      {
+        "id": "spot:sink",
+        "label": "🚰 Sink"
+      },
+      {
+        "id": "back",
+        "label": "↩ Choose something else"
+      }
+    ],
+    "selected": null
+  },
+  {
+    "lead": [
+      "Found your 📱 phone! It took 2 moves."
+    ],
+    "command": "A parcel needs opening: find your scissors! You are in the Kitchen.",
+    "choices": [
+      {
+        "id": "spots",
+        "label": "Look at a spot in this room (Kitchen)"
+      },
+      {
+        "id": "pockets",
+        "label": "Look in a pocket"
+      },
+      {
+        "id": "doors",
+        "label": "Walk to another room"
+      }
+    ],
+    "selected": null
+  },
+  {
+    "lead": [],
+    "command": "Which pocket do you look in?",
+    "choices": [
+      {
+        "id": "pocket:trousers/trousers-front-left",
+        "label": "🫳 Front pocket, left (Trousers)"
+      },
+      {
+        "id": "pocket:trousers/trousers-front-right",
+        "label": "🫴 Front pocket, right (Trousers)"
+      },
+      {
+        "id": "pocket:trousers/trousers-back",
+        "label": "🍑 Back pocket (Trousers)"
+      },
+      {
+        "id": "back",
+        "label": "↩ Choose something else"
+      }
+    ],
+    "selected": null
+  },
+  {
+    "lead": [
+      "🔑 keys: put away from its home spot; found with 1 moves.",
+      "👛 wallet: put away from its home spot; found with 1 moves.",
+      "📱 phone: put on its home spot; found with 2 moves.",
+      "✂️ scissors: put away from its home spot; found with 1 moves."
+    ],
+    "command": "Round finished. Score: 45",
+    "choices": [
+      {
+        "id": "again",
+        "label": "Play again"
+      },
+      {
+        "id": "setup",
+        "label": "Choose my home spots"
+      }
+    ],
+    "selected": null
+  }
+]
