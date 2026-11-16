@@ -116,6 +116,48 @@ export const en = {
     'spot-not-here': 'That spot is not in this room',
     'garment-not-here': 'That garment is not in this room',
     'out-of-reach': 'That pocket is out of reach',
+    'too-far-in-a-hurry': 'No time to walk that far.',
+    'nothing-in-hand': 'You have nothing to put away now.',
+    'nothing-to-find': 'You are not looking for anything now.',
+    'not-now': 'That cannot be done now.',
+    'already-here': 'You are already there.',
+  },
+
+  // What the day tells around its events: a pause, the arrival after a move, and why you are in a hurry.
+  pauses: {
+    day: ({ number }) => `Day ${number}.`,
+    outForTheDay: () => 'You are out for the day.',
+  },
+  arrivals: {
+    arrive: 'You come home.',
+    morning: ({ room }) => `Morning. You are ${room.in} and about to leave.`,
+  },
+  hurryReasons: {
+    doorbell: 'The doorbell rings.',
+    pan: 'The pan is boiling over.',
+    phone: 'Your phone rings in another room.',
+    toilet: 'You badly need the toilet.',
+  },
+  // Per thing and use: `need` is the line before "Find ...", `after` the line after the move to the use room.
+  uses: {
+    keys: {
+      shed: { need: 'You need the spade and the shed is locked.', after: 'The shed is open. You have the spade.' },
+      car: { need: 'You left the shopping in the car.', after: 'You are at the car with the shopping.' },
+    },
+    wallet: {
+      door: { need: 'The pizza is at the door.', after: 'You paid at the front door.' },
+      order: { need: 'You are ordering a book online.', after: 'The order is placed. You are at your desk.' },
+    },
+    phone: {
+      call: { need: 'Your phone rings.', after: 'You walked around while talking. The call is over.' },
+      alarm: { need: 'You want to set the alarm for tomorrow.', after: 'The alarm is set.' },
+      recipe: { need: 'You want to look up a recipe.', after: 'Dinner is on the stove.' },
+    },
+    scissors: {
+      present: { need: 'A present needs wrapping.', after: 'The present is wrapped.' },
+      flowers: { need: 'You want to cut some flowers.', after: 'The flowers are cut.' },
+      package: { need: 'A package will not open.', after: 'The package is open.' },
+    },
   },
 
   next: 'Next',

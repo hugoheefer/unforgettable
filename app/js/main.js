@@ -1,6 +1,7 @@
 // Entry point: connects the app flow to the page. All rules live in the other modules.
 
-import { LAYOUT, ITEMS, DEFAULT_PLAN } from './layout.js';
+import { LAYOUT } from './layout.js';
+import { THINGS as ITEMS, defaultPlan } from './things.js';
 import { World } from './world.js';
 import { Round } from './round.js';
 import { AppFlow } from './app-flow.js';
@@ -12,7 +13,7 @@ import { textsFor } from './texts.js';
 const app = document.getElementById('app');
 const world = new World(LAYOUT);
 const store = createSaveStore(() => window.localStorage, {
-  defaults: { plan: DEFAULT_PLAN, progress: { streaks: {} }, things: ITEMS.map((item) => item.id) },
+  defaults: { plan: defaultPlan(), progress: { streaks: {} }, things: ITEMS.map((item) => item.id) },
   world: { hasLocation: (location) => world.hasLocation(location), restore: (snapshot) => World.restore(LAYOUT, snapshot) },
 });
 

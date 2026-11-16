@@ -42,17 +42,3 @@ export const LAYOUT = Object.freeze({
       pockets: [spot('trousers-front-left', '🫳'), spot('trousers-front-right', '🫴'), spot('trousers-back', '🍑')] },
   ],
 });
-
-export const ITEMS = Object.freeze([
-  { id: 'keys', icon: '🔑' },
-  { id: 'wallet', icon: '👛' },
-  { id: 'phone', icon: '📱' },
-  { id: 'scissors', icon: '✂️' },
-]);
-
-export const DEFAULT_PLAN = Object.freeze({
-  keys: { placeId: 'hall', spotId: 'hook' },
-  wallet: { garmentId: 'coat', pocketId: 'coat-inside' },
-  phone: { placeId: 'kitchen', spotId: 'counter' },
-  scissors: { placeId: 'study', spotId: 'desk-drawer' },
-});

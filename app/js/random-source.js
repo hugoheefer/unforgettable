@@ -3,6 +3,7 @@
 /** @param {() => number} next a number generator giving values in [0, 1) */
 export function createRandomSource(next = Math.random) {
   return {
+    chance: (probability) => next() < probability,
     pick: (list) => list[Math.floor(next() * list.length)],
     shuffle(list) {
       const copy = [...list];

@@ -3,8 +3,10 @@
 
 import { AppFlow } from '../app/js/app-flow.js';
 import { Round } from '../app/js/round.js';
-import { LAYOUT, ITEMS, DEFAULT_PLAN } from '../app/js/layout.js';
+import { LAYOUT } from '../app/js/layout.js';
+import { THINGS as ITEMS, defaultPlan } from '../app/js/things.js';
 import { TEXTS } from './texts-helper.mjs';
+const DEFAULT_PLAN = defaultPlan();
 
 const firstChoice = { pick: (list) => list[0], shuffle: (list) => [...list] };
 

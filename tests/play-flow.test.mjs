@@ -2,10 +2,12 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { Round } from '../app/js/round.js';
 import { PlayFlow } from '../app/js/play-flow.js';
-import { LAYOUT, ITEMS, DEFAULT_PLAN } from '../app/js/layout.js';
+import { LAYOUT } from '../app/js/layout.js';
+import { THINGS as ITEMS, defaultPlan } from '../app/js/things.js';
 import { checkFlowContract } from './flow-contract.mjs';
 import { TEXTS } from './texts-helper.mjs';
 import { RefusedMove } from '../app/js/errors.js';
+const DEFAULT_PLAN = defaultPlan();
 
 const firstChoice = { pick: (list) => list[0], shuffle: (list) => [...list] };
 const newFlow = (streaks = {}, options = {}) =>

@@ -1,9 +1,11 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { SetupFlow } from '../app/js/setup-flow.js';
-import { LAYOUT, ITEMS, DEFAULT_PLAN } from '../app/js/layout.js';
+import { LAYOUT } from '../app/js/layout.js';
+import { THINGS as ITEMS, defaultPlan } from '../app/js/things.js';
 import { checkFlowContract } from './flow-contract.mjs';
 import { TEXTS } from './texts-helper.mjs';
+const DEFAULT_PLAN = defaultPlan();
 
 const newFlow = () => new SetupFlow({ layout: LAYOUT, items: ITEMS, plan: DEFAULT_PLAN, texts: TEXTS });
 const ids = (step) => step.choices.map((choice) => choice.id);

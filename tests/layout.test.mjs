@@ -1,7 +1,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { LAYOUT, ITEMS, DEFAULT_PLAN } from '../app/js/layout.js';
+import { LAYOUT } from '../app/js/layout.js';
+import { THINGS as ITEMS, defaultPlan } from '../app/js/things.js';
 import { World } from '../app/js/world.js';
+const DEFAULT_PLAN = defaultPlan();
 
 const ids = (list) => list.map((entry) => entry.id);
 
