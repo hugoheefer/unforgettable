@@ -38,7 +38,7 @@ Every screen is now one command plus its choices and a Next button (see CLAUDE.m
 
 ## Next
 
-The decided plan to a usable version is in `plan.md` (2026-11-16): story 0 refactor, 1 the world persists, 2 days made of events, 3 find cost and day summary, 4 progress, 5 first use and choosing things, 6 bridge to real life, 7 putting things back, 8 hand-over. Build them in that order; move each to "Done" here when it is finished.
+The decided plan to a usable version is in `plan.md` (2026-11-16): story 0 refactor, 0b texts ready for a second language, 1 the world persists, 2 days made of events, 3 find cost and day summary, 4 progress, 5 first use and choosing things, 6 bridge to real life, 7 putting things back, 8 hand-over. Build them in that order; move each to "Done" here when it is finished.
 
 Later: away from home (friend, library, carry-along rule), flat floor plan, 3D view, sound.
 

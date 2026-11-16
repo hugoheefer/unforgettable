@@ -42,6 +42,15 @@ The next stories build on these seams.
 - `play-flow.js` says "You put your coat on" for any garment: use the garment's name.
 - Golden test before touching it: one scripted round through `AppFlow` whose list of `step()` values is compared before and after.
 
+## Story 0b: texts ready for a second language (English only for now)
+
+User decision 2026-11-16: the screens stay English, but adding Dutch later must be easy; the language choice itself is not built yet.
+- All text the player reads moves out of the logic into one module per language: `app/js/texts/en.js` exports one object with every sentence as a string or a small function of its values (`putAwayQuestion: ({ room, item }) => ...`), including the names of rooms, spots, pockets, garments and things, keyed by their id. `layout.js` keeps ids, icons and structure only.
+- `texts.js` holds the list of languages (a table: code, name, module) and `textsFor(code)`, which falls back to English for an unknown code. The flows get the texts object injected; no module imports `en.js` directly except `texts.js`.
+- Adding Dutch later is then: copy `en.js` to `nl.js`, translate, add one row to the table, and add the choice to the welcome screen. Nothing else changes.
+- First tests: every flow still produces the same English screens (the golden test of story 0); a contract test that will hold for any language: every key of `en.js` exists in each listed language with the same kind (string or function), and every room, spot, pocket, garment and thing id in `layout.js` has a name; `textsFor('xx')` gives English.
+- Mutation check: remove one name from `en.js`; the contract test must name the missing id.
+
 ## Story 1: the world persists
 
 - `World.snapshot()` returns plain data (item locations, garment places); `World.restore(layout, snapshot)` rebuilds it. Unknown items, spots or garments in a snapshot are dropped (stale save), never a crash.
@@ -75,7 +84,7 @@ Evolve `round.js` into `day.js`; most rules stay (reach of pockets, take off, pu
 
 - First start (no save): three screens, each one command and Next: why things get lost (you put them down without noticing), the idea (one fixed place per thing), how the game works (days, steps, your own places). Then choosing things and home spots, then day 1.
 - "How it works" on the welcome screen repeats them. "Start again" with a confirm step erases the save.
-- Choose which things to train: 3 to 6 from a list of about ten (keys, wallet, phone, glasses, scissors, remote control, charger, headphones, umbrella, bag), each with its use table. The save stores the chosen ids; an unknown id is dropped on load.
+- Choose which things to train: 3 to 6 from this list (user decision 2026-11-16), each with its use table: keys, wallet, phone, glasses, scissors, remote control, charger, headphones, umbrella, bag, cymbal bag, drumsticks, gate key, car papers, driver's licence, bank card. The list is shown in groups (every day, cards and papers, music, around the house) so one screen stays short. The save stores the chosen ids; an unknown id is dropped on load.
 - First tests: a new player gets the introduction and a returning player does not; choosing fewer than 3 things keeps Next disabled; a day only has events for chosen things; erasing brings back the introduction.
 
 ## Story 6: the bridge to real life
@@ -102,5 +111,7 @@ Away from home (friend, library, the carry-along rule), a flat floor plan, a 3D 
 
 ## Open questions for the user (defaults are used until answered)
 
-1. Language: the screens are English. If the person who gets the app reads Dutch more easily, say so before story 5 (all texts are in tables by then, so it is one file).
-2. Are the ten things in story 5 the right ones for that person?
+Answered 2026-11-16: English for now with the code prepared for more languages (story 0b); the list of things is in story 5.
+
+1. Two names were dictated and are interpreted: "symbols, bag" as a drummer's cymbal bag, "port opening key" as the key or remote that opens the gate ("gate key"). Correct them if they are wrong.
+2. The stories are outlines with their first tests, not yet worked out in detail (exact wording of every screen, the full use table per thing, the layout of the progress screen). Each story is detailed just before it is built, and shown to the user first.
