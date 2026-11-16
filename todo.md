@@ -24,6 +24,18 @@ Built in one go: steps 0 to 7 in a first form. `app/` runs as a static page; set
 
 Feedback: not always clear what to do; rooms and clothes were mixed. Now: a blue instruction line says what to do and each tile says "Put here" or "Look here"; the house has all common rooms (hall, living, dining, kitchen, toilet, landing, bedroom, bathroom, study, garage, garden, shed, car) with 3 to 5 places each; the player wears a coat and trousers with pockets (shown apart as "You wear"); the coat can be taken off and hung anywhere in the room you stand in (costs a move), and then its pockets are only within reach in that room; scissors added. 100 unit tests.
 
+## Third version (2026-11-16, after the second try)
+
+Every screen is now one command plus its choices and a Next button (see CLAUDE.md). Welcome, choosing home spots (area, then place), the round (a question per action, the distraction screen, the search) and the result are all steps from `app-flow.js`. 134 unit tests.
+
+## Roadmap (advice, in order of value for the goal: a real habit)
+
+1. **Real-life bridge**: a daily check-in "Did you put your keys on their home spot today?" plus an if-then card per item ("When I come home, my keys go on the hook"). This trains the real habit, which the game alone cannot.
+2. **Progress**: streak and share of home placements per item over time; one short round a day.
+3. **Make it personal**: choose which things to train and name your own places (your real hook, your real drawer).
+4. **More situations**: friend's house, parents, library, car trip; pressure that depends on time, not only on moves.
+5. **Visual mode**: first a flat floor plan (SVG), later an optional 3D wireframe view as another renderer on the same round engine (see the advice given on 2026-11-16: the command-and-choices mode stays the base).
+
 ## Next (in order; each step: tests red first, then code, then you review)
 
 0. **Project setup**: `package.json` (`type: module`, `test` script), `app/index.html` + `app/css/` + `app/js/main.js` with relative links, a first `tests/*.test.mjs` run with `node --test`, README; smoke check that `app/index.html` loads in Playwright.

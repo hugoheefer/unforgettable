@@ -15,7 +15,7 @@ function describeInstruction(round) {
 }
 
 /** The place and garment names for the hint "Your plan: Inside pocket (Coat)". */
-function describeHome(round, location) {
+export function describeLocation(round, location) {
   if (isPocket(location)) {
     const garment = round.garmentOf(location.garmentId);
     return `${garment.pockets.find((pocket) => pocket.id === location.pocketId).name} (${garment.name})`;
@@ -64,7 +64,7 @@ export function describeRoom(round) {
       const exit = round.roomOf(id);
       return { id: exit.id, name: exit.name, icon: exit.icon };
     }),
-    hintText: level === 'shown' ? `Your plan: ${describeHome(round, home.location)}` : '',
+    hintText: level === 'shown' ? `Your plan: ${describeLocation(round, home.location)}` : '',
     instruction: describeInstruction(round),
     verb: dropping ? 'Put here' : 'Look here',
   };

@@ -27,6 +27,8 @@ My general working rules are in my private repo [hugoheefer/claude-config](https
 
 ## Design decisions (with the reason)
 
+- **One command and its choices per screen, then Next** (user decision 2026-11-16, after trying the second version: "too much information on one screen, it is not clear what to do"). Every screen is a `Step` (`lead`, `command`, `choices`, `selected`); `play-flow.js`, `setup-flow.js` and `app-flow.js` produce the steps, `screens.js` draws any step the same way. A choice only selects; the action happens on Next. Short feedback (what happened, moves left, the plan) goes in the small `lead` lines above the command, never in separate panels. The result screen is the one place that lists several lines, because that is the feedback the player learns from.
+
 - **Core logic has no DOM, no `Date.now()`, no `Math.random()`**: time, randomness and storage come in through ports, so every scenario is a deterministic unit test.
 - **Wrong places are cheap and tempting on purpose.** Research on habit cues shows people pick the cue that costs the least effort, so the nearest place must be the easy one and the home spot the one that costs an extra step.
 - **Hints fade.** Reminders that never go away can stop a habit from forming, so the home-spot highlight goes from shown, to dimmed, to hidden as the streak per item grows.
