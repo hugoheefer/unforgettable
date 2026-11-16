@@ -19,15 +19,15 @@
       "⏱ Your phone is ringing! 3 moves left.",
       "Your plan: Key hook (Hallway)"
     ],
-    "command": "You are in the Hallway. Where do you put your 🔑 keys?",
+    "command": "You are in the hallway. Where do you put your 🔑 keys?",
     "choices": [
       {
         "id": "spots",
-        "label": "Put it in this room (Hallway)"
+        "label": "Here, in the hallway"
       },
       {
         "id": "pockets",
-        "label": "Put it in a pocket"
+        "label": "In a pocket"
       },
       {
         "id": "doors",
@@ -77,19 +77,19 @@
   },
   {
     "lead": [
-      "You hung your coat on the Coat hooks.",
+      "You hung your coat on the coat hooks.",
       "⏱ Your phone is ringing! 2 moves left.",
       "Your plan: Key hook (Hallway)"
     ],
-    "command": "You are in the Hallway. Where do you put your 🔑 keys?",
+    "command": "You are in the hallway. Where do you put your 🔑 keys?",
     "choices": [
       {
         "id": "spots",
-        "label": "Put it in this room (Hallway)"
+        "label": "Here, in the hallway"
       },
       {
         "id": "pockets",
-        "label": "Put it in a pocket"
+        "label": "In a pocket"
       },
       {
         "id": "doors",
@@ -146,15 +146,15 @@
       "⏱ Your phone is ringing! 3 moves left.",
       "Your plan: Inside pocket (Coat)"
     ],
-    "command": "You are in the Hallway. Where do you put your 👛 wallet?",
+    "command": "You are in the hallway. Where do you put your 👛 wallet?",
     "choices": [
       {
         "id": "spots",
-        "label": "Put it in this room (Hallway)"
+        "label": "Here, in the hallway"
       },
       {
         "id": "pockets",
-        "label": "Put it in a pocket"
+        "label": "In a pocket"
       },
       {
         "id": "doors",
@@ -172,7 +172,7 @@
       "⏱ Your phone is ringing! 3 moves left.",
       "Your plan: Inside pocket (Coat)"
     ],
-    "command": "Which spot in the Hallway?",
+    "command": "Which spot in the hallway?",
     "choices": [
       {
         "id": "spot:hook",
@@ -207,15 +207,15 @@
       "⏱ Your phone is ringing! 3 moves left.",
       "Your plan: Counter (Kitchen)"
     ],
-    "command": "You are in the Hallway. Where do you put your 📱 phone?",
+    "command": "You are in the hallway. Where do you put your 📱 phone?",
     "choices": [
       {
         "id": "spots",
-        "label": "Put it in this room (Hallway)"
+        "label": "Here, in the hallway"
       },
       {
         "id": "pockets",
-        "label": "Put it in a pocket"
+        "label": "In a pocket"
       },
       {
         "id": "doors",
@@ -267,15 +267,15 @@
       "⏱ Your phone is ringing! 2 moves left.",
       "Your plan: Counter (Kitchen)"
     ],
-    "command": "You are in the Kitchen. Where do you put your 📱 phone?",
+    "command": "You are in the kitchen. Where do you put your 📱 phone?",
     "choices": [
       {
         "id": "spots",
-        "label": "Put it in this room (Kitchen)"
+        "label": "Here, in the kitchen"
       },
       {
         "id": "pockets",
-        "label": "Put it in a pocket"
+        "label": "In a pocket"
       },
       {
         "id": "doors",
@@ -289,7 +289,7 @@
       "⏱ Your phone is ringing! 2 moves left.",
       "Your plan: Counter (Kitchen)"
     ],
-    "command": "Which spot in the Kitchen?",
+    "command": "Which spot in the kitchen?",
     "choices": [
       {
         "id": "spot:counter",
@@ -321,19 +321,19 @@
   },
   {
     "lead": [
-      "✔ Your 📱 phone is on its home spot.",
+      "✔ You put your 📱 phone on the home spot.",
       "⏱ Your phone is ringing! 3 moves left.",
       "Your plan: Desk drawer (Study)"
     ],
-    "command": "You are in the Kitchen. Where do you put your ✂️ scissors?",
+    "command": "You are in the kitchen. Where do you put your ✂️ scissors?",
     "choices": [
       {
         "id": "spots",
-        "label": "Put it in this room (Kitchen)"
+        "label": "Here, in the kitchen"
       },
       {
         "id": "pockets",
-        "label": "Put it in a pocket"
+        "label": "In a pocket"
       },
       {
         "id": "doors",
@@ -378,7 +378,7 @@
   },
   {
     "lead": [],
-    "command": "You start the car: find your keys! You are in the Hallway.",
+    "command": "You start the car: find your keys! You are in the hallway.",
     "choices": [
       {
         "id": "spots",
@@ -434,7 +434,7 @@
     "lead": [
       "Found your 🔑 keys! It took 1 move."
     ],
-    "command": "You are at the till: find your wallet! You are in the Hallway.",
+    "command": "You are at the till: find your wallet! You are in the hallway.",
     "choices": [
       {
         "id": "spots",
@@ -453,7 +453,7 @@
   },
   {
     "lead": [],
-    "command": "Which spot do you look at in the Hallway?",
+    "command": "Which spot do you look at in the hallway?",
     "choices": [
       {
         "id": "spot:hook",
@@ -486,7 +486,7 @@
     "lead": [
       "Found your 👛 wallet! It took 1 move."
     ],
-    "command": "Someone is calling: find your phone! You are in the Hallway.",
+    "command": "Someone is calling: find your phone! You are in the hallway.",
     "choices": [
       {
         "id": "spots",
@@ -536,7 +536,7 @@
   },
   {
     "lead": [],
-    "command": "Someone is calling: find your phone! You are in the Kitchen.",
+    "command": "Someone is calling: find your phone! You are in the kitchen.",
     "choices": [
       {
         "id": "spots",
@@ -555,7 +555,7 @@
   },
   {
     "lead": [],
-    "command": "Which spot do you look at in the Kitchen?",
+    "command": "Which spot do you look at in the kitchen?",
     "choices": [
       {
         "id": "spot:counter",
@@ -588,7 +588,7 @@
     "lead": [
       "Found your 📱 phone! It took 2 moves."
     ],
-    "command": "A parcel needs opening: find your scissors! You are in the Kitchen.",
+    "command": "A parcel needs opening: find your scissors! You are in the kitchen.",
     "choices": [
       {
         "id": "spots",
@@ -630,10 +630,10 @@
   },
   {
     "lead": [
-      "🔑 keys: put away from its home spot; found with 1 moves.",
-      "👛 wallet: put away from its home spot; found with 1 moves.",
-      "📱 phone: put on its home spot; found with 2 moves.",
-      "✂️ scissors: put away from its home spot; found with 1 moves."
+      "🔑 keys: put away from the home spot; found with 1 move.",
+      "👛 wallet: put away from the home spot; found with 1 move.",
+      "📱 phone: put on the home spot; found with 2 moves.",
+      "✂️ scissors: put away from the home spot; found with 1 move."
     ],
     "command": "Round finished. Score: 45",
     "choices": [

@@ -2,48 +2,45 @@
 // plain data that the DOM code only has to draw.
 
 import { isPocket, sameLocation } from './world.js';
+import { named } from './names.js';
 
 const iconOf = (items, itemId) => items.find((item) => item.id === itemId).icon;
 
-function describeInstruction(round) {
+function describeInstruction(round, texts) {
   const state = round.state();
   const item = round.items.find((candidate) => candidate.id === (state.holding ?? state.findItem));
-  const label = `${item.icon} ${item.name}`;
-  return state.phase === 'drop'
-    ? `Put your ${label} down: tap a spot or a pocket, or walk to another room.`
-    : `Find your ${label}: look at a spot or a pocket, or walk to another room.`;
+  const thing = named(texts.things, item);
+  return state.phase === 'drop' ? texts.instructionDrop({ thing }) : texts.instructionFind({ thing });
 }
 
 /** The place and garment names for the hint "Your plan: Inside pocket (Coat)". */
-export function describeLocation(round, location) {
+export function describeLocation(round, location, texts) {
   if (isPocket(location)) {
     const garment = round.garmentOf(location.garmentId);
-    return `${garment.pockets.find((pocket) => pocket.id === location.pocketId).name} (${garment.name})`;
+    const pocket = garment.pockets.find((candidate) => candidate.id === location.pocketId);
+    return texts.locationPocket({ pocket: named(texts.pockets, pocket), garment: named(texts.garments, garment) });
   }
   const place = round.roomOf(location.placeId);
-  return `${place.spots.find((spot) => spot.id === location.spotId).name} (${place.name})`;
+  const spot = place.spots.find((candidate) => candidate.id === location.spotId);
+  return texts.locationSpot({ spot: named(texts.spots, spot), room: named(texts.rooms, place) });
 }
 
-export function describeRoom(round) {
+export function describeRoom(round, texts) {
   const state = round.state();
   const room = round.roomOf(state.roomId);
   const dropping = state.phase === 'drop';
   const home = dropping && state.holding ? { itemId: state.holding, location: round.plan[state.holding] } : null;
   const level = home ? round.hintFor(home.itemId) : 'hidden';
 
-  const tileFor = (entry, location) => ({
-    id: entry.id,
-    name: entry.name,
-    icon: entry.icon,
+  const tileFor = (entry, table, location) => ({
+    ...named(table, entry),
     seen: round.seenAt(location).map((itemId) => iconOf(round.items, itemId)),
     hint: home && sameLocation(home.location, location) ? level : 'hidden',
   });
 
   const garmentView = (garment, extra) => ({
-    id: garment.id,
-    name: garment.name,
-    icon: garment.icon,
-    pockets: garment.pockets.map((pocket) => tileFor(pocket, { garmentId: garment.id, pocketId: pocket.id })),
+    ...named(texts.garments, garment),
+    pockets: garment.pockets.map((pocket) => tileFor(pocket, texts.pockets, { garmentId: garment.id, pocketId: pocket.id })),
     ...extra,
   });
 
@@ -56,16 +53,13 @@ export function describeRoom(round) {
     .map((garment) => garmentView(garment, { canPutOn: true, onSpot: round.world.garmentSpot(garment.id).spotId }));
 
   return {
-    room: { id: room.id, name: room.name, icon: room.icon },
-    spots: room.spots.map((spot) => tileFor(spot, { placeId: room.id, spotId: spot.id })),
+    room: named(texts.rooms, room),
+    spots: room.spots.map((spot) => tileFor(spot, texts.spots, { placeId: room.id, spotId: spot.id })),
     worn,
     hanging,
-    exits: round.world.exitsOf(room.id).map((id) => {
-      const exit = round.roomOf(id);
-      return { id: exit.id, name: exit.name, icon: exit.icon };
-    }),
-    hintText: level === 'shown' ? `Your plan: ${describeLocation(round, home.location)}` : '',
-    instruction: describeInstruction(round),
-    verb: dropping ? 'Put here' : 'Look here',
+    exits: round.world.exitsOf(room.id).map((id) => named(texts.rooms, round.roomOf(id))),
+    hintText: level === 'shown' ? texts.planHint({ location: describeLocation(round, home.location, texts) }) : '',
+    instruction: describeInstruction(round, texts),
+    verb: dropping ? texts.verbDrop : texts.verbFind,
   };
 }

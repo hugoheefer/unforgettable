@@ -4,6 +4,7 @@
 import { AppFlow } from '../app/js/app-flow.js';
 import { Round } from '../app/js/round.js';
 import { LAYOUT, ITEMS, DEFAULT_PLAN } from '../app/js/layout.js';
+import { TEXTS } from './texts-helper.mjs';
 
 const firstChoice = { pick: (list) => list[0], shuffle: (list) => [...list] };
 
@@ -31,7 +32,8 @@ export function playScriptedRound() {
     items: ITEMS,
     plan: DEFAULT_PLAN,
     progress: { streaks: {} },
-    createRound: (plan, progress) => new Round({ layout: LAYOUT, items: ITEMS, plan, random: firstChoice, progress }),
+    texts: TEXTS,
+    createRound: (plan, progress) => new Round({ layout: LAYOUT, items: ITEMS, plan, random: firstChoice, progress, texts: TEXTS }),
     onPlanChange: () => {},
     onProgressChange: () => {},
   });

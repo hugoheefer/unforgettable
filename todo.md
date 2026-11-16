@@ -40,6 +40,10 @@ Every screen is now one command plus its choices and a Next button (see CLAUDE.m
 
 Refactor without behaviour change: a golden test of one whole round, one contract for every flow (`step`, `choose`, `next`, `isFinished`, `onFinished`), no `instanceof` in `app-flow.js`, `World.garmentSpot`, the put-on sentence names the garment. 148 tests.
 
+## Story 0b done (2026-11-16)
+
+All texts and names moved to `app/js/texts/en.js` and injected; `layout.js` holds ids and icons only; refusals have codes. A few sentences changed wording (rooms lowercase inside a sentence, "Here, in the hallway", "1 move"). 170 tests.
+
 ## Next
 
 The decided plan to a usable version is in `plan.md` (2026-11-16): story 0 refactor, 0b texts ready for a second language, 1 the world persists, 2 days made of events, 3 find cost and day summary, 4 progress, 5 first use and choosing things, 6 bridge to real life, 7 putting things back, 8 hand-over. Build them in that order; move each to "Done" here when it is finished.

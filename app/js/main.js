@@ -7,6 +7,7 @@ import { AppFlow } from './app-flow.js';
 import { createSaveStore } from './save-store.js';
 import { createRandomSource } from './random-source.js';
 import { renderStep } from './screens.js';
+import { textsFor } from './texts.js';
 
 const app = document.getElementById('app');
 const world = new World(LAYOUT);
@@ -16,13 +17,15 @@ const store = createSaveStore(() => window.localStorage, {
 });
 
 let save = store.load();
+const texts = textsFor('en');
 
 const flow = new AppFlow({
   layout: LAYOUT,
   items: ITEMS,
   plan: save.plan,
   progress: save.progress,
-  createRound: (plan, progress) => new Round({ layout: LAYOUT, items: ITEMS, plan, random: createRandomSource(), progress }),
+  texts,
+  createRound: (plan, progress) => new Round({ layout: LAYOUT, items: ITEMS, plan, random: createRandomSource(), progress, texts }),
   onPlanChange: (plan) => {
     save = { ...save, plan };
     store.save(save);
@@ -44,7 +47,7 @@ function render() {
       render();
       window.scrollTo(0, 0);
     },
-  }));
+  }, texts));
 }
 
 render();

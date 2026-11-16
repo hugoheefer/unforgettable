@@ -3,13 +3,15 @@
 // An item lies on a spot in a room, or in a pocket of a garment. A garment is worn, or lies on a spot, and the
 // things in its pockets move with it.
 
+import { unknownLocation } from './errors.js';
+
 /**
  * @typedef {{ placeId: string, spotId: string }} SpotLocation
  * @typedef {{ garmentId: string, pocketId: string }} PocketLocation
  * @typedef {SpotLocation | PocketLocation} Location
- * @typedef {{ id: string, name: string, icon: string }} Spot
- * @typedef {{ id: string, name: string, icon: string, spots: Spot[], exits: string[] }} Place
- * @typedef {{ id: string, name: string, icon: string, pockets: Spot[], startsWorn?: boolean,
+ * @typedef {{ id: string, icon: string }} Spot
+ * @typedef {{ id: string, icon: string, spots: Spot[], exits: string[] }} Place
+ * @typedef {{ id: string, icon: string, pockets: Spot[], startsWorn?: boolean,
  *             startsAt?: SpotLocation, removable?: boolean }} Garment
  */
 
@@ -52,7 +54,7 @@ export class World {
   }
 
   assertLocation(location) {
-    if (!this.hasLocation(location)) throw new Error(`Unknown spot or pocket: ${locationKey(location)}`);
+    if (!this.hasLocation(location)) throw unknownLocation(locationKey(location));
   }
 
   /** Puts an item on a spot or in a pocket; an item that lay elsewhere is moved. */

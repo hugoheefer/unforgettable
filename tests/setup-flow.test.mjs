@@ -3,8 +3,9 @@ import assert from 'node:assert/strict';
 import { SetupFlow } from '../app/js/setup-flow.js';
 import { LAYOUT, ITEMS, DEFAULT_PLAN } from '../app/js/layout.js';
 import { checkFlowContract } from './flow-contract.mjs';
+import { TEXTS } from './texts-helper.mjs';
 
-const newFlow = () => new SetupFlow({ layout: LAYOUT, items: ITEMS, plan: DEFAULT_PLAN });
+const newFlow = () => new SetupFlow({ layout: LAYOUT, items: ITEMS, plan: DEFAULT_PLAN, texts: TEXTS });
 const ids = (step) => step.choices.map((choice) => choice.id);
 const pick = (flow, id) => { flow.choose(id); flow.next(); };
 
@@ -26,7 +27,7 @@ test('after the area the places in it are offered, and the current one is starre
   const flow = newFlow();
   pick(flow, 'area:hall');
   const step = flow.step();
-  assert.match(step.command, /Hallway/);
+  assert.match(step.command, /hallway/);
   assert.ok(ids(step).includes('place:hook'));
   assert.equal(step.choices.find((choice) => choice.id === 'place:hook').mark, '★');
 });
@@ -81,10 +82,15 @@ checkFlowContract('SetupFlow', () => newFlow());
 
 test('the flow tells its owner exactly once that every item has a home spot, and not before', () => {
   let finished = 0;
-  const flow = new SetupFlow({ layout: LAYOUT, items: ITEMS, plan: DEFAULT_PLAN, onFinished: () => { finished += 1; } });
+  const flow = new SetupFlow({ layout: LAYOUT, items: ITEMS, plan: DEFAULT_PLAN, texts: TEXTS, onFinished: () => { finished += 1; } });
   for (let i = 0; i < ITEMS.length - 1; i += 1) { pick(flow, 'area:kitchen'); pick(flow, 'place:sink'); }
   assert.equal(finished, 0);
   pick(flow, 'area:kitchen');
   pick(flow, 'place:sink');
   assert.equal(finished, 1);
+});
+
+test('the questions come from the injected texts, not from the code', () => {
+  const flow = new SetupFlow({ layout: LAYOUT, items: ITEMS, plan: DEFAULT_PLAN, texts: { ...TEXTS, whereToKeep: () => 'WAAR?' } });
+  assert.equal(flow.step().command, 'WAAR?');
 });

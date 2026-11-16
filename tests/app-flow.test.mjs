@@ -4,19 +4,22 @@ import { AppFlow } from '../app/js/app-flow.js';
 import { Round } from '../app/js/round.js';
 import { LAYOUT, ITEMS, DEFAULT_PLAN } from '../app/js/layout.js';
 import { checkFlowContract } from './flow-contract.mjs';
+import { TEXTS } from './texts-helper.mjs';
 
 const firstChoice = { pick: (list) => list[0], shuffle: (list) => [...list] };
 
 function newApp(overrides = {}) {
+  const texts = overrides.texts ?? TEXTS;
   const calls = { plans: [], progress: [], roundPlans: [] };
   const app = new AppFlow({
     layout: LAYOUT,
     items: ITEMS,
     plan: DEFAULT_PLAN,
     progress: { streaks: {} },
+    texts,
     createRound: (plan, progress) => {
       calls.roundPlans.push(plan);
-      return new Round({ layout: LAYOUT, items: ITEMS, plan, random: firstChoice, progress });
+      return new Round({ layout: LAYOUT, items: ITEMS, plan, random: firstChoice, progress, texts });
     },
     onPlanChange: (plan) => calls.plans.push(plan),
     onProgressChange: (progress) => calls.progress.push(progress),
@@ -93,3 +96,18 @@ test('"play again" starts a new round', () => {
 });
 
 checkFlowContract('AppFlow', () => newApp().app);
+
+test('the welcome comes from the injected texts, not from the code', () => {
+  const { app } = newApp({ texts: { ...TEXTS, welcome: 'WELKOM' } });
+  assert.equal(app.step().command, 'WELKOM');
+});
+
+test('the questions of the setup and of the round come from the injected texts too', () => {
+  const texts = { ...TEXTS, whereToKeep: () => 'WAAR?', putCommand: () => 'LEG NEER' };
+  const { app } = newApp({ texts });
+  pick(app, 'setup');
+  assert.equal(app.step().command, 'WAAR?');
+  const other = newApp({ texts }).app;
+  pick(other, 'play');
+  assert.equal(other.step().command, 'LEG NEER');
+});

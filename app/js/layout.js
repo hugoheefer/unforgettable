@@ -1,53 +1,53 @@
 // The proof-of-concept world: a house with its common rooms, a garden with a shed and a car, and the clothes
-// the player wears. Data only.
+// the player wears. Data only: ids, icons and structure. Names and sentences live in texts/.
 //
 // `kind: 'container'` marks a place that is not a room you wander off to when distracted (the car).
 
-const spot = (id, name, icon) => ({ id, name, icon });
+const spot = (id, icon) => ({ id, icon });
 
 export const LAYOUT = Object.freeze({
   startRoomId: 'hall',
   places: [
-    { id: 'hall', name: 'Hallway', icon: '🚪', exits: ['living', 'kitchen', 'toilet', 'landing', 'garden'],
-      spots: [spot('hook', 'Key hook', '🪝'), spot('coat-hooks', 'Coat hooks', '🧥'), spot('console', 'Console table', '🪑'), spot('shoes', 'Shoe rack', '👟'), spot('umbrella', 'Umbrella stand', '☂️')] },
-    { id: 'living', name: 'Living room', icon: '🛋️', exits: ['hall', 'dining'],
-      spots: [spot('coffee-table', 'Coffee table', '☕'), spot('sofa', 'Sofa', '🛋️'), spot('tv-stand', 'TV stand', '📺'), spot('bookcase', 'Bookcase', '📚'), spot('armchair', 'Armchair', '💺')] },
-    { id: 'dining', name: 'Dining room', icon: '🍽️', exits: ['living', 'kitchen'],
-      spots: [spot('dining-table', 'Dining table', '🍽️'), spot('sideboard', 'Sideboard', '🗄️'), spot('dining-chair', 'Chair', '🪑')] },
-    { id: 'kitchen', name: 'Kitchen', icon: '🍳', exits: ['hall', 'dining', 'garage'],
-      spots: [spot('counter', 'Counter', '🔪'), spot('drawer', 'Kitchen drawer', '🗃️'), spot('fruit-bowl', 'Fruit bowl', '🍎'), spot('fridge-top', 'Fridge top', '🧊'), spot('sink', 'Sink', '🚰')] },
-    { id: 'toilet', name: 'Toilet', icon: '🚽', exits: ['hall'],
-      spots: [spot('cistern', 'Cistern', '🚽'), spot('magazine-rack', 'Magazine rack', '📰'), spot('toilet-sill', 'Window sill', '🪟')] },
-    { id: 'landing', name: 'Landing', icon: '🪜', exits: ['hall', 'bedroom', 'bathroom', 'study'],
-      spots: [spot('landing-chest', 'Chest', '🧰'), spot('landing-shelf', 'Shelf', '🖼️'), spot('stairs', 'Stair step', '🪜')] },
-    { id: 'bedroom', name: 'Bedroom', icon: '🛏️', exits: ['landing'],
-      spots: [spot('nightstand', 'Nightstand', '🕯️'), spot('dresser', 'Dresser', '🪞'), spot('bed', 'Bed', '🛏️'), spot('wardrobe', 'Wardrobe', '🚪'), spot('bedroom-chair', 'Chair', '🪑')] },
-    { id: 'bathroom', name: 'Bathroom', icon: '🛁', exits: ['landing'],
-      spots: [spot('bath-sink', 'Sink', '🚰'), spot('bath-shelf', 'Shelf', '🧴'), spot('laundry', 'Laundry basket', '🧺'), spot('bath-cabinet', 'Mirror cabinet', '🪞')] },
-    { id: 'study', name: 'Study', icon: '💻', exits: ['landing'],
-      spots: [spot('desk', 'Desk', '🖥️'), spot('desk-drawer', 'Desk drawer', '🗃️'), spot('study-shelf', 'Shelf', '📚'), spot('printer', 'Printer', '🖨️')] },
-    { id: 'garage', name: 'Garage', icon: '🏠', exits: ['kitchen', 'garden'],
-      spots: [spot('workbench', 'Workbench', '🔧'), spot('toolbox', 'Toolbox', '🧰'), spot('garage-shelf', 'Shelf', '🥫')] },
-    { id: 'garden', name: 'Garden', icon: '🌳', exits: ['hall', 'garage', 'shed', 'car'],
-      spots: [spot('doorstep', 'Doorstep', '🚪'), spot('bench', 'Garden bench', '🪑'), spot('plant-pot', 'Plant pot', '🪴'), spot('garden-table', 'Garden table', '⛱️')] },
-    { id: 'shed', name: 'Shed', icon: '🛖', exits: ['garden'],
-      spots: [spot('shed-shelf', 'Shelf', '🥫'), spot('shed-bench', 'Bench', '🔨'), spot('wheelbarrow', 'Wheelbarrow', '🛒')] },
-    { id: 'car', name: 'Car', icon: '🚗', kind: 'container', exits: ['garden'],
-      spots: [spot('glovebox', 'Glove box', '🧤'), spot('cupholder', 'Cup holder', '🥤'), spot('seat', 'Passenger seat', '💺'), spot('door-pocket', 'Door pocket', '🚪')] },
+    { id: 'hall', icon: '🚪', exits: ['living', 'kitchen', 'toilet', 'landing', 'garden'],
+      spots: [spot('hook', '🪝'), spot('coat-hooks', '🧥'), spot('console', '🪑'), spot('shoes', '👟'), spot('umbrella', '☂️')] },
+    { id: 'living', icon: '🛋️', exits: ['hall', 'dining'],
+      spots: [spot('coffee-table', '☕'), spot('sofa', '🛋️'), spot('tv-stand', '📺'), spot('bookcase', '📚'), spot('armchair', '💺')] },
+    { id: 'dining', icon: '🍽️', exits: ['living', 'kitchen'],
+      spots: [spot('dining-table', '🍽️'), spot('sideboard', '🗄️'), spot('dining-chair', '🪑')] },
+    { id: 'kitchen', icon: '🍳', exits: ['hall', 'dining', 'garage'],
+      spots: [spot('counter', '🔪'), spot('drawer', '🗃️'), spot('fruit-bowl', '🍎'), spot('fridge-top', '🧊'), spot('sink', '🚰')] },
+    { id: 'toilet', icon: '🚽', exits: ['hall'],
+      spots: [spot('cistern', '🚽'), spot('magazine-rack', '📰'), spot('toilet-sill', '🪟')] },
+    { id: 'landing', icon: '🪜', exits: ['hall', 'bedroom', 'bathroom', 'study'],
+      spots: [spot('landing-chest', '🧰'), spot('landing-shelf', '🖼️'), spot('stairs', '🪜')] },
+    { id: 'bedroom', icon: '🛏️', exits: ['landing'],
+      spots: [spot('nightstand', '🕯️'), spot('dresser', '🪞'), spot('bed', '🛏️'), spot('wardrobe', '🚪'), spot('bedroom-chair', '🪑')] },
+    { id: 'bathroom', icon: '🛁', exits: ['landing'],
+      spots: [spot('bath-sink', '🚰'), spot('bath-shelf', '🧴'), spot('laundry', '🧺'), spot('bath-cabinet', '🪞')] },
+    { id: 'study', icon: '💻', exits: ['landing'],
+      spots: [spot('desk', '🖥️'), spot('desk-drawer', '🗃️'), spot('study-shelf', '📚'), spot('printer', '🖨️')] },
+    { id: 'garage', icon: '🏠', exits: ['kitchen', 'garden'],
+      spots: [spot('workbench', '🔧'), spot('toolbox', '🧰'), spot('garage-shelf', '🥫')] },
+    { id: 'garden', icon: '🌳', exits: ['hall', 'garage', 'shed', 'car'],
+      spots: [spot('doorstep', '🚪'), spot('bench', '🪑'), spot('plant-pot', '🪴'), spot('garden-table', '⛱️')] },
+    { id: 'shed', icon: '🛖', exits: ['garden'],
+      spots: [spot('shed-shelf', '🥫'), spot('shed-bench', '🔨'), spot('wheelbarrow', '🛒')] },
+    { id: 'car', icon: '🚗', kind: 'container', exits: ['garden'],
+      spots: [spot('glovebox', '🧤'), spot('cupholder', '🥤'), spot('seat', '💺'), spot('door-pocket', '🚪')] },
   ],
   garments: [
-    { id: 'coat', name: 'Coat', icon: '🧥', startsWorn: true, removable: true,
-      pockets: [spot('coat-left', 'Left pocket', '🫳'), spot('coat-right', 'Right pocket', '🫴'), spot('coat-inside', 'Inside pocket', '🧷')] },
-    { id: 'trousers', name: 'Trousers', icon: '👖', startsWorn: true, removable: false,
-      pockets: [spot('trousers-front-left', 'Front pocket, left', '🫳'), spot('trousers-front-right', 'Front pocket, right', '🫴'), spot('trousers-back', 'Back pocket', '🍑')] },
+    { id: 'coat', icon: '🧥', startsWorn: true, removable: true,
+      pockets: [spot('coat-left', '🫳'), spot('coat-right', '🫴'), spot('coat-inside', '🧷')] },
+    { id: 'trousers', icon: '👖', startsWorn: true, removable: false,
+      pockets: [spot('trousers-front-left', '🫳'), spot('trousers-front-right', '🫴'), spot('trousers-back', '🍑')] },
   ],
 });
 
 export const ITEMS = Object.freeze([
-  { id: 'keys', name: 'keys', icon: '🔑', findPrompt: 'You start the car: find your keys!' },
-  { id: 'wallet', name: 'wallet', icon: '👛', findPrompt: 'You are at the till: find your wallet!' },
-  { id: 'phone', name: 'phone', icon: '📱', findPrompt: 'Someone is calling: find your phone!' },
-  { id: 'scissors', name: 'scissors', icon: '✂️', findPrompt: 'A parcel needs opening: find your scissors!' },
+  { id: 'keys', icon: '🔑' },
+  { id: 'wallet', icon: '👛' },
+  { id: 'phone', icon: '📱' },
+  { id: 'scissors', icon: '✂️' },
 ]);
 
 export const DEFAULT_PLAN = Object.freeze({

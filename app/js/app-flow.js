@@ -3,6 +3,8 @@
 
 import { PlayFlow } from './play-flow.js';
 import { SetupFlow } from './setup-flow.js';
+import { choiceNotOffered } from './errors.js';
+import { named } from './names.js';
 
 /** A screen with fixed text whose choices lead somewhere. */
 class ChoiceScreen {
@@ -17,7 +19,7 @@ class ChoiceScreen {
   }
 
   choose(choiceId) {
-    if (!this.base.choices.some((choice) => choice.id === choiceId)) throw new Error(`Choice not offered: ${choiceId}`);
+    if (!this.base.choices.some((choice) => choice.id === choiceId)) throw choiceNotOffered(choiceId);
     this.selected = choiceId;
   }
 
@@ -26,15 +28,11 @@ class ChoiceScreen {
   }
 }
 
-const describeResult = (round, result) => {
-  const item = round.items.find((candidate) => candidate.id === result.itemId);
-  const where = result.atHome ? 'put on its home spot' : result.forced ? 'left where you were interrupted' : 'put away from its home spot';
-  return `${item.icon} ${item.name}: ${where}; found with ${result.findCost} moves.`;
-};
+const placementKind = (result) => (result.atHome ? 'atHome' : result.forced ? 'interrupted' : 'away');
 
 export class AppFlow {
   /**
-   * @param {{ layout: object, items: object[], plan: object, progress: object,
+   * @param {{ layout: object, items: object[], plan: object, progress: object, texts: object,
    *           createRound: (plan: object, progress: object) => import('./round.js').Round,
    *           onPlanChange: (plan: object) => void, onProgressChange: (progress: object) => void }} options
    */
@@ -46,8 +44,8 @@ export class AppFlow {
   welcome() {
     return new ChoiceScreen(
       {
-        command: 'Unforgettable. Learn to always put your things in the same place.',
-        choices: [{ id: 'play', label: 'Start playing' }, { id: 'setup', label: 'Choose my home spots' }],
+        command: this.texts.welcome,
+        choices: [{ id: 'play', label: this.texts.startPlaying }, { id: 'setup', label: this.texts.chooseHomeSpots }],
       },
       (choice) => {
         this.current = choice === 'play' ? this.startRound() : this.startSetup();
@@ -57,11 +55,11 @@ export class AppFlow {
 
   startRound() {
     this.round = this.createRound(this.plan, this.progress);
-    return new PlayFlow(this.round, { onFinished: () => this.finishRound() });
+    return new PlayFlow(this.round, { texts: this.texts, onFinished: () => this.finishRound() });
   }
 
   startSetup() {
-    return new SetupFlow({ layout: this.layout, items: this.items, plan: this.plan, onFinished: () => this.finishSetup() });
+    return new SetupFlow({ layout: this.layout, items: this.items, plan: this.plan, texts: this.texts, onFinished: () => this.finishSetup() });
   }
 
   step() {
@@ -82,14 +80,19 @@ export class AppFlow {
     this.current = this.welcome();
   }
 
+  describeResult(result) {
+    const item = this.round.items.find((candidate) => candidate.id === result.itemId);
+    return this.texts.results[placementKind(result)]({ thing: named(this.texts.things, item), cost: result.findCost });
+  }
+
   finishRound() {
     this.progress = this.round.progress();
     this.onProgressChange(this.progress);
     this.current = new ChoiceScreen(
       {
-        lead: this.round.results().map((result) => describeResult(this.round, result)),
-        command: `Round finished. Score: ${this.round.state().score}`,
-        choices: [{ id: 'again', label: 'Play again' }, { id: 'setup', label: 'Choose my home spots' }],
+        lead: this.round.results().map((result) => this.describeResult(result)),
+        command: this.texts.resultCommand({ score: this.round.state().score }),
+        choices: [{ id: 'again', label: this.texts.playAgain }, { id: 'setup', label: this.texts.chooseHomeSpots }],
       },
       (choice) => {
         this.current = choice === 'again' ? this.startRound() : this.startSetup();

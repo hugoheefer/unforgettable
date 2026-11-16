@@ -10,8 +10,9 @@ function el(tag, className, text) {
 /**
  * @param {{ lead: string[], command: string, choices: { id: string, label: string, mark?: string }[], selected: string | null }} step
  * @param {{ onChoose: (id: string) => void, onNext: () => void }} handlers
+ * @param {{ next: string }} texts
  */
-export function renderStep(step, { onChoose, onNext }) {
+export function renderStep(step, { onChoose, onNext }, texts) {
   const screen = el('section', 'screen');
   if (step.lead.length > 0) {
     const lead = el('div', 'lead');
@@ -35,7 +36,7 @@ export function renderStep(step, { onChoose, onNext }) {
   }
   screen.append(choices);
 
-  const next = el('button', 'primary next', 'Next');
+  const next = el('button', 'primary next', texts.next);
   next.type = 'button';
   next.disabled = step.choices.length > 0 && step.selected === null;
   next.addEventListener('click', onNext);

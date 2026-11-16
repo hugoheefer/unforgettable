@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { Round } from '../app/js/round.js';
+import { TEXTS } from './texts-helper.mjs';
 
 const layout = {
   startRoomId: 'hall',
@@ -18,7 +19,7 @@ const plan = { keys: { placeId: 'hall', spotId: 'hook' }, wallet: { placeId: 'ki
 // Always the first choice and the order as given, so every scenario is deterministic.
 const firstChoice = { pick: (list) => list[0], shuffle: (list) => [...list] };
 const newRound = (options = {}) =>
-  new Round({ layout, items, plan, random: firstChoice, progress: { streaks: {} }, ...options });
+  new Round({ layout, items, plan, random: firstChoice, progress: { streaks: {} }, texts: TEXTS, ...options });
 
 /** Puts both items on their home spots, using the shortest way. */
 function dropAtHome(round) {
@@ -308,4 +309,16 @@ test('while dropping you see what you left in a pocket you can reach', () => {
   const round = coatRound();
   round.putInPocket('coat', 'left');
   assert.deepEqual(round.seenAt({ garmentId: 'coat', pocketId: 'left' }), ['keys']);
+});
+
+test('every refused move carries a code, so the flow can tell it in the language of the player', () => {
+  const coatLayout = { ...layout, garments: [{ id: 'coat', icon: '🧥', startsWorn: true, removable: true, pockets: [{ id: 'right', icon: '🫴' }] }, { id: 'belt', icon: '🥋', startsWorn: true, removable: false, pockets: [] }] };
+  const make = () => newRound({ layout: coatLayout });
+  const codeOf = (action) => { try { action(); } catch (error) { return error.code; } return undefined; };
+  assert.equal(codeOf(() => make().walkTo('bedroom')), 'no-door');
+  assert.equal(codeOf(() => make().takeOff('belt', 'hook')), 'not-removable');
+  assert.equal(codeOf(() => { const r = make(); r.takeOff('coat', 'hook'); r.takeOff('coat', 'hook'); }), 'not-worn');
+  assert.equal(codeOf(() => make().takeOff('coat', 'counter')), 'spot-not-here');
+  assert.equal(codeOf(() => make().putOn('coat')), 'garment-not-here');
+  assert.equal(codeOf(() => { const r = make(); r.takeOff('coat', 'hook'); r.walkTo('kitchen'); r.putInPocket('coat', 'right'); }), 'out-of-reach');
 });

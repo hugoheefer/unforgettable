@@ -6,33 +6,24 @@
 
 import { World, isPocket, locationKey, sameLocation } from './world.js';
 import { hintLevel, recordPlacement, streakOf } from './habit.js';
+import { RefusedMove } from './errors.js';
+import { named } from './names.js';
 
 const DEFAULT_BUDGET = 3;
 const POINTS_FOR_HOME_SPOT = 10;
 const POINTS_FOR_QUICK_FIND = 10;
 
-const PRESSURES = [
-  'Your phone is ringing!',
-  'The kettle is boiling over!',
-  'Someone is at the door!',
-  'You are late, hurry up!',
-];
-const DISTRACTIONS = [
-  'The neighbour wants to chat. Time passes...',
-  'You cook dinner and lose track of time...',
-  'You answer a long phone call...',
-];
-
 export class Round {
   /**
    * @param {{ layout: object, items: object[], plan: object, random: { pick: Function, shuffle: Function },
-   *           progress: { streaks: object }, budget?: number }} options
+   *           progress: { streaks: object }, texts: object, budget?: number }} options
    */
-  constructor({ layout, items, plan, random, progress, budget = DEFAULT_BUDGET }) {
+  constructor({ layout, items, plan, random, progress, texts, budget = DEFAULT_BUDGET }) {
     this.layout = layout;
     this.items = items;
     this.plan = plan;
     this.random = random;
+    this.texts = texts;
     this.budget = budget;
     this.world = new World(layout);
     this.habits = progress;
@@ -50,7 +41,7 @@ export class Round {
 
   startPressure() {
     this.movesLeft = this.budget;
-    this.pressure = this.random.pick(PRESSURES);
+    this.pressure = this.random.pick(this.texts.pressures);
   }
 
   roomOf(id) {
@@ -72,7 +63,7 @@ export class Round {
       notice: this.notice,
       distraction: this.distraction,
       findItem,
-      findPrompt: findItem ? this.items.find((item) => item.id === findItem).findPrompt : '',
+      findPrompt: findItem ? this.texts.findPrompts[findItem] : '',
       score: this.score,
     };
   }
@@ -91,15 +82,15 @@ export class Round {
   }
 
   walkTo(roomId) {
-    if (!this.world.exitsOf(this.roomId).includes(roomId)) throw new Error(`There is no door to ${roomId}`);
+    if (!this.world.exitsOf(this.roomId).includes(roomId)) throw new RefusedMove('no-door');
     this.roomId = roomId;
     this.spendMove();
   }
 
   /** Takes a worn garment off and hangs it on a spot of this room. */
   takeOff(garmentId, spotId) {
-    if (this.garmentOf(garmentId).removable === false) throw new Error('That garment cannot be taken off');
-    if (!this.world.isWorn(garmentId)) throw new Error('You are not wearing that garment');
+    if (this.garmentOf(garmentId).removable === false) throw new RefusedMove('not-removable');
+    if (!this.world.isWorn(garmentId)) throw new RefusedMove('not-worn');
     this.assertSpotInRoom(spotId);
     this.world.hang(garmentId, { placeId: this.roomId, spotId });
     this.spendMove();
@@ -107,13 +98,13 @@ export class Round {
 
   /** Puts on a garment that hangs in this room. */
   putOn(garmentId) {
-    if (this.world.garmentRoom(garmentId) !== this.roomId) throw new Error('That garment is not in this room');
+    if (this.world.garmentRoom(garmentId) !== this.roomId) throw new RefusedMove('garment-not-here');
     this.world.wear(garmentId);
     this.spendMove();
   }
 
   assertSpotInRoom(spotId) {
-    if (!this.roomOf(this.roomId).spots.some((spot) => spot.id === spotId)) throw new Error('That spot is not in this room');
+    if (!this.roomOf(this.roomId).spots.some((spot) => spot.id === spotId)) throw new RefusedMove('spot-not-here');
   }
 
   /** A spot is within reach in its own room; a pocket when its garment is worn or hangs in this room. */
@@ -123,7 +114,7 @@ export class Round {
   }
 
   assertReach(location) {
-    if (!this.canReach(location)) throw new Error('That pocket is out of reach');
+    if (!this.canReach(location)) throw new RefusedMove('out-of-reach');
   }
 
   // ---- dropping ----
@@ -131,9 +122,9 @@ export class Round {
   /** Out of time: the item goes down on the first spot of the room you stand in, not where you planned. */
   interrupt() {
     const spot = this.roomOf(this.roomId).spots[0];
-    const itemName = this.items.find((item) => item.id === this.toPlace[0]).name;
+    const item = this.items.find((candidate) => candidate.id === this.toPlace[0]);
     this.place({ placeId: this.roomId, spotId: spot.id }, true);
-    this.notice = `You were interrupted and left the ${itemName} on the ${spot.name}.`;
+    this.notice = this.texts.interrupted({ thing: named(this.texts.things, item), spot: named(this.texts.spots, spot) });
   }
 
   putDown(spotId) {
@@ -161,7 +152,7 @@ export class Round {
 
   startFinding() {
     this.phase = 'find';
-    this.distraction = this.random.pick(DISTRACTIONS);
+    this.distraction = this.random.pick(this.texts.distractions);
     const otherRooms = this.layout.places.filter((place) => place.id !== this.roomId && place.kind !== 'container');
     this.roomId = this.random.pick(otherRooms).id;
     this.toFind = this.random.shuffle(this.items.map((item) => item.id));

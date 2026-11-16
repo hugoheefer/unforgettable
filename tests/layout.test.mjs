@@ -34,10 +34,6 @@ test('the suggested plan gives every item one spot that exists', () => {
   for (const item of ITEMS) assert.ok(world.hasLocation(DEFAULT_PLAN[item.id]), item.id);
 });
 
-test('every item knows what to say when it has to be found', () => {
-  for (const item of ITEMS) assert.ok(item.findPrompt.length > 0, item.id);
-});
-
 test('the house has all the common rooms', () => {
   const roomIds = ids(LAYOUT.places);
   for (const room of ['hall', 'living', 'dining', 'kitchen', 'toilet', 'bathroom', 'bedroom', 'study', 'garage', 'garden'])

@@ -2,13 +2,15 @@
 // clothing), then the place in it. Pure; the plan that was passed in is never changed.
 
 import { isPocket, sameLocation } from './world.js';
+import { choiceNotOffered } from './errors.js';
+import { named } from './names.js';
 
 const CURRENT = '★';
-const BACK = { id: 'back', label: '↩ Choose something else' };
 
 export class SetupFlow {
-  /** @param {{ layout: object, items: object[], plan: object, onFinished?: () => void }} options `onFinished` is called once, after the last item got its home spot */
-  constructor({ layout, items, plan, onFinished = () => {} }) {
+  /** @param {{ layout: object, items: object[], plan: object, texts: object, onFinished?: () => void }} options `onFinished` is called once, after the last item got its home spot */
+  constructor({ layout, items, plan, texts, onFinished = () => {} }) {
+    this.texts = texts;
     this.onFinished = onFinished;
     this.layout = layout;
     this.items = items;
@@ -27,9 +29,18 @@ export class SetupFlow {
   }
 
   areas() {
+    const { texts } = this;
     return [
-      ...this.layout.places.map((place) => ({ ...place, places: place.spots.map((spot) => ({ spot, location: { placeId: place.id, spotId: spot.id } })), isRoom: true })),
-      ...this.layout.garments.map((garment) => ({ ...garment, places: garment.pockets.map((pocket) => ({ spot: pocket, location: { garmentId: garment.id, pocketId: pocket.id } })), isRoom: false })),
+      ...this.layout.places.map((place) => ({
+        ...named(texts.rooms, place),
+        places: place.spots.map((spot) => ({ spot: named(texts.spots, spot), location: { placeId: place.id, spotId: spot.id } })),
+        isRoom: true,
+      })),
+      ...this.layout.garments.map((garment) => ({
+        ...named(texts.garments, garment),
+        places: garment.pockets.map((pocket) => ({ spot: named(texts.pockets, pocket), location: { garmentId: garment.id, pocketId: pocket.id } })),
+        isRoom: false,
+      })),
     ];
   }
 
@@ -38,25 +49,26 @@ export class SetupFlow {
   }
 
   step() {
+    const { texts } = this;
     const item = this.items[this.index];
     const current = this.chosen[item.id];
     if (!this.area) {
       const choices = this.areas().map((area) => {
-        const choice = { id: `area:${area.id}`, label: `${area.icon} ${area.name}` };
+        const choice = { id: `area:${area.id}`, label: texts.tileLabel(area) };
         return this.isCurrentArea(area, current) ? { ...choice, mark: CURRENT } : choice;
       });
-      return { lead: [], command: `Where do you want to always keep your ${item.icon} ${item.name}?`, choices, selected: this.selected };
+      return { lead: [], command: texts.whereToKeep({ thing: named(texts.things, item) }), choices, selected: this.selected };
     }
     const choices = this.area.places.map(({ spot, location }) => {
-      const choice = { id: `place:${spot.id}`, label: `${spot.icon} ${spot.name}` };
+      const choice = { id: `place:${spot.id}`, label: texts.tileLabel(spot) };
       return sameLocation(location, current) ? { ...choice, mark: CURRENT } : choice;
     });
-    const question = this.area.isRoom ? `Which place in the ${this.area.name}?` : `Which pocket of the ${this.area.name.toLowerCase()}?`;
-    return { lead: [], command: question, choices: [...choices, BACK], selected: this.selected };
+    const question = this.area.isRoom ? texts.whichPlace({ room: this.area }) : texts.whichPocket({ garment: this.area });
+    return { lead: [], command: question, choices: [...choices, { id: 'back', label: texts.back }], selected: this.selected };
   }
 
   choose(choiceId) {
-    if (!this.step().choices.some((choice) => choice.id === choiceId)) throw new Error(`Choice not offered: ${choiceId}`);
+    if (!this.step().choices.some((choice) => choice.id === choiceId)) throw choiceNotOffered(choiceId);
     this.selected = choiceId;
   }
 
