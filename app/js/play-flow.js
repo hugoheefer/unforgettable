@@ -30,12 +30,16 @@ const askingFor = (texts) => ({
 export class PlayFlow {
   /**
    * @param {import('./day.js').Day} day
-   * @param {{ texts: object, onFinished?: () => void }} options `onFinished` is called once, when the last event is done
+   * @param {{ texts: object, onFinished?: () => void, onFound?: (record: object) => void, onPut?: (record: object) => void }} options
+   *   `onFinished` is called once, when the last event is done; `onFound` and `onPut` get what each finished find
+   *   or put-away cost, before `onFinished`
    */
-  constructor(day, { texts, onFinished = () => {} }) {
+  constructor(day, { texts, onFinished = () => {}, onFound = () => {}, onPut = () => {} }) {
     this.day = day;
     this.texts = texts;
     this.onFinished = onFinished;
+    this.onFound = onFound;
+    this.onPut = onPut;
     this.back = { id: 'back', label: texts.back };
     this.menu = { type: 'root' };
     this.selected = null;
@@ -197,9 +201,16 @@ export class PlayFlow {
     }
     const [first, second] = rest.split('/');
     if (day.state().event.kind === 'putAway') {
-      return [this.placedText(kind === 'pocket' ? day.putInPocket(first, second) : day.putDown(first))];
+      const placed = kind === 'pocket' ? day.putInPocket(first, second) : day.putDown(first);
+      const { thingId, steps, atHome, hurry } = placed;
+      this.onPut({ thingId, steps, atHome, hurry });
+      return [this.placedText(placed)];
     }
-    return [this.lookedText(day.state().event.thingId, kind === 'pocket' ? day.lookInPocket(first, second) : day.look(first))];
+    const thingId = day.state().event.thingId;
+    const looked = kind === 'pocket' ? day.lookInPocket(first, second) : day.look(first);
+    const { found, steps, shortest, wasHome } = looked;
+    if (found) this.onFound({ thingId, steps, shortest, wasHome });
+    return [this.lookedText(thingId, looked)];
   }
 
   placedText({ thingId, location, atHome }) {

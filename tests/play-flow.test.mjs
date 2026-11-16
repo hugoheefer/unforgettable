@@ -399,3 +399,72 @@ test('putting on a garment says that garment\'s name', () => {
 });
 
 checkFlowContract('PlayFlow', () => putFlow());
+
+// ---- reporting what a find and a put-away cost ----
+
+const hookWorld = () => worldWith({ keys: spot('hall', 'hook') });
+const recorder = () => {
+  const reported = { found: [], put: [] };
+  return { reported, options: { onFound: (record) => reported.found.push(record), onPut: (record) => reported.put.push(record) } };
+};
+
+test('a find that ends is reported once, with what it cost and what it could have cost', () => {
+  const { reported, options } = recorder();
+  const flow = flowFor(findDay('keys', { world: hookWorld() }), options);
+  pick(flow, 'spots');
+  pick(flow, 'spot:hook');
+  assert.deepEqual(reported.found, [{ thingId: 'keys', steps: 1, shortest: 1, wasHome: true }]);
+  assert.deepEqual(reported.put, []);
+});
+
+test('looking in a place where the thing is not reports nothing', () => {
+  const { reported, options } = recorder();
+  const flow = flowFor(findDay('keys', { world: hookWorld() }), options);
+  pick(flow, 'spots');
+  pick(flow, 'spot:shoes');
+  assert.deepEqual(reported, { found: [], put: [] });
+});
+
+test('a find after wrong looks is reported with all the steps it took', () => {
+  const { reported, options } = recorder();
+  const flow = flowFor(findDay('keys', { world: hookWorld() }), options);
+  for (const id of ['spot:shoes', 'spot:console', 'spot:hook']) { pick(flow, 'spots'); pick(flow, id); }
+  assert.deepEqual(reported.found, [{ thingId: 'keys', steps: 3, shortest: 1, wasHome: true }]);
+});
+
+test('a put-away that ends is reported once, with its steps, whether it was at home and the hurry', () => {
+  const { reported, options } = recorder();
+  const flow = flowFor(putAwayDay('keys'), options);
+  pick(flow, 'spots');
+  pick(flow, 'spot:hook');
+  assert.deepEqual(reported.put, [{ thingId: 'keys', steps: 0, atHome: true, hurry: false }]);
+  assert.deepEqual(reported.found, []);
+});
+
+test('a put-away on another spot after a walk is reported as not at home, with the steps of the walk', () => {
+  const { reported, options } = recorder();
+  const flow = flowFor(putAwayDay('keys'), options);
+  pick(flow, 'doors');
+  pick(flow, 'door:living');
+  pick(flow, 'spots');
+  pick(flow, 'spot:sofa');
+  assert.deepEqual(reported.put, [{ thingId: 'keys', steps: 1, atHome: false, hurry: false }]);
+});
+
+test('a put-away in a hurry is reported as such', () => {
+  const { reported, options } = recorder();
+  const flow = flowFor(putAwayDay('keys', { hurry: 'doorbell' }), options);
+  pick(flow, 'spots');
+  pick(flow, 'spot:hook');
+  assert.equal(reported.put[0].hurry, true);
+});
+
+test('walking, hanging a coat and opening a list report nothing', () => {
+  const { reported, options } = recorder();
+  const flow = flowFor(putAwayDay('keys'), options);
+  pick(flow, 'doors');
+  pick(flow, 'door:living');
+  pick(flow, 'hang:coat');
+  pick(flow, 'spot:sofa');
+  assert.deepEqual(reported, { found: [], put: [] });
+});

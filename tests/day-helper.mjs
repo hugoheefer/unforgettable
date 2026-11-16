@@ -1,7 +1,7 @@
 // Shared building blocks of the day tests: event factories, a day built from plain state, and a bot that plays
 // a whole day. Not a test file itself (the runner only takes *.test.mjs).
 
-import { Day } from '../app/js/day.js';
+import { Day, EVENT_KINDS } from '../app/js/day.js';
 import { LAYOUT } from '../app/js/layout.js';
 import { RefusedMove, REFUSALS } from '../app/js/errors.js';
 import { THINGS, defaultPlan } from '../app/js/things.js';
@@ -40,9 +40,15 @@ export function makeDay(events, { state = {}, world = new World(LAYOUT), plan = 
 export const putAwayDay = (thingId, { roomId = 'hall', hurry = null, ...options } = {}) =>
   makeDay([putAway(thingId, hurry)], { ...options, state: { roomId, startedIn: roomId, inHand: [thingId], ...options.state } });
 
-/** A day that is looking for one thing; the world decides where it lies. */
-export const findDay = (thingId, { roomId = 'hall', ...options } = {}) =>
-  makeDay([find(thingId)], { ...options, state: { roomId, startedIn: roomId, ...options.state } });
+/**
+ * A day that is looking for one thing; the world decides where it lies. The find is entered, as the day does it
+ * when an event begins, so the day has noted what the find should cost.
+ */
+export function findDay(thingId, { roomId = 'hall', ...options } = {}) {
+  const day = makeDay([find(thingId)], { ...options, state: { roomId, startedIn: roomId, ...options.state } });
+  EVENT_KINDS.find.enter(day, day.event());
+  return day;
+}
 
 /** The refusal code of an action, or undefined when nothing was refused. */
 export function refusalOf(action) {

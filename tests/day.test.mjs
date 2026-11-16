@@ -125,7 +125,7 @@ test('after a find the thing is in hand and no longer on its spot', () => {
 
 test('looking at the right spot tells you what it found and what it took', () => {
   const day = findDay('keys', { world: worldWith({ keys: spot('hall', 'hook') }) });
-  assert.deepEqual(day.look('hook'), { found: true, steps: 1, location: spot('hall', 'hook'), seen: [] });
+  assert.deepEqual(day.look('hook'), { found: true, steps: 1, location: spot('hall', 'hook'), seen: [], shortest: 1, wasHome: true });
 });
 
 test('looking costs one step whether or not the thing is there', () => {
@@ -160,7 +160,7 @@ test('a find ends the event and the next event starts at zero steps', () => {
 test('a thing in a pocket of the coat you wear is found in any room for one step', () => {
   const world = worldWith({ wallet: pocket('coat', 'coat-inside') });
   const day = findDay('wallet', { world, roomId: 'kitchen' });
-  assert.deepEqual(day.lookInPocket('coat', 'coat-inside'), { found: true, steps: 1, location: pocket('coat', 'coat-inside'), seen: [] });
+  assert.deepEqual(day.lookInPocket('coat', 'coat-inside'), { found: true, steps: 1, location: pocket('coat', 'coat-inside'), seen: [], shortest: 1, wasHome: true });
   assert.deepEqual(day.state().inHand, ['wallet']);
   assert.equal(day.world.whereIs('wallet'), null);
 });
@@ -198,7 +198,7 @@ test('putting a thing down on a spot of the room leaves it there, out of your ha
   const result = day.putDown('sofa');
   assert.deepEqual(day.world.whereIs('keys'), spot('living', 'sofa'));
   assert.deepEqual(day.state().inHand, ['wallet']);
-  assert.deepEqual(result, { thingId: 'keys', location: spot('living', 'sofa'), atHome: false, steps: 0 });
+  assert.deepEqual(result, { thingId: 'keys', location: spot('living', 'sofa'), atHome: false, steps: 0, hurry: false });
 });
 
 test('putting a thing in a pocket of the coat you wear leaves it in that pocket', () => {
@@ -579,4 +579,136 @@ for (const [name, spoil] of Object.entries(BROKEN)) {
 test('a saved day for a thing that is no longer chosen cannot be continued', () => {
   const withoutKeys = { layout: LAYOUT, things: THINGS.filter((thing) => thing.id !== 'keys') };
   assert.equal(canContinue(goodState(), withoutKeys), false);
+});
+
+// ---- what a find costs ----
+
+const costOf = ({ found: wasFound, steps, shortest, wasHome }) => ({ found: wasFound, steps, shortest, wasHome });
+const keysAt = (location, hang = {}) => worldWith({ keys: location }, hang);
+
+test('a thing found on its home spot in the room where the event started costs 1 step, 1 possible, was home', () => {
+  const day = findDay('keys', { world: keysAt(spot('hall', 'hook')) });
+  assert.deepEqual(costOf(day.look('hook')), { found: true, steps: 1, shortest: 1, wasHome: true });
+});
+
+test('looking at three wrong spots first costs 4 steps and 1 possible', () => {
+  const day = findDay('keys', { world: keysAt(spot('hall', 'console')) });
+  day.look('hook');
+  day.look('coat-hooks');
+  day.look('shoes');
+  assert.deepEqual(costOf(day.look('console')), { found: true, steps: 4, shortest: 1, wasHome: false });
+});
+
+test('a thing two rooms away found by the shortest way costs 3 and 3', () => {
+  const day = findDay('keys', { world: keysAt(spot('dining', 'sideboard')) });
+  day.walkTo('living');
+  day.walkTo('dining');
+  assert.deepEqual(costOf(day.look('sideboard')), { found: true, steps: 3, shortest: 3, wasHome: false });
+});
+
+test('a thing in a pocket of the coat you wear has 1 possible step', () => {
+  const day = findDay('wallet', { world: worldWith({ wallet: pocket('coat', 'coat-left') }) });
+  assert.deepEqual(costOf(day.lookInPocket('coat', 'coat-left')), { found: true, steps: 1, shortest: 1, wasHome: false });
+});
+
+test('a thing in the pocket that is its home spot was home', () => {
+  const day = findDay('wallet', { world: worldWith({ wallet: pocket('coat', 'coat-inside') }) });
+  assert.equal(day.lookInPocket('coat', 'coat-inside').wasHome, true);
+});
+
+test('a thing in the pocket of a coat that hangs in the next room has 2 possible steps', () => {
+  const world = worldWith({ wallet: pocket('coat', 'coat-inside') }, { coat: spot('living', 'sofa') });
+  const day = findDay('wallet', { world });
+  day.walkTo('living');
+  assert.deepEqual(costOf(day.lookInPocket('coat', 'coat-inside')), { found: true, steps: 2, shortest: 2, wasHome: true });
+});
+
+test('a look that finds nothing tells nothing about the cost', () => {
+  const result = findDay('keys', { world: keysAt(spot('hall', 'console')) }).look('hook');
+  assert.equal(result.found, false);
+  assert.equal('shortest' in result, false);
+  assert.equal('wasHome' in result, false);
+});
+
+test('the shortest way is counted from the room where the event started, not from where you stand', () => {
+  const day = findDay('keys', { world: keysAt(spot('dining', 'sideboard')) });
+  for (const room of ['garden', 'hall', 'living', 'dining']) day.walkTo(room);
+  assert.deepEqual(costOf(day.look('sideboard')), { found: true, steps: 5, shortest: 3, wasHome: false });
+});
+
+test('a find that begins after a move counts from the room that move ended in', () => {
+  const events = [pause('day'), moveTo('living', 'morning'), find('keys')];
+  const day = makeDay(events, { world: keysAt(spot('dining', 'sideboard')) });
+  day.continue();
+  day.walkTo('dining');
+  assert.deepEqual(costOf(day.look('sideboard')), { found: true, steps: 2, shortest: 2, wasHome: false });
+});
+
+test('a find that is continued after a reload keeps its shortest way', () => {
+  const day = findDay('keys', { world: keysAt(spot('dining', 'sideboard')) });
+  day.walkTo('living');
+  const again = resumed(day);
+  again.walkTo('dining');
+  assert.deepEqual(costOf(again.look('sideboard')), { found: true, steps: 3, shortest: 3, wasHome: false });
+});
+
+test('home spots chosen in the middle of a find do not change whether the thing was home when the event began', () => {
+  const day = findDay('keys', { world: keysAt(spot('hall', 'console')) });
+  day.usePlan({ ...defaultPlan(), keys: spot('hall', 'console') });
+  assert.equal(day.look('console').wasHome, false);
+});
+
+test('the note about the find is part of the saved state and is gone when the find is over', () => {
+  const world = keysAt(spot('hall', 'hook'));
+  const day = makeDay([pause('day'), find('keys'), putAway('keys')], { world });
+  day.continue();
+  assert.deepEqual(day.snapshot().findStart, { shortest: 1, wasHome: true });
+  day.look('hook');
+  assert.equal(day.snapshot().findStart, null);
+  assert.equal(canContinue(day.snapshot(), context), true);
+});
+
+// ---- a put-away tells whether it was done in a hurry ----
+
+test('a put-away in a hurry says so', () => {
+  assert.equal(putAwayDay('keys', { hurry: 'doorbell' }).putDown('hook').hurry, true);
+});
+
+test('a put-away without a hurry says so too', () => {
+  assert.equal(putAwayDay('keys').putDown('hook').hurry, false);
+});
+
+test('a put-away in a pocket tells about the hurry as well', () => {
+  assert.equal(putAwayDay('wallet', { hurry: 'pan' }).putInPocket('coat', 'coat-inside').hurry, true);
+});
+
+// ---- a saved day in the middle of a find needs its note ----
+
+const goodFindState = () => structuredClone(dayState([pause('day'), find('keys', 'shed')], { index: 1, findStart: { shortest: 2, wasHome: false } }));
+
+test('a day in the middle of a find, with its note, can be continued', () => {
+  assert.equal(canContinue(goodFindState(), context), true);
+});
+
+const BROKEN_NOTES = {
+  'no note while a find is running': (s) => { delete s.findStart; return s; },
+  'a note that is null while a find is running': (s) => { s.findStart = null; return s; },
+  'a note that is not an object': (s) => { s.findStart = '2'; return s; },
+  'a note without a shortest way': (s) => { delete s.findStart.shortest; return s; },
+  'a shortest way of 0': (s) => { s.findStart.shortest = 0; return s; },
+  'a shortest way that is not a whole number': (s) => { s.findStart.shortest = 1.5; return s; },
+  'a note without wasHome': (s) => { delete s.findStart.wasHome; return s; },
+  'a wasHome that is not true or false': (s) => { s.findStart.wasHome = 'yes'; return s; },
+};
+
+for (const [name, spoil] of Object.entries(BROKEN_NOTES)) {
+  test(`a saved day with ${name} cannot be continued`, () => {
+    assert.equal(canContinue(spoil(goodFindState()), context), false);
+  });
+}
+
+test('a saved day with a note left over from a find that is over cannot be continued', () => {
+  const state = goodState();
+  state.findStart = { shortest: 1, wasHome: true };
+  assert.equal(canContinue(state, context), false);
 });

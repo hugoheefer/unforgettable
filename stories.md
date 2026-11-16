@@ -278,7 +278,7 @@ The uses of the four current things are in the catalogue at the end of this file
 Menu
 On their home spot tonight: keys, wallet.
 Somewhere else: phone (on the garden table).
-Searching cost 9 steps today. With everything on its home spot: 4.
+Searching cost 9 steps today. Going straight to each thing: 4.
 Putting things away cost 5 steps.
 A thing on its home spot is found without thinking.          the advice line
 **Day 3 is done.**

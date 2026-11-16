@@ -1,9 +1,13 @@
 // Saves the player's plan, streaks and world in the browser. The storage is injected (see pong-notice-store.js
 // in my-wiki), and every access is guarded: a blocked or damaged storage must never stop the game.
 
+import { validHistory } from './history.js';
+
 const SAVE_KEY = 'unforgettable-save';
 const VERSION = 2;
 const DEFAULT_LANGUAGE = 'en';
+
+const DATE_FORMAT = /^\d{4}-\d{2}-\d{2}$/;
 
 const isObject = (value) => typeof value === 'object' && value !== null && !Array.isArray(value);
 const isWholeNumber = (value) => Number.isInteger(value) && value >= 0;
@@ -54,6 +58,8 @@ export function createSaveStore(getStorage, { defaults, world }) {
         world: world.restore(saved?.world).snapshot(),
         day: validDay(saved?.day),
         dayCount: isWholeNumber(saved?.dayCount) ? saved.dayCount : 0,
+        history: validHistory(saved?.history),
+        lastDayFinishedOn: typeof saved?.lastDayFinishedOn === 'string' && DATE_FORMAT.test(saved.lastDayFinishedOn) ? saved.lastDayFinishedOn : null,
       };
     },
     save(data) {

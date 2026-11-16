@@ -6,6 +6,10 @@ import { PlayFlow } from './play-flow.js';
 import { SetupFlow } from './setup-flow.js';
 import { World } from './world.js';
 import { choiceNotOffered } from './errors.js';
+import { recordFind, recordPut } from './history.js';
+import { summarize } from './summary.js';
+import { describeLocation } from './room-view.js';
+import { named } from './names.js';
 
 /** A screen with fixed text whose choices lead somewhere. */
 class ChoiceScreen {
@@ -36,11 +40,13 @@ export class AppFlow {
    *           onSave: (state: { plan: object, progress: object, world: object, day: object | null, dayCount: number }) => void }} options
    *   `things` are the chosen catalogue entries; `saved` is what `onSave` handed over last time (or the defaults)
    */
-  constructor({ layout, things, texts, random, saved, onSave }) {
-    Object.assign(this, { layout, things, texts, random, onSave });
+  constructor({ layout, things, texts, random, clock, saved, onSave }) {
+    Object.assign(this, { layout, things, texts, random, clock, onSave });
     this.plan = saved.plan;
     this.progress = saved.progress;
     this.dayCount = saved.dayCount;
+    this.history = saved.history;
+    this.lastDayFinishedOn = saved.lastDayFinishedOn;
     this.world = World.restore(layout, saved.world);
     // a day that cannot be continued (it names something that is gone) is dropped; the world stays
     this.day = canContinue(saved.day, { layout, things })
@@ -57,6 +63,8 @@ export class AppFlow {
       world: this.world.snapshot(),
       day: this.day ? this.day.snapshot() : null,
       dayCount: this.dayCount,
+      history: this.history,
+      lastDayFinishedOn: this.lastDayFinishedOn,
     });
   }
 
@@ -78,7 +86,13 @@ export class AppFlow {
     this.day ??= Day.start({
       layout: this.layout, things: this.things, world: this.world, plan: this.plan, progress: this.progress, random: this.random, number: this.dayCount + 1,
     });
-    return new PlayFlow(this.day, { texts: this.texts, onFinished: () => this.finishDay() });
+    const dayNumber = this.day.state().number;
+    return new PlayFlow(this.day, {
+      texts: this.texts,
+      onFinished: () => this.finishDay(),
+      onFound: (record) => { this.history = recordFind(this.history, { day: dayNumber, ...record }); },
+      onPut: (record) => { this.history = recordPut(this.history, { day: dayNumber, ...record }); },
+    });
   }
 
   startSetup() {
@@ -116,10 +130,13 @@ export class AppFlow {
     const { texts } = this;
     const number = this.day.state().number;
     this.progress = this.day.progress();
+    const lead = this.summaryLines(number);
     this.day = null;
     this.dayCount += 1;
+    this.lastDayFinishedOn = this.clock.today();
     this.current = new ChoiceScreen(
       {
+        lead,
         command: texts.dayDone({ number }),
         choices: [{ id: 'next', label: texts.startDay({ number: this.dayCount + 1 }) }, { id: 'start', label: texts.backToStart }],
       },
@@ -127,5 +144,26 @@ export class AppFlow {
         this.current = choice === 'next' ? this.startDay() : this.welcome();
       },
     );
+  }
+
+  /** The lines of the summary screen, in the order of the story; a line with nothing to say is left out. */
+  summaryLines(dayNumber) {
+    const { texts } = this;
+    const summary = summarize({ dayNumber, history: this.history, world: this.world, plan: this.plan, things: this.things });
+    const thingNamed = (thingId) => named(texts.things, this.things.find((thing) => thing.id === thingId));
+    const lookup = { garmentOf: (id) => this.layout.garments.find((garment) => garment.id === id), roomOf: (id) => this.layout.places.find((place) => place.id === id) };
+    const advice = texts.advice[summary.advice]({ things: summary.away.map((entry) => thingNamed(entry.thingId)) });
+    const noSearch = summary.advice === 'noSearch';
+    const lines = [
+      summary.home.length > 0 && texts.homeLine({ things: summary.home.map(thingNamed) }),
+      summary.away.length > 0 && texts.awayLine({
+        things: summary.away.map((entry) => ({ thing: thingNamed(entry.thingId), where: describeLocation(lookup, entry.location, texts, { withRoom: false }) })),
+      }),
+      noSearch ? advice : texts.searchedLine({ searched: summary.searched, possible: summary.possible }),
+      texts.puttingLine({ steps: summary.putSteps }),
+      !noSearch && advice,
+      this.lastDayFinishedOn === this.clock.today() && texts.comeBackTomorrow,
+    ];
+    return lines.filter(Boolean);
   }
 }

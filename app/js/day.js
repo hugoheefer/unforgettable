@@ -16,11 +16,15 @@ import { buildDay, HURRY_REASONS } from './scenario.js';
 /** In a hurry only a room this many steps away can be walked to or reached. */
 const HURRY_REACH = 1;
 
+/** Looking where a thing lies is one step, however near. */
+const LOOK_STEPS = 1;
+
 const PAUSE_TEXTS = ['day', 'outForTheDay'];
 const MOVE_TEXTS = ['arrive', 'morning', 'after'];
 
 const isObject = (value) => typeof value === 'object' && value !== null && !Array.isArray(value);
 const isWholeNumber = (value) => Number.isInteger(value) && value >= 0;
+const isFindStart = (note) => isObject(note) && Number.isInteger(note.shortest) && note.shortest >= 1 && typeof note.wasHome === 'boolean';
 const hasUse = (thingId, useId, context) => context.things.get(thingId)?.uses.some((use) => use.id === useId) === true;
 
 /** The text of a move, in the event itself and in the pending text of the screen after it. */
@@ -50,7 +54,10 @@ export const EVENT_KINDS = {
     isValid: (event, context) => context.rooms.has(event.roomId) && isValidMoveText(event, context),
   },
   find: {
-    enter() {},
+    enter(day, event) {
+      const where = day.world.whereIs(event.thingId);
+      day.findStart = where && { shortest: day.roomDistanceTo(where) + LOOK_STEPS, wasHome: sameLocation(where, day.plan[event.thingId]) };
+    },
     isDone: (day, event) => day.inHand.includes(event.thingId),
     isValid: (event, context) => context.things.has(event.thingId) && (event.useId === null || hasUse(event.thingId, event.useId, context)),
   },
@@ -74,7 +81,7 @@ export const EVENT_KINDS = {
 export function canContinue(state, { layout, things }) {
   if (!isObject(state)) return false;
   const context = { rooms: new Set(layout.places.map((place) => place.id)), things: new Map(things.map((thing) => [thing.id, thing])) };
-  const { number, events, index, roomId, startedIn, inHand, steps, opened, arrival } = state;
+  const { number, events, index, roomId, startedIn, inHand, steps, opened, arrival, findStart } = state;
   const validEvents = Array.isArray(events) && events.length > 0
     && events.every((event) => isObject(event) && Object.hasOwn(EVENT_KINDS, event.kind) && EVENT_KINDS[event.kind].isValid(event, context));
   return validEvents && isWholeNumber(number) && isWholeNumber(index) && index < events.length
@@ -82,6 +89,7 @@ export function canContinue(state, { layout, things }) {
     && Array.isArray(inHand) && inHand.every((id) => context.things.has(id))
     && isWholeNumber(steps)
     && Array.isArray(opened) && opened.every((key) => typeof key === 'string')
+    && (events[index].kind === 'find' ? isFindStart(findStart) : (findStart ?? null) === null)
     && (arrival === null || (isObject(arrival) && isValidMoveText(arrival, context)));
 }
 
@@ -114,8 +122,8 @@ export class Day {
 
   /** Plain data of the day as it goes into the save. A copy, so later actions do not change it. */
   snapshot() {
-    const { number, events, index, roomId, inHand, steps, startedIn, opened, arrival } = this;
-    return structuredClone({ number, events, index, roomId, inHand, steps, startedIn, opened, arrival });
+    const { number, events, index, roomId, inHand, steps, startedIn, opened, arrival, findStart } = this;
+    return structuredClone({ number, events, index, roomId, inHand, steps, startedIn, opened, arrival, findStart: findStart ?? null });
   }
 
   /** Everything a view needs to know about the running event. */
@@ -180,6 +188,7 @@ export class Day {
     this.steps = 0;
     this.opened = [];
     this.startedIn = this.roomId;
+    this.findStart = null;
     const event = this.event();
     if (event) EVENT_KINDS[event.kind].enter(this, event);
   }
@@ -278,13 +287,18 @@ export class Day {
     this.inHand = this.inHand.filter((id) => id !== thingId);
     const { steps } = this;
     this.settle();
-    return { thingId, location, atHome, steps };
+    return { thingId, location, atHome, steps, hurry: Boolean(hurry) };
+  }
+
+  /** Steps from the room where the event started to the room a location is reached from; 0 for a worn garment. */
+  roomDistanceTo(location) {
+    if (isPocket(location) && this.world.isWorn(location.garmentId)) return 0;
+    const roomId = isPocket(location) ? this.world.garmentRoom(location.garmentId) : location.placeId;
+    return this.world.stepsBetween(this.startedIn, roomId);
   }
 
   homeWithinHurryReach(home) {
-    if (isPocket(home) && this.world.isWorn(home.garmentId)) return true;
-    const roomId = isPocket(home) ? this.world.garmentRoom(home.garmentId) : home.placeId;
-    return this.world.stepsBetween(this.startedIn, roomId) <= HURRY_REACH;
+    return this.roomDistanceTo(home) <= HURRY_REACH;
   }
 
   // ---- finding ----
@@ -313,6 +327,7 @@ export class Day {
       this.inHand.push(thingId);
     }
     const result = { found, steps: this.steps, location: { ...location }, seen: this.world.itemsOn(location) };
+    if (found && this.findStart) Object.assign(result, this.findStart);
     this.settle();
     return result;
   }

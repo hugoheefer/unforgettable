@@ -52,6 +52,10 @@ All texts and names moved to `app/js/texts/en.js` and injected; `layout.js` hold
 
 Days made of events replace the round: `things.js` (catalogue), `scenario.js` (events of a day), `day.js` (runs them on a persistent world), new screens (put away, find, walk list with distances, pauses, a Menu link during a day), saving after every step and continuing after a reload. The old round, the points and the forced drop are gone. 346 tests. Not checked: dark mode, a real phone, a hurried put-away in the browser (unit tests only).
 
+## Story 3 done (2026-11-16)
+
+Every find records its steps and the shortest way; every put-away its steps. The end of a day is a summary: what is on its home spot tonight, what is elsewhere and where, steps spent searching against going straight, steps spent putting away, one line of advice, and "come back tomorrow" when a second day is finished on the same date. 453 tests. Not reached in the browser: the costly and the no-search summaries (unit tests only). **Now the user plays a few days before story 4.**
+
 ## Next
 
 The decided plan to a usable version is in `plan.md` (2026-11-16): story 0 refactor, 0b texts ready for a second language, 1 the world persists, 2 days made of events, 3 find cost and day summary, 4 progress, 5 first use and choosing things, 6 bridge to real life, 7 putting things back, 8 hand-over. Build them in that order; move each to "Done" here when it is finished.

@@ -6,6 +6,7 @@ import { World } from './world.js';
 import { AppFlow } from './app-flow.js';
 import { createSaveStore } from './save-store.js';
 import { createRandomSource } from './random-source.js';
+import { createClock } from './clock.js';
 import { renderStep } from './screens.js';
 import { textsFor } from './texts.js';
 
@@ -24,6 +25,7 @@ const flow = new AppFlow({
   things: THINGS.filter((thing) => save.things.includes(thing.id)),
   texts,
   random: createRandomSource(),
+  clock: createClock(),
   saved: save,
   onSave: (state) => {
     save = { ...save, ...state };

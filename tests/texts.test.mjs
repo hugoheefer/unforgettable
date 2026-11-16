@@ -5,6 +5,7 @@ import { LANGUAGES, textsFor } from '../app/js/texts.js';
 import { REFUSALS } from '../app/js/errors.js';
 import { THINGS } from '../app/js/things.js';
 import { buildDay, HURRY_REASONS } from '../app/js/scenario.js';
+import { ADVICE } from '../app/js/summary.js';
 import { TEXTS } from './texts-helper.mjs';
 import { rand } from './day-helper.mjs';
 
@@ -119,4 +120,45 @@ test('every pause and every arrival that a day can have has a text', () => {
   assert.deepEqual([...pauses].filter((key) => TEXTS.pauses?.[key] === undefined), []);
   assert.deepEqual([...arrivals].filter((key) => TEXTS.arrivals?.[key] === undefined), []);
   assert.ok(pauses.has('outForTheDay') && arrivals.has('morning'), 'the sample days cover the leaving part');
+});
+
+// ---- the summary of a day ----
+
+test('every advice that the summary can give has a sentence', () => {
+  assert.deepEqual(ADVICE.filter((row) => typeof TEXTS.advice?.[row.key] !== 'function'), []);
+  assert.ok(ADVICE.length > 0, 'the summary has advice rows');
+});
+
+test('the home line lists the names of the things that are on their home spot', () => {
+  assert.equal(TEXTS.homeLine({ things: [{ name: 'keys' }, { name: 'wallet' }] }), 'On the home spot tonight: keys, wallet.');
+  assert.equal(TEXTS.homeLine({ things: [{ name: 'keys' }] }), 'On the home spot tonight: keys.');
+});
+
+test('the away line gives each thing with where it is, in brackets', () => {
+  const things = [{ thing: { name: 'phone' }, where: 'on the garden table' }, { thing: { name: 'keys' }, where: 'on the sofa' }];
+  assert.equal(TEXTS.awayLine({ things }), 'Somewhere else: phone (on the garden table), keys (on the sofa).');
+});
+
+test('the searching line says one step in the singular and several in the plural', () => {
+  assert.equal(TEXTS.searchedLine({ searched: 9, possible: 4 }), 'Searching cost 9 steps today. Going straight to each thing: 4.');
+  assert.equal(TEXTS.searchedLine({ searched: 1, possible: 1 }), 'Searching cost 1 step today. Going straight to each thing: 1.');
+});
+
+test('the putting-away line says one step in the singular and several in the plural', () => {
+  assert.equal(TEXTS.puttingLine({ steps: 5 }), 'Putting things away cost 5 steps.');
+  assert.equal(TEXTS.puttingLine({ steps: 1 }), 'Putting things away cost 1 step.');
+  assert.equal(TEXTS.puttingLine({ steps: 0 }), 'Putting things away cost 0 steps.');
+});
+
+test('the advice sentences are the ones of the story, the someAway one without a verb that depends on the count', () => {
+  const things = [{ name: 'phone' }, { name: 'keys' }];
+  assert.equal(TEXTS.advice.noSearch({ things }), 'Nothing to search for today.');
+  assert.equal(TEXTS.advice.costly({ things }), "Most of today's steps went into searching. A fixed place costs a few steps once.");
+  assert.equal(TEXTS.advice.allHome({ things }), 'Everything is in its place. Tomorrow you will find it without thinking.');
+  assert.equal(TEXTS.advice.someAway({ things }), 'Remember where you left: phone, keys. Tomorrow you will know.');
+  assert.equal(TEXTS.advice.someAway({ things: [{ name: 'phone' }] }), 'Remember where you left: phone. Tomorrow you will know.');
+});
+
+test('the line about coming back tomorrow is the one of the story', () => {
+  assert.equal(TEXTS.comeBackTomorrow, 'Come back tomorrow. A night in between is the real test.');
 });

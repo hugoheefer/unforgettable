@@ -5,6 +5,7 @@
 // name entries (merged with their icon by `named()`) and the values it needs.
 
 const steps = (count) => (count === 1 ? '1 step' : `${count} steps`);
+const list = (names) => names.join(', ');
 const seenText = (seen) => (seen.length > 0 ? ` ${seen.join(' ')}` : '');
 
 export const en = {
@@ -156,6 +157,19 @@ export const en = {
   continueDay: ({ number }) => `Continue day ${number}`,
   dayDone: ({ number }) => `Day ${number} is done.`,
   backToStart: 'Back to the start',
+
+  // The summary of a day. `things` are name entries; for the away line each is `{ thing, where }`.
+  homeLine: ({ things }) => `On the home spot tonight: ${list(things.map((thing) => thing.name))}.`,
+  awayLine: ({ things }) => `Somewhere else: ${list(things.map(({ thing, where }) => `${thing.name} (${where})`))}.`,
+  searchedLine: ({ searched, possible }) => `Searching cost ${steps(searched)} today. Going straight to each thing: ${possible}.`,
+  puttingLine: ({ steps: count }) => `Putting things away cost ${steps(count)}.`,
+  advice: {
+    noSearch: () => 'Nothing to search for today.',
+    costly: () => "Most of today's steps went into searching. A fixed place costs a few steps once.",
+    allHome: () => 'Everything is in its place. Tomorrow you will find it without thinking.',
+    someAway: ({ things }) => `Remember where you left: ${list(things.map((thing) => thing.name))}. Tomorrow you will know.`,
+  },
+  comeBackTomorrow: 'Come back tomorrow. A night in between is the real test.',
 
   planHint: ({ location }) => `Your plan: ${location}.`,
   hurryLine: ({ reason }) => `${reason} No time to walk far.`,
