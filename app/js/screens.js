@@ -8,12 +8,18 @@ function el(tag, className, text) {
 }
 
 /**
- * @param {{ lead: string[], command: string, choices: { id: string, label: string, mark?: string }[], selected: string | null }} step
- * @param {{ onChoose: (id: string) => void, onNext: () => void }} handlers
- * @param {{ next: string }} texts
+ * @param {{ lead: string[], command: string, choices: { id: string, label: string, mark?: string }[], selected: string | null, canLeave?: boolean }} step
+ * @param {{ onChoose: (id: string) => void, onNext: () => void, onLeave: () => void }} handlers
+ * @param {{ next: string, menu: string }} texts
  */
-export function renderStep(step, { onChoose, onNext }, texts) {
+export function renderStep(step, { onChoose, onNext, onLeave }, texts) {
   const screen = el('section', 'screen');
+  if (step.canLeave) {
+    const menu = el('button', 'menu-link', texts.menu);
+    menu.type = 'button';
+    menu.addEventListener('click', onLeave);
+    screen.append(menu);
+  }
   if (step.lead.length > 0) {
     const lead = el('div', 'lead');
     for (const line of step.lead) lead.append(el('p', '', line));

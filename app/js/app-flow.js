@@ -1,10 +1,11 @@
-// The whole app as a series of screens, each with a command and choices: welcome, choosing home spots,
-// the round, and the result. Pure: rounds are made by the injected `createRound`, saving by callbacks.
+// The whole app as a series of screens, each with a command and choices: the start screen, choosing home
+// spots, the days, and the end of a day. Pure: saving goes through one callback with the complete plain state.
 
+import { Day, canContinue } from './day.js';
 import { PlayFlow } from './play-flow.js';
 import { SetupFlow } from './setup-flow.js';
+import { World } from './world.js';
 import { choiceNotOffered } from './errors.js';
-import { named } from './names.js';
 
 /** A screen with fixed text whose choices lead somewhere. */
 class ChoiceScreen {
@@ -28,39 +29,60 @@ class ChoiceScreen {
   }
 }
 
-const placementKind = (result) => (result.atHome ? 'atHome' : result.forced ? 'interrupted' : 'away');
-
 export class AppFlow {
   /**
-   * @param {{ layout: object, items: object[], plan: object, progress: object, texts: object,
-   *           createRound: (plan: object, progress: object) => import('./round.js').Round,
-   *           onPlanChange: (plan: object) => void, onProgressChange: (progress: object) => void,
-   *           onWorldChange: (snapshot: object) => void }} options
+   * @param {{ layout: object, things: object[], texts: object, random: object,
+   *           saved: { plan: object, progress: object, world: object, day: object | null, dayCount: number },
+   *           onSave: (state: { plan: object, progress: object, world: object, day: object | null, dayCount: number }) => void }} options
+   *   `things` are the chosen catalogue entries; `saved` is what `onSave` handed over last time (or the defaults)
    */
-  constructor(options) {
-    Object.assign(this, options);
+  constructor({ layout, things, texts, random, saved, onSave }) {
+    Object.assign(this, { layout, things, texts, random, onSave });
+    this.plan = saved.plan;
+    this.progress = saved.progress;
+    this.dayCount = saved.dayCount;
+    this.world = World.restore(layout, saved.world);
+    // a day that cannot be continued (it names something that is gone) is dropped; the world stays
+    this.day = canContinue(saved.day, { layout, things })
+      ? new Day({ layout, things, world: this.world, plan: this.plan, progress: this.progress, state: saved.day })
+      : null;
     this.current = this.welcome();
   }
 
+  /** The complete plain state, as a copy that later play does not change. */
+  saveState() {
+    return structuredClone({
+      plan: this.plan,
+      progress: this.day ? this.day.progress() : this.progress,
+      world: this.world.snapshot(),
+      day: this.day ? this.day.snapshot() : null,
+      dayCount: this.dayCount,
+    });
+  }
+
   welcome() {
+    const { texts } = this;
+    const play = this.day ? texts.continueDay({ number: this.day.state().number }) : texts.startDay({ number: this.dayCount + 1 });
     return new ChoiceScreen(
       {
-        command: this.texts.welcome,
-        choices: [{ id: 'play', label: this.texts.startPlaying }, { id: 'setup', label: this.texts.chooseHomeSpots }],
+        command: texts.welcome,
+        choices: [{ id: 'play', label: play }, { id: 'setup', label: texts.chooseHomeSpots }],
       },
       (choice) => {
-        this.current = choice === 'play' ? this.startRound() : this.startSetup();
+        this.current = choice === 'play' ? this.startDay() : this.startSetup();
       },
     );
   }
 
-  startRound() {
-    this.round = this.createRound(this.plan, this.progress);
-    return new PlayFlow(this.round, { texts: this.texts, onFinished: () => this.finishRound() });
+  startDay() {
+    this.day ??= Day.start({
+      layout: this.layout, things: this.things, world: this.world, plan: this.plan, progress: this.progress, random: this.random, number: this.dayCount + 1,
+    });
+    return new PlayFlow(this.day, { texts: this.texts, onFinished: () => this.finishDay() });
   }
 
   startSetup() {
-    return new SetupFlow({ layout: this.layout, items: this.items, plan: this.plan, texts: this.texts, onFinished: () => this.finishSetup() });
+    return new SetupFlow({ layout: this.layout, items: this.things, plan: this.plan, texts: this.texts, onFinished: () => this.finishSetup() });
   }
 
   step() {
@@ -71,33 +93,38 @@ export class AppFlow {
     this.current.choose(choiceId);
   }
 
+  /** Acts on the choice and hands the new state over when it changed. */
   next() {
+    const before = JSON.stringify(this.saveState());
     this.current.next();
+    const after = this.saveState();
+    if (JSON.stringify(after) !== before) this.onSave(after);
+  }
+
+  /** The Menu link of a day: back to the start screen; the day continues where it was. */
+  leave() {
+    this.current = this.welcome();
   }
 
   finishSetup() {
     this.plan = this.current.plan();
-    this.onPlanChange(this.plan);
+    this.day?.usePlan(this.plan);
     this.current = this.welcome();
   }
 
-  describeResult(result) {
-    const item = this.round.items.find((candidate) => candidate.id === result.itemId);
-    return this.texts.results[placementKind(result)]({ thing: named(this.texts.things, item), cost: result.findCost });
-  }
-
-  finishRound() {
-    this.progress = this.round.progress();
-    this.onProgressChange(this.progress);
-    this.onWorldChange(this.round.world.snapshot());
+  finishDay() {
+    const { texts } = this;
+    const number = this.day.state().number;
+    this.progress = this.day.progress();
+    this.day = null;
+    this.dayCount += 1;
     this.current = new ChoiceScreen(
       {
-        lead: this.round.results().map((result) => this.describeResult(result)),
-        command: this.texts.resultCommand({ score: this.round.state().score }),
-        choices: [{ id: 'again', label: this.texts.playAgain }, { id: 'setup', label: this.texts.chooseHomeSpots }],
+        command: texts.dayDone({ number }),
+        choices: [{ id: 'next', label: texts.startDay({ number: this.dayCount + 1 }) }, { id: 'start', label: texts.backToStart }],
       },
       (choice) => {
-        this.current = choice === 'again' ? this.startRound() : this.startSetup();
+        this.current = choice === 'next' ? this.startDay() : this.welcome();
       },
     );
   }

@@ -1,9 +1,12 @@
-// The questions the app asks during a round, one screen at a time: a command and the choices the player can
-// make. The player picks one and taps Next. Pure: it drives a Round and holds no DOM.
+// The questions the app asks during a day, one screen at a time: a command and the choices the player can
+// make. The player picks one and taps Next. Pure: it drives a Day and holds no DOM.
 //
-// A screen is { lead: string[], command: string, choices: { id, label, mark? }[], selected: string | null }.
-// Choice ids: 'spots' | 'pockets' | 'doors' | 'hang:<garment>' | 'puton:<garment>' open a list; inside a list
-// 'spot:<id>' | 'pocket:<garment>/<pocket>' | 'door:<room>' act; 'back' returns to the first question.
+// A screen is { lead: string[], command: string, choices: { id, label, mark? }[], selected: string | null,
+// canLeave: true }. Choice ids: 'spots' | 'pockets' | 'doors' | 'hang:<garment>' | 'puton:<garment>' open a list;
+// inside a list 'spot:<id>' | 'pocket:<garment>/<pocket>' | 'door:<room>' act; 'back' returns to the first question.
+//
+// The lead is, in time order: what the last action did, the text of the move it ended in (that screen only),
+// and the lines that explain the event (why you look, why you hurry, the plan).
 
 import { describeLocation, describeRoom } from './room-view.js';
 import { RefusedMove, choiceNotOffered } from './errors.js';
@@ -14,75 +17,96 @@ const HINT_MARK = '★';
 const markOf = (hint) => (hint === 'hidden' ? undefined : HINT_MARK);
 const withMark = (choice, hint) => (markOf(hint) ? { ...choice, mark: markOf(hint) } : choice);
 
+/** The texts that differ between putting a thing away and looking for it. */
+const askingFor = (texts) => ({
+  putAway: {
+    command: texts.putCommand, spots: texts.spotsPutAway, pockets: texts.whichPocketPutAway, hereOption: texts.putInRoom, pocketOption: texts.putInPocket,
+  },
+  find: {
+    command: texts.findCommand, spots: texts.spotsFinding, pockets: texts.whichPocketFinding, hereOption: texts.lookHere, pocketOption: texts.lookInPocket,
+  },
+});
+
 export class PlayFlow {
   /**
-   * @param {import('./round.js').Round} round
-   * @param {{ texts: object, onFinished?: () => void }} options `onFinished` is called once, when the last thing is found
+   * @param {import('./day.js').Day} day
+   * @param {{ texts: object, onFinished?: () => void }} options `onFinished` is called once, when the last event is done
    */
-  constructor(round, { texts, onFinished = () => {} }) {
-    this.round = round;
+  constructor(day, { texts, onFinished = () => {} }) {
+    this.day = day;
     this.texts = texts;
     this.onFinished = onFinished;
     this.back = { id: 'back', label: texts.back };
     this.menu = { type: 'root' };
     this.selected = null;
     this.lead = [];
-    this.interlude = null; // the distraction screen between dropping and searching
+    this.arrival = day.state().arrival; // a day restored right after a move shows its text again
+    this.reported = false;
   }
 
   isFinished() {
-    return this.round.state().phase === 'done';
+    return this.day.state().finished;
   }
 
   step() {
-    if (this.interlude) return { lead: this.lead, command: this.interlude, choices: [], selected: null };
-    const state = this.round.state();
-    const view = describeRoom(this.round, this.texts);
-    const { command, choices } = this.question(state, view);
-    const lead = [...this.lead];
-    if (state.phase === 'drop') {
-      lead.push(this.texts.dropStatus({ pressure: state.pressure, movesLeft: state.movesLeft }));
-      if (view.hintText) lead.push(view.hintText);
-    }
-    return { lead, command, choices, selected: this.selected };
+    const state = this.day.state();
+    if (state.finished) return { lead: this.lead, command: '', choices: [], selected: null, canLeave: true };
+    const view = describeRoom(this.day, this.texts);
+    const { command, choices } = state.event.kind === 'pause' ? this.pause(state) : this.question(state, view);
+    return { lead: [...this.lead, ...this.arrivalLines(state), ...this.contextLines(state, view)], command, choices, selected: this.selected, canLeave: true };
   }
 
-  question(state, view) {
+  pause(state) {
+    return { command: this.texts.pauses[state.event.text]({ number: state.number }), choices: [] };
+  }
+
+  arrivalLines(state) {
+    const { arrival, texts } = this;
+    if (!arrival) return [];
+    if (arrival.text === 'after') return [texts.uses[arrival.thingId][arrival.useId].after];
+    const line = texts.arrivals[arrival.text];
+    return [typeof line === 'function' ? line({ room: named(texts.rooms, this.day.roomOf(state.roomId)) }) : line];
+  }
+
+  contextLines({ event }, view) {
     const { texts } = this;
-    const dropping = state.phase === 'drop';
+    if (event.kind === 'find') return event.useId ? [texts.uses[event.thingId][event.useId].need] : [];
+    if (event.kind !== 'putAway') return [];
+    const hurry = event.hurry ? [texts.hurryLine({ reason: texts.hurryReasons[event.hurry] })] : [];
+    return view.hintText ? [...hurry, view.hintText] : hurry;
+  }
+
+  question({ event }, view) {
+    const { texts } = this;
+    const asking = askingFor(texts)[event.kind];
     switch (this.menu.type) {
       case 'spots':
-        return { command: (dropping ? texts.spotsDropping : texts.spotsFinding)({ room: view.room }), choices: this.spotChoices(view) };
+        return { command: asking.spots({ room: view.room }), choices: this.spotChoices(view) };
       case 'pockets':
-        return { command: dropping ? texts.whichPocketDropping : texts.whichPocketFinding, choices: this.pocketChoices(view) };
+        return { command: asking.pockets, choices: this.pocketChoices(view) };
       case 'doors':
-        return { command: texts.walkWhere, choices: [...view.exits.map((exit) => ({ id: `door:${exit.id}`, label: texts.tileLabel(exit) })), this.back] };
+        return { command: texts.walkWhere, choices: [...view.rooms.map((room) => withMark({ id: `door:${room.id}`, label: texts.walkOption({ room, steps: room.steps }) }, room.hint)), this.back] };
       case 'hang': {
-        const garment = named(texts.garments, this.round.garmentOf(this.menu.garmentId));
+        const garment = named(texts.garments, this.day.garmentOf(this.menu.garmentId));
         return { command: texts.hangWhere({ garment }), choices: this.spotChoices(view) };
       }
       default:
-        return dropping
-          ? { command: texts.putCommand({ room: view.room, thing: this.thingOf(state.holding) }), choices: this.rootChoices(view, dropping) }
-          : { command: texts.findCommand({ prompt: state.findPrompt, room: view.room }), choices: this.rootChoices(view, dropping) };
+        return { command: asking.command({ room: view.room, thing: this.thingOf(event.thingId) }), choices: this.rootChoices(event, view) };
     }
   }
 
-  thingOf(itemId) {
-    return named(this.texts.things, this.round.items.find((candidate) => candidate.id === itemId));
+  thingOf(thingId) {
+    return named(this.texts.things, this.day.things.find((candidate) => candidate.id === thingId));
   }
 
-  rootChoices(view, dropping) {
+  rootChoices(event, view) {
     const { texts } = this;
-    const choices = [
-      { id: 'spots', label: dropping ? texts.putInRoom({ room: view.room }) : texts.lookAtSpot({ room: view.room }) },
-    ];
-    if (this.reachablePockets(view).length > 0) choices.push({ id: 'pockets', label: dropping ? texts.putInPocket : texts.lookInPocket });
+    const asking = askingFor(texts)[event.kind];
+    const choices = [{ id: 'spots', label: asking.hereOption({ room: view.room }) }];
+    if (this.reachablePockets(view).length > 0) choices.push({ id: 'pockets', label: asking.pocketOption });
     choices.push({ id: 'doors', label: texts.walkToRoom });
-    if (dropping) {
-      for (const garment of view.worn) if (garment.canTakeOff) choices.push({ id: `hang:${garment.id}`, label: texts.takeOff({ garment }) });
-      for (const garment of view.hanging) choices.push({ id: `puton:${garment.id}`, label: texts.putOn({ garment }) });
-    }
+    for (const garment of view.worn) if (garment.canTakeOff) choices.push({ id: `hang:${garment.id}`, label: texts.takeOff({ garment }) });
+    if (event.kind === 'putAway') for (const garment of view.hanging) choices.push({ id: `puton:${garment.id}`, label: texts.putOn({ garment }) });
     return choices;
   }
 
@@ -107,29 +131,21 @@ export class PlayFlow {
   }
 
   next() {
-    if (this.interlude) {
-      this.interlude = null;
-      this.lead = [];
+    const event = this.day.state().event;
+    if (!event) return;
+    if (event.kind === 'pause') {
+      this.perform(() => this.day.continue());
       return;
     }
     const choice = this.selected;
     if (!choice) return;
     this.selected = null;
-    this.lead = [];
-    const phaseBefore = this.round.state().phase;
-    try {
-      this.apply(choice);
-    } catch (error) {
-      if (!(error instanceof RefusedMove)) throw error;
-      this.lead = [this.texts.refusals[error.code]];
-    }
-    const state = this.round.state();
-    if (state.notice) this.lead.push(state.notice);
-    if (phaseBefore === 'drop' && state.phase === 'find') this.interlude = state.distraction;
-    if (phaseBefore !== 'done' && state.phase === 'done') this.onFinished();
+    this.apply(choice);
   }
 
   apply(choice) {
+    this.lead = [];
+    this.arrival = null;
     if (choice === 'back') {
       this.menu = { type: 'root' };
       return;
@@ -142,52 +158,63 @@ export class PlayFlow {
 
   /** Does what the player chose, then goes back to the first question. */
   act(kind, rest) {
-    const state = this.round.state();
-    const dropping = state.phase === 'drop';
-    const itemId = state.holding ?? state.findItem;
-    const menu = this.menu;
-    const { texts } = this;
+    const { menu } = this;
     this.menu = { type: 'root' };
-    if (kind === 'puton') {
-      this.round.putOn(rest);
-      this.lead = [texts.putOnDone({ garment: named(texts.garments, this.round.garmentOf(rest)) })];
-    } else if (kind === 'door') {
-      this.round.walkTo(rest);
-    } else if (menu.type === 'hang') {
-      this.round.takeOff(menu.garmentId, rest);
-      this.lead = [texts.hungDone({ garment: named(texts.garments, this.round.garmentOf(menu.garmentId)), spot: this.spotOf(rest) })];
-    } else if (dropping) {
-      if (kind === 'pocket') this.round.putInPocket(...rest.split('/'));
-      else this.round.putDown(rest);
-      this.lead = [this.placedText(itemId)];
-    } else {
-      const outcome = kind === 'pocket' ? this.round.openPocket(...rest.split('/')) : this.round.open(rest);
-      this.lead = [this.lookedText(itemId, outcome)];
+    this.perform(() => this.run(kind, rest, menu));
+  }
+
+  /** Runs an action of the day; a refused move is told in the player's language, a mistake in the code is not hidden. */
+  perform(action) {
+    this.lead = [];
+    try {
+      this.lead = action() ?? [];
+    } catch (error) {
+      if (!(error instanceof RefusedMove)) throw error;
+      this.lead = [this.texts.refusals[error.code]];
+    }
+    const state = this.day.state();
+    this.arrival = state.arrival;
+    if (state.finished && !this.reported) {
+      this.reported = true;
+      this.onFinished();
     }
   }
 
-  spotOf(spotId) {
-    return named(this.texts.spots, this.round.roomOf(this.round.state().roomId).spots.find((spot) => spot.id === spotId));
+  run(kind, rest, menu) {
+    const { texts, day } = this;
+    if (kind === 'puton') {
+      day.putOn(rest);
+      return [texts.putOnDone({ garment: named(texts.garments, day.garmentOf(rest)) })];
+    }
+    if (kind === 'door') {
+      day.walkTo(rest);
+      return [];
+    }
+    if (menu.type === 'hang') {
+      day.takeOff(menu.garmentId, rest);
+      const spot = named(texts.spots, day.roomOf(day.state().roomId).spots.find((candidate) => candidate.id === rest));
+      return [texts.hungDone({ garment: named(texts.garments, day.garmentOf(menu.garmentId)), spot })];
+    }
+    const [first, second] = rest.split('/');
+    if (day.state().event.kind === 'putAway') {
+      return [this.placedText(kind === 'pocket' ? day.putInPocket(first, second) : day.putDown(first))];
+    }
+    return [this.lookedText(day.state().event.thingId, kind === 'pocket' ? day.lookInPocket(first, second) : day.look(first))];
   }
 
-  placedText(itemId) {
-    const thing = this.thingOf(itemId);
-    const result = this.round.results().find((entry) => entry.itemId === itemId);
-    if (result.atHome) return this.texts.placedHome({ thing });
+  placedText({ thingId, location, atHome }) {
+    const thing = this.thingOf(thingId);
+    if (atHome) return this.texts.placedHome({ thing });
     return this.texts.placedAway({
       thing,
-      where: describeLocation(this.round, result.location, this.texts),
-      plan: describeLocation(this.round, this.round.plan[itemId], this.texts),
+      where: describeLocation(this.day, location, this.texts, { withRoom: false }),
+      home: describeLocation(this.day, this.day.plan[thingId], this.texts),
     });
   }
 
-  lookedText(itemId, outcome) {
-    const thing = this.thingOf(itemId);
-    if (outcome.found) {
-      const cost = this.round.results().find((entry) => entry.itemId === itemId).findCost;
-      return this.texts.found({ thing, cost });
-    }
-    const seen = outcome.items.map((id) => this.round.items.find((candidate) => candidate.id === id).icon);
-    return seen.length > 0 ? this.texts.notHereSee({ seen }) : this.texts.notHere;
+  lookedText(thingId, { found, steps, location, seen }) {
+    if (found) return this.texts.found({ thing: this.thingOf(thingId), where: describeLocation(this.day, location, this.texts, { withRoom: false }), steps });
+    const icons = seen.map((id) => this.day.things.find((candidate) => candidate.id === id).icon);
+    return icons.length > 0 ? this.texts.notHereSee({ seen: icons }) : this.texts.notHere;
   }
 }

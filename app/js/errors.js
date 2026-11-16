@@ -3,7 +3,6 @@
 
 /** Developer messages of the moves the game refuses, by code. The player's sentences live in the texts. */
 export const REFUSALS = {
-  'no-door': 'Refused: there is no door to that room',
   'not-removable': 'Refused: that garment cannot be taken off',
   'not-worn': 'Refused: you are not wearing that garment',
   'spot-not-here': 'Refused: that spot is not in this room',

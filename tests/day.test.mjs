@@ -1,11 +1,11 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { Day } from '../app/js/day.js';
+import { Day, canContinue } from '../app/js/day.js';
 import { RefusedMove } from '../app/js/errors.js';
 import { LAYOUT } from '../app/js/layout.js';
 import { THINGS, defaultPlan } from '../app/js/things.js';
 import { World } from '../app/js/world.js';
-import { find, findDay, makeDay, moveTo, pause, playOut, pocket, putAway, putAwayDay, rand, refusalOf, spot, worldWith } from './day-helper.mjs';
+import { dayState, find, findDay, makeDay, moveTo, pause, playOut, pocket, putAway, putAwayDay, rand, refusalOf, spot, worldWith } from './day-helper.mjs';
 
 const coatHooks = spot('hall', 'coat-hooks');
 
@@ -493,4 +493,90 @@ test('the saved state is a copy: later actions do not change it', () => {
   day.look('sofa');
   assert.equal(snapshot.steps, 2);
   assert.equal(snapshot.index, 0);
+});
+
+// ---- changing the home spots between two events ----
+
+test('a plan chosen between two events applies to the next put-away', () => {
+  const day = putAwayDay('keys', { roomId: 'kitchen' });
+  day.usePlan({ ...defaultPlan(), keys: spot('kitchen', 'counter') });
+  assert.equal(day.putDown('counter').atHome, true);
+  assert.equal(day.progress().streaks.keys, 1);
+});
+
+test('the hint follows the plan that was chosen last', () => {
+  const day = putAwayDay('keys');
+  day.usePlan({ ...defaultPlan(), keys: spot('kitchen', 'counter') });
+  assert.deepEqual(day.plan.keys, spot('kitchen', 'counter'));
+});
+
+// ---- a saved day that cannot be continued ----
+
+const context = { layout: LAYOUT, things: THINGS };
+/** A day in the middle of a use, with every field filled in. */
+const goodState = () => structuredClone(dayState(
+  [pause('day'), find('keys', 'shed'), moveTo('shed', 'after', { thingId: 'keys', useId: 'shed' }), putAway('keys', 'doorbell')],
+  { index: 3, roomId: 'shed', startedIn: 'shed', inHand: ['keys'], steps: 2, opened: ['hall/hook'], arrival: { text: 'after', thingId: 'keys', useId: 'shed' } },
+));
+
+test('a day made by the game can be continued, at its start and in the middle of an event', () => {
+  const day = Day.start({ layout: LAYOUT, things: THINGS, world: new World(LAYOUT), plan: defaultPlan(), progress: { streaks: {} }, random: rand({ chance: () => true }), number: 2 });
+  assert.equal(canContinue(day.snapshot(), context), true);
+  day.continue();
+  day.walkTo('kitchen');
+  assert.equal(canContinue(day.snapshot(), context), true);
+});
+
+test('a state with every field filled in can be continued', () => {
+  assert.equal(canContinue(goodState(), context), true);
+});
+
+test('a state without a pending text and without a hurry can be continued', () => {
+  const state = goodState();
+  state.arrival = null;
+  state.events[3].hurry = null;
+  assert.equal(canContinue(state, context), true);
+});
+
+const BROKEN = {
+  'something that is not an object': () => 'a day',
+  'a list instead of an object': () => [],
+  'no number': (s) => { delete s.number; return s; },
+  'no events': (s) => { s.events = []; return s; },
+  'events that are not a list': (s) => { s.events = 'many'; return s; },
+  'an unknown kind of event': (s) => { s.events[1] = { kind: 'dance' }; return s; },
+  'an event that is not an object': (s) => { s.events[1] = 'find'; return s; },
+  'a pause with an unknown text': (s) => { s.events[0].text = 'nap'; return s; },
+  'a move to a room that does not exist': (s) => { s.events[2].roomId = 'moon'; return s; },
+  'a move with an unknown text': (s) => { s.events[2].text = 'teleport'; return s; },
+  'a move after a use without the thing': (s) => { delete s.events[2].thingId; return s; },
+  'a move after a use that the thing does not have': (s) => { s.events[2].useId = 'moon'; return s; },
+  'a find for a thing that does not exist': (s) => { s.events[1].thingId = 'ghost'; return s; },
+  'a find with a use that the thing does not have': (s) => { s.events[1].useId = 'moon'; return s; },
+  'a put-away for a thing that does not exist': (s) => { s.events[3].thingId = 'ghost'; return s; },
+  'a put-away with an unknown reason to hurry': (s) => { s.events[3].hurry = 'earthquake'; return s; },
+  'an index past the last event': (s) => { s.index = 4; return s; },
+  'a negative index': (s) => { s.index = -1; return s; },
+  'an index that is not a whole number': (s) => { s.index = 1.5; return s; },
+  'a room that does not exist': (s) => { s.roomId = 'moon'; return s; },
+  'a room where the event started that does not exist': (s) => { s.startedIn = 'moon'; return s; },
+  'a thing in hand that does not exist': (s) => { s.inHand = ['ghost']; return s; },
+  'things in hand that are not a list': (s) => { s.inHand = 'keys'; return s; },
+  'steps that are negative': (s) => { s.steps = -1; return s; },
+  'steps that are not a whole number': (s) => { s.steps = '2'; return s; },
+  'spots looked at that are not strings': (s) => { s.opened = [1]; return s; },
+  'spots looked at that are not a list': (s) => { s.opened = 'hall/hook'; return s; },
+  'a pending text that is not an object': (s) => { s.arrival = 'arrive'; return s; },
+  'a pending text with an unknown key': (s) => { s.arrival = { text: 'teleport' }; return s; },
+};
+
+for (const [name, spoil] of Object.entries(BROKEN)) {
+  test(`a saved day with ${name} cannot be continued`, () => {
+    assert.equal(canContinue(spoil(goodState()), context), false);
+  });
+}
+
+test('a saved day for a thing that is no longer chosen cannot be continued', () => {
+  const withoutKeys = { layout: LAYOUT, things: THINGS.filter((thing) => thing.id !== 'keys') };
+  assert.equal(canContinue(goodState(), withoutKeys), false);
 });

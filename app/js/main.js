@@ -1,9 +1,8 @@
 // Entry point: connects the app flow to the page. All rules live in the other modules.
 
 import { LAYOUT } from './layout.js';
-import { THINGS as ITEMS, defaultPlan } from './things.js';
+import { THINGS, defaultPlan } from './things.js';
 import { World } from './world.js';
-import { Round } from './round.js';
 import { AppFlow } from './app-flow.js';
 import { createSaveStore } from './save-store.js';
 import { createRandomSource } from './random-source.js';
@@ -13,30 +12,21 @@ import { textsFor } from './texts.js';
 const app = document.getElementById('app');
 const world = new World(LAYOUT);
 const store = createSaveStore(() => window.localStorage, {
-  defaults: { plan: defaultPlan(), progress: { streaks: {} }, things: ITEMS.map((item) => item.id) },
+  defaults: { plan: defaultPlan(), progress: { streaks: {} }, things: THINGS.map((thing) => thing.id) },
   world: { hasLocation: (location) => world.hasLocation(location), restore: (snapshot) => World.restore(LAYOUT, snapshot) },
 });
 
 let save = store.load();
-const texts = textsFor('en');
+const texts = textsFor(save.language);
 
 const flow = new AppFlow({
   layout: LAYOUT,
-  items: ITEMS,
-  plan: save.plan,
-  progress: save.progress,
+  things: THINGS.filter((thing) => save.things.includes(thing.id)),
   texts,
-  createRound: (plan, progress) => new Round({ layout: LAYOUT, items: ITEMS, plan, random: createRandomSource(), progress, texts }),
-  onPlanChange: (plan) => {
-    save = { ...save, plan };
-    store.save(save);
-  },
-  onProgressChange: (progress) => {
-    save = { ...save, progress };
-    store.save(save);
-  },
-  onWorldChange: (snapshot) => {
-    save = { ...save, world: snapshot };
+  random: createRandomSource(),
+  saved: save,
+  onSave: (state) => {
+    save = { ...save, ...state };
     store.save(save);
   },
 });
@@ -49,6 +39,11 @@ function render() {
     },
     onNext: () => {
       flow.next();
+      render();
+      window.scrollTo(0, 0);
+    },
+    onLeave: () => {
+      flow.leave();
       render();
       window.scrollTo(0, 0);
     },

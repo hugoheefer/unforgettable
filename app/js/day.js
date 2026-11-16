@@ -5,25 +5,40 @@
 // exactly where the player was. Invariant: the event at `index` has always been entered, and a move never
 // stays current, because it is done the moment it is entered.
 //
-// A thing is in one of three places: on a spot or in a pocket of the world, nowhere, or in hand. Reach works as
-// in the old round: a spot within its own room; a pocket when its garment is worn or hangs in this room.
+// A thing is in one of three places: on a spot or in a pocket of the world, nowhere, or in hand. A spot is within
+// reach in its own room; a pocket when its garment is worn or hangs in this room.
 
 import { isPocket, locationKey, sameLocation } from './world.js';
 import { hintLevel, recordPlacement, streakOf } from './habit.js';
 import { RefusedMove, unknownRoom } from './errors.js';
-import { buildDay } from './scenario.js';
+import { buildDay, HURRY_REASONS } from './scenario.js';
 
 /** In a hurry only a room this many steps away can be walked to or reached. */
 const HURRY_REACH = 1;
 
+const PAUSE_TEXTS = ['day', 'outForTheDay'];
+const MOVE_TEXTS = ['arrive', 'morning', 'after'];
+
+const isObject = (value) => typeof value === 'object' && value !== null && !Array.isArray(value);
+const isWholeNumber = (value) => Number.isInteger(value) && value >= 0;
+const hasUse = (thingId, useId, context) => context.things.get(thingId)?.uses.some((use) => use.id === useId) === true;
+
+/** The text of a move, in the event itself and in the pending text of the screen after it. */
+function isValidMoveText(entry, context) {
+  if (!MOVE_TEXTS.includes(entry.text)) return false;
+  return entry.text !== 'after' || hasUse(entry.thingId, entry.useId, context);
+}
+
 /**
- * What each kind of event does when it begins and when it is over. `day.js` never switches on the kind.
+ * What each kind of event does when it begins, when it is over, and what a saved event of its kind must
+ * hold (`isValid`, checked before a saved day is continued). `day.js` never switches on the kind.
  * A move is done at once: it sets the room and leaves its text for the next screen.
  */
 export const EVENT_KINDS = {
   pause: {
     enter() {},
     isDone: (day) => day.acknowledged,
+    isValid: (event) => PAUSE_TEXTS.includes(event.text),
   },
   moveTo: {
     enter(day, event) {
@@ -32,10 +47,12 @@ export const EVENT_KINDS = {
       day.arrival = text;
     },
     isDone: () => true,
+    isValid: (event, context) => context.rooms.has(event.roomId) && isValidMoveText(event, context),
   },
   find: {
     enter() {},
     isDone: (day, event) => day.inHand.includes(event.thingId),
+    isValid: (event, context) => context.things.has(event.thingId) && (event.useId === null || hasUse(event.thingId, event.useId, context)),
   },
   putAway: {
     enter(day, event) {
@@ -43,8 +60,30 @@ export const EVENT_KINDS = {
       if (!day.inHand.includes(event.thingId)) day.inHand.push(event.thingId);
     },
     isDone: (day, event) => !day.inHand.includes(event.thingId),
+    isValid: (event, context) =>
+      context.things.has(event.thingId) && (event.hurry === null || HURRY_REASONS.some((reason) => reason.id === event.hurry)),
   },
 };
+
+/**
+ * Whether a day from the save can be continued: every part is of the right kind and names things, rooms and
+ * uses that exist now. A day that fails is dropped by the caller; the constructor trusts its state.
+ * @param {unknown} state
+ * @param {{ layout: object, things: object[] }} options `things` are the chosen catalogue entries
+ */
+export function canContinue(state, { layout, things }) {
+  if (!isObject(state)) return false;
+  const context = { rooms: new Set(layout.places.map((place) => place.id)), things: new Map(things.map((thing) => [thing.id, thing])) };
+  const { number, events, index, roomId, startedIn, inHand, steps, opened, arrival } = state;
+  const validEvents = Array.isArray(events) && events.length > 0
+    && events.every((event) => isObject(event) && Object.hasOwn(EVENT_KINDS, event.kind) && EVENT_KINDS[event.kind].isValid(event, context));
+  return validEvents && isWholeNumber(number) && isWholeNumber(index) && index < events.length
+    && context.rooms.has(roomId) && context.rooms.has(startedIn)
+    && Array.isArray(inHand) && inHand.every((id) => context.things.has(id))
+    && isWholeNumber(steps)
+    && Array.isArray(opened) && opened.every((key) => typeof key === 'string')
+    && (arrival === null || (isObject(arrival) && isValidMoveText(arrival, context)));
+}
 
 export class Day {
   /**
@@ -96,6 +135,21 @@ export class Day {
 
   progress() {
     return this.habits;
+  }
+
+  /** Home spots chosen between two events apply from the next put-away. */
+  usePlan(plan) {
+    this.plan = plan;
+  }
+
+  /** The other rooms with their distance, nearest first, then in the order of the layout; in a hurry only next door. */
+  reachableRooms() {
+    const hurry = this.event()?.hurry;
+    return this.layout.places
+      .filter((place) => place.id !== this.roomId)
+      .map((place) => ({ id: place.id, steps: this.world.stepsBetween(this.roomId, place.id) }))
+      .filter((room) => !hurry || room.steps <= HURRY_REACH)
+      .sort((a, b) => a.steps - b.steps);
   }
 
   hintFor(thingId) {

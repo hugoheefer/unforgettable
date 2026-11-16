@@ -1,7 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { LAYOUT } from '../app/js/layout.js';
-import { THINGS as ITEMS, defaultPlan } from '../app/js/things.js';
 import { LANGUAGES, textsFor } from '../app/js/texts.js';
 import { REFUSALS } from '../app/js/errors.js';
 import { THINGS } from '../app/js/things.js';
@@ -45,7 +44,7 @@ function mismatches(reference, other, path = '') {
 }
 
 test('every thing of the layout has all its forms in the texts', () => {
-  assert.deepEqual(missingForms('things', ids(ITEMS)), []);
+  assert.deepEqual(missingForms('things', ids(THINGS)), []);
 });
 
 test('every room of the layout has all its forms in the texts', () => {
@@ -62,11 +61,6 @@ test('every garment of the layout has all its forms in the texts', () => {
 
 test('every pocket of the layout has all its forms in the texts', () => {
   assert.deepEqual(missingForms('pockets', LAYOUT.garments.flatMap((garment) => ids(garment.pockets))), []);
-});
-
-test('every thing knows what to say when it has to be found', () => {
-  const missing = ids(ITEMS).filter((id) => typeof TEXTS.findPrompts?.[id] !== 'string' || TEXTS.findPrompts[id].length === 0);
-  assert.deepEqual(missing, []);
 });
 
 test('every refusal of the game has a sentence for the player', () => {

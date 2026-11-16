@@ -61,9 +61,8 @@ test('pocket ids are unique over the whole game, and never equal a spot id', () 
   for (const id of pocketIds) assert.equal(spotIds.includes(id), false, id);
 });
 
-test('the person starts the round at the front door, in a room', () => {
+test('the person starts the day at the front door', () => {
   assert.equal(LAYOUT.startRoomId, 'hall');
-  assert.notEqual(LAYOUT.places.find((place) => place.id === 'hall').kind, 'container');
 });
 
 test('things like tools and scissors are part of the game', () => {

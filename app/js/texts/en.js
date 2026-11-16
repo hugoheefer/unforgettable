@@ -4,7 +4,7 @@
 // changes a case, so a translator can reorder a sentence freely. A sentence is a string, or a function of the
 // name entries (merged with their icon by `named()`) and the values it needs.
 
-const moves = (count) => (count === 1 ? '1 move' : `${count} moves`);
+const steps = (count) => (count === 1 ? '1 step' : `${count} steps`);
 const seenText = (seen) => (seen.length > 0 ? ` ${seen.join(' ')}` : '');
 
 export const en = {
@@ -96,21 +96,8 @@ export const en = {
     'trousers-back': { name: 'Back pocket', at: 'in the back pocket of your trousers' },
   },
 
-  findPrompts: {
-    keys: 'You start the car: find your keys!',
-    wallet: 'You are at the till: find your wallet!',
-    phone: 'Someone is calling: find your phone!',
-    scissors: 'A parcel needs opening: find your scissors!',
-  },
-  pressures: ['Your phone is ringing!', 'The kettle is boiling over!', 'Someone is at the door!', 'You are late, hurry up!'],
-  distractions: [
-    'The neighbour wants to chat. Time passes...',
-    'You cook dinner and lose track of time...',
-    'You answer a long phone call...',
-  ],
   // What the player is told when the game refuses a move; the keys are the codes of `RefusedMove`.
   refusals: {
-    'no-door': 'There is no door to that room.',
     'not-removable': 'That garment cannot be taken off',
     'not-worn': 'You are not wearing that garment',
     'spot-not-here': 'That spot is not in this room',
@@ -162,35 +149,34 @@ export const en = {
 
   next: 'Next',
   back: '↩ Choose something else',
-  welcome: 'Unforgettable. Learn to always put your things in the same place.',
-  startPlaying: 'Start playing',
+  menu: 'Menu',
+  welcome: 'Unforgettable. Always put your things in the same place.',
   chooseHomeSpots: 'Choose my home spots',
-  playAgain: 'Play again',
-  resultCommand: ({ score }) => `Round finished. Score: ${score}`,
-  results: {
-    atHome: ({ thing, cost }) => `${thing.icon} ${thing.name}: put on the home spot; found with ${moves(cost)}.`,
-    interrupted: ({ thing, cost }) => `${thing.icon} ${thing.name}: left where you were interrupted; found with ${moves(cost)}.`,
-    away: ({ thing, cost }) => `${thing.icon} ${thing.name}: put away from the home spot; found with ${moves(cost)}.`,
-  },
+  startDay: ({ number }) => `Start day ${number}`,
+  continueDay: ({ number }) => `Continue day ${number}`,
+  dayDone: ({ number }) => `Day ${number} is done.`,
+  backToStart: 'Back to the start',
 
-  dropStatus: ({ pressure, movesLeft }) => `⏱ ${pressure} ${moves(movesLeft)} left.`,
-  planHint: ({ location }) => `Your plan: ${location}`,
-  locationSpot: ({ spot, room }) => `${spot.name} (${room.name})`,
-  locationPocket: ({ pocket, garment }) => `${pocket.name} (${garment.name})`,
+  planHint: ({ location }) => `Your plan: ${location}.`,
+  hurryLine: ({ reason }) => `${reason} No time to walk far.`,
+  locationSpot: ({ spot, room }) => `${spot.at} ${room.in}`,
+  locationHere: ({ spot }) => spot.at,
+  locationPocket: ({ pocket }) => pocket.at,
   tileLabel: ({ icon, name, seen = [] }) => `${icon} ${name}${seenText(seen)}`,
   pocketLabel: ({ pocket, garment, hangs, seen }) =>
     `${pocket.icon} ${pocket.name} (${garment.name}${hangs ? ', hangs here' : ''})${seenText(seen)}`,
+  walkOption: ({ room, steps: count }) => `${room.name} · ${steps(count)}`,
 
-  putCommand: ({ room, thing }) => `You are ${room.in}. Where do you put your ${thing.icon} ${thing.name}?`,
-  findCommand: ({ prompt, room }) => `${prompt} You are ${room.in}.`,
-  spotsDropping: ({ room }) => `Which spot ${room.in}?`,
+  putCommand: ({ room, thing }) => `You are ${room.in}. Put your ${thing.icon} ${thing.name} away.`,
+  findCommand: ({ room, thing }) => `Find your ${thing.icon} ${thing.name}. You are ${room.in}.`,
+  spotsPutAway: ({ room }) => `Which spot ${room.in}?`,
   spotsFinding: ({ room }) => `Which spot do you look at ${room.in}?`,
-  whichPocketDropping: 'Which pocket?',
+  whichPocketPutAway: 'Which pocket?',
   whichPocketFinding: 'Which pocket do you look in?',
   walkWhere: 'Where do you walk to?',
   hangWhere: ({ garment }) => `Where do you hang ${garment.your}?`,
   putInRoom: ({ room }) => `Here, ${room.in}`,
-  lookAtSpot: ({ room }) => `Look at a spot in this room (${room.name})`,
+  lookHere: ({ room }) => `Look here, ${room.in}`,
   putInPocket: 'In a pocket',
   lookInPocket: 'Look in a pocket',
   walkToRoom: 'Walk to another room',
@@ -200,18 +186,12 @@ export const en = {
   putOnDone: ({ garment }) => `You put ${garment.your} on.`,
   hungDone: ({ garment, spot }) => `You hung ${garment.your} ${spot.at}.`,
   placedHome: ({ thing }) => `✔ You put your ${thing.icon} ${thing.name} on the home spot.`,
-  placedAway: ({ thing, where, plan }) => `You left your ${thing.icon} ${thing.name} here: ${where}. Your plan was: ${plan}.`,
-  found: ({ thing, cost }) => `Found your ${thing.icon} ${thing.name}! It took ${moves(cost)}.`,
+  placedAway: ({ thing, where, home }) => `You put your ${thing.icon} ${thing.name} ${where}. Home spot: ${home}.`,
+  found: ({ thing, where, steps: count }) => `Found your ${thing.icon} ${thing.name} ${where}. ${steps(count)}.`,
   notHere: 'Not here.',
   notHereSee: ({ seen }) => `Not here. You see ${seen.join(' ')}.`,
-  interrupted: ({ thing, spot }) => `You were interrupted and left ${thing.your} ${spot.at}.`,
 
   whereToKeep: ({ thing }) => `Where do you want to always keep your ${thing.icon} ${thing.name}?`,
   whichPlace: ({ room }) => `Which place ${room.in}?`,
   whichPocket: ({ garment }) => `Which pocket of ${garment.your}?`,
-
-  instructionDrop: ({ thing }) => `Put your ${thing.icon} ${thing.name} down: tap a spot or a pocket, or walk to another room.`,
-  instructionFind: ({ thing }) => `Find your ${thing.icon} ${thing.name}: look at a spot or a pocket, or walk to another room.`,
-  verbDrop: 'Put here',
-  verbFind: 'Look here',
 };

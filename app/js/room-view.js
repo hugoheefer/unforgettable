@@ -1,40 +1,37 @@
-// What the player sees of the room they stand in and of what they wear. Pure: turns the state of a round into
-// plain data that the DOM code only has to draw.
+// What the player sees of the room they stand in and of what they wear. Pure: turns the state of a day into
+// plain data that the flows only have to turn into screens.
 
 import { isPocket, sameLocation } from './world.js';
 import { named } from './names.js';
 
-const iconOf = (items, itemId) => items.find((item) => item.id === itemId).icon;
-
-function describeInstruction(round, texts) {
-  const state = round.state();
-  const item = round.items.find((candidate) => candidate.id === (state.holding ?? state.findItem));
-  const thing = named(texts.things, item);
-  return state.phase === 'drop' ? texts.instructionDrop({ thing }) : texts.instructionFind({ thing });
-}
-
-/** The place and garment names for the hint "Your plan: Inside pocket (Coat)". */
-export function describeLocation(round, location, texts) {
+/**
+ * A location in words: a spot with its room ("on the key hook in the hallway"), or by itself when the room is
+ * obvious; a pocket always by itself, because its sentence already names the garment.
+ */
+export function describeLocation(day, location, texts, { withRoom = true } = {}) {
   if (isPocket(location)) {
-    const garment = round.garmentOf(location.garmentId);
-    const pocket = garment.pockets.find((candidate) => candidate.id === location.pocketId);
-    return texts.locationPocket({ pocket: named(texts.pockets, pocket), garment: named(texts.garments, garment) });
+    const pocket = day.garmentOf(location.garmentId).pockets.find((candidate) => candidate.id === location.pocketId);
+    return texts.locationPocket({ pocket: named(texts.pockets, pocket) });
   }
-  const place = round.roomOf(location.placeId);
-  const spot = place.spots.find((candidate) => candidate.id === location.spotId);
-  return texts.locationSpot({ spot: named(texts.spots, spot), room: named(texts.rooms, place) });
+  const place = day.roomOf(location.placeId);
+  const spot = named(texts.spots, place.spots.find((candidate) => candidate.id === location.spotId));
+  return withRoom ? texts.locationSpot({ spot, room: named(texts.rooms, place) }) : texts.locationHere({ spot });
 }
 
-export function describeRoom(round, texts) {
-  const state = round.state();
-  const room = round.roomOf(state.roomId);
-  const dropping = state.phase === 'drop';
-  const home = dropping && state.holding ? { itemId: state.holding, location: round.plan[state.holding] } : null;
-  const level = home ? round.hintFor(home.itemId) : 'hidden';
+/** The room a player has to go to for a home spot: its own room, or where the garment of the pocket hangs. */
+const homeRoomOf = (day, home) => (isPocket(home) ? day.world.garmentRoom(home.garmentId) : home.placeId);
+
+export function describeRoom(day, texts) {
+  const { event } = day.state();
+  const room = day.roomOf(day.state().roomId);
+  const putting = event?.kind === 'putAway';
+  const home = putting ? { thingId: event.thingId, location: day.plan[event.thingId] } : null;
+  const level = home ? day.hintFor(home.thingId) : 'hidden';
+  const iconOf = (thingId) => day.things.find((thing) => thing.id === thingId).icon;
 
   const tileFor = (entry, table, location) => ({
     ...named(table, entry),
-    seen: round.seenAt(location).map((itemId) => iconOf(round.items, itemId)),
+    seen: day.seenAt(location).map(iconOf),
     hint: home && sameLocation(home.location, location) ? level : 'hidden',
   });
 
@@ -44,22 +41,25 @@ export function describeRoom(round, texts) {
     ...extra,
   });
 
-  const garments = round.layout.garments ?? [];
+  const garments = day.layout.garments ?? [];
   const worn = garments
-    .filter((garment) => round.world.isWorn(garment.id))
-    .map((garment) => garmentView(garment, { canTakeOff: dropping && garment.removable !== false }));
+    .filter((garment) => day.world.isWorn(garment.id))
+    .map((garment) => garmentView(garment, { canTakeOff: putting && garment.removable !== false }));
   const hanging = garments
-    .filter((garment) => round.world.garmentRoom(garment.id) === room.id)
-    .map((garment) => garmentView(garment, { canPutOn: true, onSpot: round.world.garmentSpot(garment.id).spotId }));
+    .filter((garment) => day.world.garmentRoom(garment.id) === room.id)
+    .map((garment) => garmentView(garment, { canPutOn: true, onSpot: day.world.garmentSpot(garment.id).spotId }));
+  const homeRoomId = home ? homeRoomOf(day, home.location) : null;
 
   return {
     room: named(texts.rooms, room),
     spots: room.spots.map((spot) => tileFor(spot, texts.spots, { placeId: room.id, spotId: spot.id })),
     worn,
     hanging,
-    exits: round.world.exitsOf(room.id).map((id) => named(texts.rooms, round.roomOf(id))),
-    hintText: level === 'shown' ? texts.planHint({ location: describeLocation(round, home.location, texts) }) : '',
-    instruction: describeInstruction(round, texts),
-    verb: dropping ? texts.verbDrop : texts.verbFind,
+    rooms: day.reachableRooms().map(({ id, steps }) => ({
+      ...named(texts.rooms, day.roomOf(id)),
+      steps,
+      hint: id === homeRoomId ? level : 'hidden',
+    })),
+    hintText: level === 'shown' ? texts.planHint({ location: describeLocation(day, home.location, texts) }) : '',
   };
 }

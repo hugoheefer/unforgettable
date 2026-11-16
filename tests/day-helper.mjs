@@ -32,8 +32,8 @@ export function worldWith(things = {}, hang = {}) {
 }
 
 /** A day made from plain state; `state` overrides the fields of `dayState`. */
-export function makeDay(events, { state = {}, world = new World(LAYOUT), plan = defaultPlan(), streaks = {} } = {}) {
-  return new Day({ layout: LAYOUT, things: THINGS, world, plan, progress: { streaks }, state: dayState(events, state) });
+export function makeDay(events, { state = {}, world = new World(LAYOUT), plan = defaultPlan(), streaks = {}, DayClass = Day } = {}) {
+  return new DayClass({ layout: LAYOUT, things: THINGS, world, plan, progress: { streaks }, state: dayState(events, state) });
 }
 
 /** A day that is putting one thing away, starting in `roomId`, the thing already in hand. */

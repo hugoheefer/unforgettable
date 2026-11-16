@@ -1,7 +1,5 @@
 // The proof-of-concept world: a house with its common rooms, a garden with a shed and a car, and the clothes
 // the player wears. Data only: ids, icons and structure. Names and sentences live in texts/.
-//
-// `kind: 'container'` marks a place that is not a room you wander off to when distracted (the car).
 
 const spot = (id, icon) => ({ id, icon });
 
@@ -32,7 +30,7 @@ export const LAYOUT = Object.freeze({
       spots: [spot('doorstep', '🚪'), spot('bench', '🪑'), spot('plant-pot', '🪴'), spot('garden-table', '⛱️')] },
     { id: 'shed', icon: '🛖', exits: ['garden'],
       spots: [spot('shed-shelf', '🥫'), spot('shed-bench', '🔨'), spot('wheelbarrow', '🛒')] },
-    { id: 'car', icon: '🚗', kind: 'container', exits: ['garden'],
+    { id: 'car', icon: '🚗', exits: ['garden'],
       spots: [spot('glovebox', '🧤'), spot('cupholder', '🥤'), spot('seat', '💺'), spot('door-pocket', '🚪')] },
   ],
   garments: [

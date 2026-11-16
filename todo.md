@@ -48,6 +48,10 @@ All texts and names moved to `app/js/texts/en.js` and injected; `layout.js` hold
 
 `World.snapshot()` and `World.restore()`; the save is version 2 (language, things, plan, streaks, world, day, day count), validated field by field; the world is saved when a round ends. Nothing reads it yet: that is story 2. 198 tests.
 
+## Story 2 done (2026-11-16)
+
+Days made of events replace the round: `things.js` (catalogue), `scenario.js` (events of a day), `day.js` (runs them on a persistent world), new screens (put away, find, walk list with distances, pauses, a Menu link during a day), saving after every step and continuing after a reload. The old round, the points and the forced drop are gone. 346 tests. Not checked: dark mode, a real phone, a hurried put-away in the browser (unit tests only).
+
 ## Next
 
 The decided plan to a usable version is in `plan.md` (2026-11-16): story 0 refactor, 0b texts ready for a second language, 1 the world persists, 2 days made of events, 3 find cost and day summary, 4 progress, 5 first use and choosing things, 6 bridge to real life, 7 putting things back, 8 hand-over. Build them in that order; move each to "Done" here when it is finished.
