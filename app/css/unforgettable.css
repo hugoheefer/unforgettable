@@ -3,11 +3,12 @@
   --accent: #2f6fed; --good: #1d7a46; --bad: #b3402a; --hint: #f2b400;
 }
 @media (prefers-color-scheme: dark) {
-  :root { --bg: #15181f; --card: #1f242e; --text: #eceef3; --muted: #9aa2b4; --line: #343b4a; --accent: #6b97ff; --good: #5fcf90; --bad: #ff8b73; --hint: #f2c230; }
+  :root:not([data-theme="light"]) { --bg: #15181f; --card: #1f242e; --text: #eceef3; --muted: #9aa2b4; --line: #343b4a; --accent: #6b97ff; --good: #5fcf90; --bad: #ff8b73; --hint: #f2c230; color-scheme: dark; }
 }
+:root[data-theme="dark"] { --bg: #15181f; --card: #1f242e; --text: #eceef3; --muted: #9aa2b4; --line: #343b4a; --accent: #6b97ff; --good: #5fcf90; --bad: #ff8b73; --hint: #f2c230; color-scheme: dark; }
 * { box-sizing: border-box; }
-body { margin: 0; background: var(--bg); color: var(--text); font: 17px/1.4 system-ui, sans-serif; }
-main { max-width: 34rem; margin: 0 auto; padding: 16px; }
+body { margin: 0; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); background: var(--bg); color: var(--text); font: 17px/1.4 system-ui, sans-serif; }
+main { max-width: 34rem; margin: 0 auto; padding-block: 16px; }
 h1 { margin: 0 0 8px; font-size: 1.6rem; }
 h2 { margin: 16px 0 8px; font-size: 1.3rem; }
 h3 { margin: 16px 0 8px; font-size: 0.9rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; }
