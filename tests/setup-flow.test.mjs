@@ -2,6 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { SetupFlow } from '../app/js/setup-flow.js';
 import { LAYOUT, ITEMS, DEFAULT_PLAN } from '../app/js/layout.js';
+import { checkFlowContract } from './flow-contract.mjs';
 
 const newFlow = () => new SetupFlow({ layout: LAYOUT, items: ITEMS, plan: DEFAULT_PLAN });
 const ids = (step) => step.choices.map((choice) => choice.id);
@@ -74,4 +75,16 @@ test('the plan that was given is never changed', () => {
   pick(flow, 'area:kitchen');
   pick(flow, 'place:sink');
   assert.equal(JSON.stringify(DEFAULT_PLAN), before);
+});
+
+checkFlowContract('SetupFlow', () => newFlow());
+
+test('the flow tells its owner exactly once that every item has a home spot, and not before', () => {
+  let finished = 0;
+  const flow = new SetupFlow({ layout: LAYOUT, items: ITEMS, plan: DEFAULT_PLAN, onFinished: () => { finished += 1; } });
+  for (let i = 0; i < ITEMS.length - 1; i += 1) { pick(flow, 'area:kitchen'); pick(flow, 'place:sink'); }
+  assert.equal(finished, 0);
+  pick(flow, 'area:kitchen');
+  pick(flow, 'place:sink');
+  assert.equal(finished, 1);
 });

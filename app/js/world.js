@@ -92,6 +92,12 @@ export class World {
     this.garmentPlaces.set(garmentId, WORN);
   }
 
+  /** The spot a garment lies on, or null while it is worn. */
+  garmentSpot(garmentId) {
+    const place = this.garmentPlaces.get(garmentId);
+    return place === WORN ? null : place;
+  }
+
   /** The room a garment lies in, or null while it is worn. */
   garmentRoom(garmentId) {
     const place = this.garmentPlaces.get(garmentId);

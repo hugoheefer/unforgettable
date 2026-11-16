@@ -7,8 +7,9 @@ const CURRENT = '★';
 const BACK = { id: 'back', label: '↩ Choose something else' };
 
 export class SetupFlow {
-  /** @param {{ layout: object, items: object[], plan: object }} options */
-  constructor({ layout, items, plan }) {
+  /** @param {{ layout: object, items: object[], plan: object, onFinished?: () => void }} options `onFinished` is called once, after the last item got its home spot */
+  constructor({ layout, items, plan, onFinished = () => {} }) {
+    this.onFinished = onFinished;
     this.layout = layout;
     this.items = items;
     this.chosen = { ...plan };
@@ -72,6 +73,7 @@ export class SetupFlow {
       this.chosen[this.items[this.index].id] = picked.location;
       this.area = null;
       this.index += 1;
+      if (this.isFinished()) this.onFinished();
     }
   }
 }

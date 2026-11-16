@@ -36,6 +36,10 @@ Every screen is now one command plus its choices and a Next button (see CLAUDE.m
 4. **More situations**: friend's house, parents, library, car trip; pressure that depends on time, not only on moves.
 5. **Visual mode**: first a flat floor plan (SVG), later an optional 3D wireframe view as another renderer on the same round engine (see the advice given on 2026-11-16: the command-and-choices mode stays the base).
 
+## Story 0 done (2026-11-16)
+
+Refactor without behaviour change: a golden test of one whole round, one contract for every flow (`step`, `choose`, `next`, `isFinished`, `onFinished`), no `instanceof` in `app-flow.js`, `World.garmentSpot`, the put-on sentence names the garment. 148 tests.
+
 ## Next
 
 The decided plan to a usable version is in `plan.md` (2026-11-16): story 0 refactor, 0b texts ready for a second language, 1 the world persists, 2 days made of events, 3 find cost and day summary, 4 progress, 5 first use and choosing things, 6 bridge to real life, 7 putting things back, 8 hand-over. Build them in that order; move each to "Done" here when it is finished.

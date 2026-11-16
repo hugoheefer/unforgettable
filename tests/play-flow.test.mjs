@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { Round } from '../app/js/round.js';
 import { PlayFlow } from '../app/js/play-flow.js';
 import { LAYOUT, ITEMS, DEFAULT_PLAN } from '../app/js/layout.js';
+import { checkFlowContract } from './flow-contract.mjs';
 
 const firstChoice = { pick: (list) => list[0], shuffle: (list) => [...list] };
 const newFlow = (streaks = {}, options = {}) =>
@@ -170,4 +171,28 @@ test('a refused move shows its reason instead of crashing', () => {
   flow.next();
   pick(flow, 'pockets');
   assert.doesNotThrow(() => pick(flow, 'back'));
+});
+
+checkFlowContract('PlayFlow', () => newFlow());
+
+test('the flow tells its owner exactly once that the round is over, and not before', () => {
+  let finished = 0;
+  const flow = new PlayFlow(new Round({ layout: LAYOUT, items: ITEMS, plan: DEFAULT_PLAN, random: firstChoice, progress: { streaks: {} } }), { onFinished: () => { finished += 1; } });
+  dropEverything(flow);
+  flow.next(); // the distraction
+  for (let i = 0; i < ITEMS.length - 1; i += 1) { pick(flow, 'pockets'); pick(flow, 'pocket:coat/coat-left'); }
+  assert.equal(finished, 0);
+  pick(flow, 'pockets');
+  pick(flow, 'pocket:coat/coat-left');
+  assert.equal(finished, 1);
+});
+
+test('putting on a garment says that garment\'s name', () => {
+  const jacket = { id: 'jacket', name: 'Jacket', icon: '🧥', startsWorn: true, removable: true, pockets: [{ id: 'jacket-left', name: 'Left pocket', icon: '🫳' }] };
+  const layout = { ...LAYOUT, garments: [...LAYOUT.garments, jacket] };
+  const flow = new PlayFlow(new Round({ layout, items: ITEMS, plan: DEFAULT_PLAN, random: firstChoice, progress: { streaks: {} } }));
+  pick(flow, 'hang:jacket');
+  pick(flow, 'spot:coat-hooks');
+  pick(flow, 'puton:jacket');
+  assert.deepEqual(flow.step().lead.slice(0, 1), ['You put your jacket on.']);
 });

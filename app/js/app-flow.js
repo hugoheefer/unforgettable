@@ -50,14 +50,18 @@ export class AppFlow {
         choices: [{ id: 'play', label: 'Start playing' }, { id: 'setup', label: 'Choose my home spots' }],
       },
       (choice) => {
-        this.current = choice === 'play' ? this.startRound() : new SetupFlow({ layout: this.layout, items: this.items, plan: this.plan });
+        this.current = choice === 'play' ? this.startRound() : this.startSetup();
       },
     );
   }
 
   startRound() {
     this.round = this.createRound(this.plan, this.progress);
-    return new PlayFlow(this.round);
+    return new PlayFlow(this.round, { onFinished: () => this.finishRound() });
+  }
+
+  startSetup() {
+    return new SetupFlow({ layout: this.layout, items: this.items, plan: this.plan, onFinished: () => this.finishSetup() });
   }
 
   step() {
@@ -70,8 +74,6 @@ export class AppFlow {
 
   next() {
     this.current.next();
-    if (this.current instanceof SetupFlow && this.current.isFinished()) this.finishSetup();
-    else if (this.current instanceof PlayFlow && this.current.isFinished()) this.finishRound();
   }
 
   finishSetup() {
@@ -90,7 +92,7 @@ export class AppFlow {
         choices: [{ id: 'again', label: 'Play again' }, { id: 'setup', label: 'Choose my home spots' }],
       },
       (choice) => {
-        this.current = choice === 'again' ? this.startRound() : new SetupFlow({ layout: this.layout, items: this.items, plan: this.plan });
+        this.current = choice === 'again' ? this.startRound() : this.startSetup();
       },
     );
   }

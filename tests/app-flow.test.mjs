@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { AppFlow } from '../app/js/app-flow.js';
 import { Round } from '../app/js/round.js';
 import { LAYOUT, ITEMS, DEFAULT_PLAN } from '../app/js/layout.js';
+import { checkFlowContract } from './flow-contract.mjs';
 
 const firstChoice = { pick: (list) => list[0], shuffle: (list) => [...list] };
 
@@ -90,3 +91,5 @@ test('"play again" starts a new round', () => {
   assert.equal(calls.roundPlans.length, 2);
   assert.match(app.step().command, /Where do you put your 🔑 keys/);
 });
+
+checkFlowContract('AppFlow', () => newApp().app);

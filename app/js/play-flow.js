@@ -16,9 +16,13 @@ const withMark = (choice, hint) => (markOf(hint) ? { ...choice, mark: markOf(hin
 const seenText = (tile) => (tile.seen.length > 0 ? ` ${tile.seen.join(' ')}` : '');
 
 export class PlayFlow {
-  /** @param {import('./round.js').Round} round */
-  constructor(round) {
+  /**
+   * @param {import('./round.js').Round} round
+   * @param {{ onFinished?: () => void }} [options] `onFinished` is called once, when the last thing is found
+   */
+  constructor(round, { onFinished = () => {} } = {}) {
     this.round = round;
+    this.onFinished = onFinished;
     this.menu = { type: 'root' };
     this.selected = null;
     this.lead = [];
@@ -116,6 +120,7 @@ export class PlayFlow {
     const state = this.round.state();
     if (state.notice) this.lead.push(state.notice);
     if (phaseBefore === 'drop' && state.phase === 'find') this.interlude = state.distraction;
+    if (phaseBefore !== 'done' && state.phase === 'done') this.onFinished();
   }
 
   apply(choice) {
@@ -138,7 +143,7 @@ export class PlayFlow {
     this.menu = { type: 'root' };
     if (kind === 'puton') {
       this.round.putOn(rest);
-      this.lead = ['You put your coat on.'];
+      this.lead = [`You put your ${this.round.garmentOf(rest).name.toLowerCase()} on.`];
     } else if (kind === 'door') {
       this.round.walkTo(rest);
     } else if (menu.type === 'hang') {

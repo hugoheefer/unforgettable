@@ -139,3 +139,9 @@ test('a location survives being turned into a key and back, for spots and for po
   for (const location of [{ placeId: 'hall', spotId: 'hook' }, { garmentId: 'coat', pocketId: 'left' }])
     assert.deepEqual(parseLocationKey(locationKey(location)), location);
 });
+
+test('the spot of a hanging garment is known, and a worn garment has none', () => {
+  const world = new World(withCoat);
+  assert.deepEqual(world.garmentSpot('jacket'), { placeId: 'bedroom', spotId: 'nightstand' });
+  assert.equal(world.garmentSpot('coat'), null);
+});

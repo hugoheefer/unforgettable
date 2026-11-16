@@ -53,7 +53,7 @@ export function describeRoom(round) {
     .map((garment) => garmentView(garment, { canTakeOff: dropping && garment.removable !== false }));
   const hanging = garments
     .filter((garment) => round.world.garmentRoom(garment.id) === room.id)
-    .map((garment) => garmentView(garment, { canPutOn: true, onSpot: round.world.garmentPlaces.get(garment.id).spotId }));
+    .map((garment) => garmentView(garment, { canPutOn: true, onSpot: round.world.garmentSpot(garment.id).spotId }));
 
   return {
     room: { id: room.id, name: room.name, icon: room.icon },
