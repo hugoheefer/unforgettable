@@ -36,6 +36,7 @@ export function playScriptedRound() {
     createRound: (plan, progress) => new Round({ layout: LAYOUT, items: ITEMS, plan, random: firstChoice, progress, texts: TEXTS }),
     onPlanChange: () => {},
     onProgressChange: () => {},
+    onWorldChange: () => {},
   });
   const steps = [structuredClone(app.step())];
   for (const choice of CHOICES) {

@@ -10,7 +10,7 @@ const firstChoice = { pick: (list) => list[0], shuffle: (list) => [...list] };
 
 function newApp(overrides = {}) {
   const texts = overrides.texts ?? TEXTS;
-  const calls = { plans: [], progress: [], roundPlans: [] };
+  const calls = { plans: [], progress: [], worlds: [], roundPlans: [] };
   const app = new AppFlow({
     layout: LAYOUT,
     items: ITEMS,
@@ -23,6 +23,7 @@ function newApp(overrides = {}) {
     },
     onPlanChange: (plan) => calls.plans.push(plan),
     onProgressChange: (progress) => calls.progress.push(progress),
+    onWorldChange: (snapshot) => calls.worlds.push(snapshot),
     ...overrides,
   });
   return { app, calls };
@@ -85,6 +86,20 @@ test('the streaks are saved when the round is over, and not before', () => {
   app.next();
   for (let i = 0; i < ITEMS.length; i += 1) { pick(app, 'pockets'); pick(app, 'pocket:coat/coat-left'); }
   assert.equal(calls.progress.length, 1);
+});
+
+test('when a round ends the snapshot of its world is handed over, and not before', () => {
+  const { app, calls } = newApp();
+  pick(app, 'play');
+  assert.equal(calls.worlds.length, 0);
+  app.choose('pockets'); app.next();
+  app.choose('pocket:coat/coat-left'); app.next();
+  for (let i = 1; i < ITEMS.length; i += 1) { pick(app, 'pockets'); pick(app, 'pocket:coat/coat-left'); }
+  app.next();
+  for (let i = 0; i < ITEMS.length; i += 1) { pick(app, 'pockets'); pick(app, 'pocket:coat/coat-left'); }
+  assert.equal(calls.worlds.length, 1);
+  assert.deepEqual(calls.worlds[0], app.round.world.snapshot());
+  assert.equal(typeof calls.worlds[0].things, 'object');
 });
 
 test('"play again" starts a new round', () => {

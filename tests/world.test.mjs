@@ -145,3 +145,111 @@ test('the spot of a hanging garment is known, and a worn garment has none', () =
   assert.deepEqual(world.garmentSpot('jacket'), { placeId: 'bedroom', spotId: 'nightstand' });
   assert.equal(world.garmentSpot('coat'), null);
 });
+
+// Story 1: the world persists
+
+function furnishedWorld() {
+  const world = new World(withCoat);
+  world.put('keys', { placeId: 'hall', spotId: 'hook' });
+  world.put('wallet', { garmentId: 'coat', pocketId: 'right' });
+  world.hang('coat', { placeId: 'kitchen', spotId: 'counter' });
+  return world;
+}
+
+test('a restored world answers where things are and where garments are like the original', () => {
+  const original = furnishedWorld();
+  const restored = World.restore(withCoat, original.snapshot());
+  assert.deepEqual(restored.whereIs('keys'), { placeId: 'hall', spotId: 'hook' });
+  assert.deepEqual(restored.whereIs('wallet'), { garmentId: 'coat', pocketId: 'right' });
+  assert.deepEqual(restored.itemsOn({ placeId: 'hall', spotId: 'hook' }), ['keys']);
+  assert.deepEqual(restored.garmentsOn({ placeId: 'kitchen', spotId: 'counter' }), ['coat']);
+  assert.equal(restored.isWorn('coat'), false);
+  assert.equal(restored.isWorn('jacket'), false);
+});
+
+test('a restored world keeps a garment that is still worn', () => {
+  const restored = World.restore(withCoat, new World(withCoat).snapshot());
+  assert.equal(restored.isWorn('coat'), true);
+});
+
+test('the snapshot of a world survives being written as JSON and read back', () => {
+  const snapshot = furnishedWorld().snapshot();
+  assert.deepEqual(JSON.parse(JSON.stringify(snapshot)), snapshot);
+  assert.deepEqual(World.restore(withCoat, JSON.parse(JSON.stringify(snapshot))).snapshot(), snapshot);
+});
+
+test('a snapshot lists the things and the garments in the shape of the save', () => {
+  assert.deepEqual(furnishedWorld().snapshot(), {
+    things: { keys: { placeId: 'hall', spotId: 'hook' }, wallet: { garmentId: 'coat', pocketId: 'right' } },
+    garments: { coat: { placeId: 'kitchen', spotId: 'counter' }, jacket: { placeId: 'bedroom', spotId: 'nightstand' } },
+  });
+});
+
+test('a snapshot is not changed by moves made in the world it came from afterwards', () => {
+  const world = furnishedWorld();
+  const snapshot = world.snapshot();
+  world.put('keys', { placeId: 'kitchen', spotId: 'counter' });
+  world.wear('coat');
+  assert.deepEqual(snapshot.things.keys, { placeId: 'hall', spotId: 'hook' });
+  assert.deepEqual(snapshot.garments.coat, { placeId: 'kitchen', spotId: 'counter' });
+});
+
+test('a restored world is not changed by moves made in the world the snapshot came from', () => {
+  const world = furnishedWorld();
+  const restored = World.restore(withCoat, world.snapshot());
+  world.hang('jacket', { placeId: 'hall', spotId: 'hook' });
+  assert.deepEqual(restored.garmentSpot('jacket'), { placeId: 'bedroom', spotId: 'nightstand' });
+});
+
+test('a snapshot with a spot that does not exist loses only that thing', () => {
+  const snapshot = { things: { keys: { placeId: 'hall', spotId: 'sofa' }, phone: { placeId: 'kitchen', spotId: 'counter' } }, garments: {} };
+  const restored = World.restore(withCoat, snapshot);
+  assert.equal(restored.whereIs('keys'), null);
+  assert.deepEqual(restored.whereIs('phone'), { placeId: 'kitchen', spotId: 'counter' });
+});
+
+test('a snapshot with a pocket that does not exist loses only that thing', () => {
+  const snapshot = { things: { keys: { garmentId: 'coat', pocketId: 'secret' }, phone: { garmentId: 'coat', pocketId: 'left' } }, garments: {} };
+  const restored = World.restore(withCoat, snapshot);
+  assert.equal(restored.whereIs('keys'), null);
+  assert.deepEqual(restored.whereIs('phone'), { garmentId: 'coat', pocketId: 'left' });
+});
+
+test('a thing whose location is not an object is dropped', () => {
+  const restored = World.restore(withCoat, { things: { keys: 'hall/hook', wallet: null, phone: 7 }, garments: {} });
+  for (const id of ['keys', 'wallet', 'phone']) assert.equal(restored.whereIs(id), null, id);
+});
+
+test('a garment that is not in the layout is dropped', () => {
+  const restored = World.restore(withCoat, { things: {}, garments: { cape: 'worn' } });
+  assert.deepEqual(restored.snapshot().garments, new World(withCoat).snapshot().garments);
+});
+
+test('a garment on a spot that does not exist stays in its starting state', () => {
+  const restored = World.restore(withCoat, { things: {}, garments: { coat: { placeId: 'hall', spotId: 'sofa' }, jacket: { placeId: 'attic', spotId: 'box' } } });
+  assert.equal(restored.isWorn('coat'), true);
+  assert.deepEqual(restored.garmentSpot('jacket'), { placeId: 'bedroom', spotId: 'nightstand' });
+});
+
+test('a garment whose entry is neither worn nor a spot stays in its starting state', () => {
+  const restored = World.restore(withCoat, { things: {}, garments: { coat: 'lost', jacket: 5 } });
+  assert.equal(restored.isWorn('coat'), true);
+  assert.deepEqual(restored.garmentSpot('jacket'), { placeId: 'bedroom', spotId: 'nightstand' });
+});
+
+test('a garment saved as worn is worn again, also when it started on a spot', () => {
+  const restored = World.restore(withCoat, { things: {}, garments: { jacket: 'worn' } });
+  assert.equal(restored.isWorn('jacket'), true);
+});
+
+test('a snapshot that is not a plain object gives a fresh world, without an error', () => {
+  for (const nonsense of ['text', null, [], 7, undefined]) {
+    const restored = World.restore(withCoat, nonsense);
+    assert.deepEqual(restored.snapshot(), new World(withCoat).snapshot(), String(nonsense));
+  }
+});
+
+test('a snapshot whose things or garments are not objects gives a world with nothing of that kind restored', () => {
+  const restored = World.restore(withCoat, { things: 'many', garments: [] });
+  assert.deepEqual(restored.snapshot(), new World(withCoat).snapshot());
+});

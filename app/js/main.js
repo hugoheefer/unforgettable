@@ -12,8 +12,8 @@ import { textsFor } from './texts.js';
 const app = document.getElementById('app');
 const world = new World(LAYOUT);
 const store = createSaveStore(() => window.localStorage, {
-  defaults: { plan: DEFAULT_PLAN, progress: { streaks: {} } },
-  locationExists: (location) => world.hasLocation(location),
+  defaults: { plan: DEFAULT_PLAN, progress: { streaks: {} }, things: ITEMS.map((item) => item.id) },
+  world: { hasLocation: (location) => world.hasLocation(location), restore: (snapshot) => World.restore(LAYOUT, snapshot) },
 });
 
 let save = store.load();
@@ -32,6 +32,10 @@ const flow = new AppFlow({
   },
   onProgressChange: (progress) => {
     save = { ...save, progress };
+    store.save(save);
+  },
+  onWorldChange: (snapshot) => {
+    save = { ...save, world: snapshot };
     store.save(save);
   },
 });

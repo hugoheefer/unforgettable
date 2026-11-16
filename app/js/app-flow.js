@@ -34,7 +34,8 @@ export class AppFlow {
   /**
    * @param {{ layout: object, items: object[], plan: object, progress: object, texts: object,
    *           createRound: (plan: object, progress: object) => import('./round.js').Round,
-   *           onPlanChange: (plan: object) => void, onProgressChange: (progress: object) => void }} options
+   *           onPlanChange: (plan: object) => void, onProgressChange: (progress: object) => void,
+   *           onWorldChange: (snapshot: object) => void }} options
    */
   constructor(options) {
     Object.assign(this, options);
@@ -88,6 +89,7 @@ export class AppFlow {
   finishRound() {
     this.progress = this.round.progress();
     this.onProgressChange(this.progress);
+    this.onWorldChange(this.round.world.snapshot());
     this.current = new ChoiceScreen(
       {
         lead: this.round.results().map((result) => this.describeResult(result)),

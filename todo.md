@@ -44,6 +44,10 @@ Refactor without behaviour change: a golden test of one whole round, one contrac
 
 All texts and names moved to `app/js/texts/en.js` and injected; `layout.js` holds ids and icons only; refusals have codes. A few sentences changed wording (rooms lowercase inside a sentence, "Here, in the hallway", "1 move"). 170 tests.
 
+## Story 1 done (2026-11-16)
+
+`World.snapshot()` and `World.restore()`; the save is version 2 (language, things, plan, streaks, world, day, day count), validated field by field; the world is saved when a round ends. Nothing reads it yet: that is story 2. 198 tests.
+
 ## Next
 
 The decided plan to a usable version is in `plan.md` (2026-11-16): story 0 refactor, 0b texts ready for a second language, 1 the world persists, 2 days made of events, 3 find cost and day summary, 4 progress, 5 first use and choosing things, 6 bridge to real life, 7 putting things back, 8 hand-over. Build them in that order; move each to "Done" here when it is finished.

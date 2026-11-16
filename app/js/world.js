@@ -17,6 +17,8 @@ import { unknownLocation } from './errors.js';
 
 const WORN = 'worn';
 
+const isPlainObject = (value) => typeof value === 'object' && value !== null && !Array.isArray(value);
+
 export const isPocket = (location) => 'garmentId' in location;
 
 /** One string per location, so two locations can be compared and used as map keys. */
@@ -44,6 +46,37 @@ export class World {
     this.garmentPlaces = new Map(
       [...this.garments.values()].map((garment) => [garment.id, garment.startsWorn ? WORN : garment.startsAt]),
     );
+  }
+
+  /**
+   * Plain data of where everything is, as it goes into the save. Copies, so later moves do not change it.
+   * @returns {{ things: Record<string, Location>, garments: Record<string, 'worn' | SpotLocation> }}
+   */
+  snapshot() {
+    return {
+      things: Object.fromEntries([...this.locations].map(([itemId, at]) => [itemId, { ...at }])),
+      garments: Object.fromEntries([...this.garmentPlaces].map(([garmentId, place]) => [garmentId, place === WORN ? WORN : { ...place }])),
+    };
+  }
+
+  /**
+   * Builds a world from a snapshot that may come from a damaged save. Whatever is invalid is dropped: a thing
+   * is then nowhere, a garment stays in its starting state.
+   */
+  static restore(layout, snapshot) {
+    const world = new World(layout);
+    if (!isPlainObject(snapshot)) return world;
+    if (isPlainObject(snapshot.things)) {
+      for (const [itemId, at] of Object.entries(snapshot.things)) if (world.hasLocation(at)) world.put(itemId, at);
+    }
+    if (isPlainObject(snapshot.garments)) {
+      for (const [garmentId, place] of Object.entries(snapshot.garments)) {
+        if (!world.garments.has(garmentId)) continue;
+        if (place === WORN) world.wear(garmentId);
+        else if (world.hasLocation(place) && !isPocket(place)) world.hang(garmentId, place);
+      }
+    }
+    return world;
   }
 
   /** True for a spot in a room or a pocket of a garment that exists. */
