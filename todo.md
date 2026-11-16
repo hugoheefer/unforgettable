@@ -16,6 +16,10 @@
 - Hints fade (shown, dimmed, hidden) with the streak per item. Scenarios vary in order and place; the find prompt comes at an unpredictable moment.
 - Feedback after a miss: short and without blame ("it was in the kitchen; your plan said hook").
 
+## Proof of concept (2026-11-16, playable, 60 unit tests)
+
+Built in one go: steps 0 to 7 in a first form. `app/` runs as a static page; setup screen (choose home spots), drop phase with pressure and forced drops, distraction, find phase with move costs, result screen, fading hints, saved plan and streaks. Not yet: scenarios away from home (friend, library), progress screen, publishing to my-wiki, a check of the look on a real phone.
+
 ## Next (in order; each step: tests red first, then code, then you review)
 
 0. **Project setup**: `package.json` (`type: module`, `test` script), `app/index.html` + `app/css/` + `app/js/main.js` with relative links, a first `tests/*.test.mjs` run with `node --test`, README; smoke check that `app/index.html` loads in Playwright.
