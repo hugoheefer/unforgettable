@@ -36,22 +36,13 @@ Every screen is now one command plus its choices and a Next button (see CLAUDE.m
 4. **More situations**: friend's house, parents, library, car trip; pressure that depends on time, not only on moves.
 5. **Visual mode**: first a flat floor plan (SVG), later an optional 3D wireframe view as another renderer on the same round engine (see the advice given on 2026-11-16: the command-and-choices mode stays the base).
 
-## Next (in order; each step: tests red first, then code, then you review)
+## Next
 
-0. **Project setup**: `package.json` (`type: module`, `test` script), `app/index.html` + `app/css/` + `app/js/main.js` with relative links, a first `tests/*.test.mjs` run with `node --test`, README; smoke check that `app/index.html` loads in Playwright.
-1. **World model** (pure): `Place` (with exit/enter links and "effort to reach"), `Item`, `Pocket`. First tests: placing an item puts it in that place; an item is in exactly one place; moving between places keeps one place active.
-2. **Home-spot plans** (pure): player sets item → home spot; validation (spot exists, one home spot per item).
-3. **Scoring and habit stats** (pure): placing at the home spot scores; a wrong place scores less and is remembered as the item's real location; streak per item; hint level derived from streak (computed, not stored).
-4. **Find phase** (pure): prompt asks for an item; each opened place costs time via `Clock`; finding at once scores best; systematic search (no re-opening places) beats random.
-5. **Scenario engine** (pure, `RandomSource` injected): pressure events (call, full hands, visitor, hurry), distraction before the find prompt, surprise timing, variation across rounds.
-6. **Storage**: `Storage` port with a localStorage adapter (progress stays on the device; no server) and an in-memory double; progress merged field by field with defaults so old or damaged data still loads.
-7. **UI v1**: one place visible at a time, pictogram items, tap to place or open; screens: setup, drop, find, feedback. UI maps taps to intents; no logic.
-8. **Progress screen**: streaks per item, hint fading visible, simple history.
-9. **Away-from-home scenarios**: friend's house, parents, library with the carry-along rule.
-9b. **Publish to my-wiki** (needs your go-ahead: it widens the login wall and a push to `main` deploys): in my-wiki, on a side branch, add the `/unforgettable` folder rule to `functions/lib/public-paths.js` with tests red first (including `..` paths and look-alikes that must stay private), copy `app/` to `docs/unforgettable/`, add a homepage card, update `SETUP.md` (public paths paragraph, last copied commit).
-10. **Docs**: README, short user manual; check the look on a phone (screenshot + your review).
+The decided plan to a usable version is in `plan.md` (2026-11-16): story 0 refactor, 1 the world persists, 2 days made of events, 3 find cost and day summary, 4 progress, 5 first use and choosing things, 6 bridge to real life, 7 putting things back, 8 hand-over. Build them in that order; move each to "Done" here when it is finished.
+
+Later: away from home (friend, library, carry-along rule), flat floor plan, 3D view, sound.
 
 ## Open questions for later
 
-- Exact scoring numbers (tune from play, not guessed).
+- Language of the screens for the person who gets the app (English now); which things to offer (see `plan.md`).
 - Sound and haptics: only if wanted.
