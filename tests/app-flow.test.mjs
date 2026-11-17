@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { AppFlow } from '../app/js/app-flow.js';
-import { Day } from '../app/js/day.js';
+import { Day, EVENT_KINDS } from '../app/js/day.js';
 import { chainIdsOf } from '../app/js/day-plan.js';
 import { LAYOUT } from '../app/js/layout.js';
 import { THINGS, defaultPlan } from '../app/js/things.js';
@@ -9,7 +9,7 @@ import { World, isPocket } from '../app/js/world.js';
 import { checkFlowContract } from './flow-contract.mjs';
 import { playSession } from './play-bot.mjs';
 import { TEXTS } from './texts-helper.mjs';
-import { dayState, find, letGo, pocket, putAway, rand, spot, tell, worldWith } from './day-helper.mjs';
+import { LEFT_AT, dayState, find, letGo, makeDay, pocket, putAway, rand, spot, tell, worldWith } from './day-helper.mjs';
 
 const emptySave = () => ({
   plan: defaultPlan(), progress: { streaks: {} }, world: new World(LAYOUT).snapshot(), day: null, dayCount: 0,
@@ -366,9 +366,13 @@ test('nothing is saved when Next changed nothing', () => {
 });
 
 test('every find is saved with the thing in your hand and out of the world', () => {
-  const { app, saves } = newApp();
+  // a find followed by a story step in the same room, so that nothing lays the keys down yet
+  const events = [find('keys', LEFT_AT.keys, 'come-home', 'keys'), tell('hall', 'come-home', 'shoes')];
+  const world = worldWith(defaultPlan());
+  const day = makeDay(events, { world, plan: defaultPlan(), state: { number: 1 } });
+  EVENT_KINDS.find.enter(day, day.event());
+  const { app, saves } = newApp({ saved: { day: day.snapshot(), world: world.snapshot() } });
   pick(app, 'play');
-  app.next();
   pick(app, 'pockets');
   pick(app, 'pocket:coat/coat-right');
   assert.equal(saves.at(-1).world.things.keys, undefined);
@@ -961,14 +965,12 @@ test('the pizza story opens with the doorbell, straight after the last screen of
   assert.deepEqual(screens[bell].lead, []);
 });
 
-test('in the present story, the call is told in the kitchen where the phone was fetched, and the phone goes back without walking away first', () => {
+test('in the present story, the call is told in the kitchen where the phone was fetched, with no walk back first', () => {
   const screens = session();
   const call = screens.findIndex((screen) => screen.command === 'The party starts at eight.');
   assert.ok(call > 0, 'the call is told');
   assert.equal(screens[call].room, 'kitchen');
-  const away = screens.findIndex((screen, index) => index > call && screen.command === 'You are in the kitchen. Put your 📱 phone back.');
-  assert.ok(away > call, 'the phone is put back in the kitchen');
-  assert.equal(screens.slice(call, away).some((screen) => screen.command.startsWith('Go back')), false);
+  assert.equal(screens[call - 1].command.startsWith('Go back'), false);
 });
 
 test('a session ends with the evening and the check, and asks "Is everything back in its place?" only once', () => {
@@ -981,4 +983,14 @@ test('a session ends with the evening and the check, and asks "Is everything bac
 test('a well-played session of come-home, coffee and present asks the player back at most twice', () => {
   const commands = commandsOf(session());
   assert.equal(commands.filter((command) => command.startsWith('Go back')).length <= 2, true);
+});
+
+// ---- no clues ----
+
+test('a whole session through the real chains never tells the player to put a thing back, on the first day or later', () => {
+  const { app } = newApp();
+  for (const screen of [...playSession(app), ...playSession(app)]) {
+    const said = [...screen.lead, screen.command].join(' ');
+    assert.doesNotMatch(said, /Put your .* back/, said);
+  }
 });

@@ -76,6 +76,10 @@ Chains of events replace the events of story 2: six chains (come home, go out, c
 
 No hints while playing; one tap by default with a setting for two; praise for a thing put on its home spot. 705 tests. Story 3c (a natural flow) is done too: stories join where the player is, steps are tied to a room only when the story needs it, one check per session at the end ("It is evening."), "front garden". 732 tests. Next: the user tests.
 
+## No clues (2026-11-17, evening)
+
+The app never tells the player to put a thing back, also not in the first session; "Something else first" no longer reveals what is in hand. 740 tests. **Open concern:** a new player gets no explanation of what the game wants; the introduction of story 5 matters more now.
+
 ## Next
 
 The decided plan to a usable version is in `plan.md` (2026-11-16): story 0 refactor, 0b texts ready for a second language, 1 the world persists, 2 days made of events, 3 find cost and day summary, 4 progress, 5 first use and choosing things, 6 bridge to real life, 7 putting things back, 8 hand-over. Build them in that order; move each to "Done" here when it is finished.

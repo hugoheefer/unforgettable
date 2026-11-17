@@ -229,18 +229,16 @@ export class PlayFlow {
 
   // ---- Something else first, and what was forgotten ----
 
+  /** Every chosen thing is offered, whether or not it is in hand: what the screen offers must not give away what the player holds. */
   elseScreen() {
     const { texts, day } = this;
     const view = describeRoom(day, texts);
-    const inHand = day.state().inHand;
     const choices = [
-      ...inHand.map((thingId) => ({ id: `putaway:${thingId}`, label: texts.putMineAway({ thing: this.thingOf(thingId) }) })),
+      ...day.things.map((thing) => ({ id: `putaway:${thing.id}`, label: texts.putMineAway({ thing: this.thingOf(thing.id) }) })),
       ...this.coatChoices(view),
       { id: 'back', label: texts.goOn },
     ];
-    return inHand.length === 0
-      ? { lead: [texts.holdNothing], command: texts.elseCommand, choices, preselect: 'back' }
-      : { command: texts.elseCommand, choices };
+    return { command: texts.elseCommand, choices };
   }
 
   forgotScreen() {
@@ -287,9 +285,14 @@ export class PlayFlow {
     else this.act(kind, rest);
   }
 
+  /** A thing that is not in hand cannot be put away; the player is told so, and only when they ask. */
   startPuttingAway(thingId) {
-    this.putting = thingId;
     this.menu = { type: 'root' };
+    if (!this.day.state().inHand.includes(thingId)) {
+      this.lead = [this.texts.notHolding({ thing: this.thingOf(thingId) })];
+      return;
+    }
+    this.putting = thingId;
   }
 
   /** Does what the player chose, then goes back to the first question. */

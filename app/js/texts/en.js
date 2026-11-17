@@ -235,7 +235,7 @@ export const en = {
   goOn: 'Go on',
   somethingElse: 'Something else first',
   elseCommand: 'What do you want to do first?',
-  holdNothing: 'You hold nothing.',
+  notHolding: ({ thing }) => `You are not holding your ${thing.icon} ${thing.name}.`,
   putMineAway: ({ thing }) => `Put my ${thing.icon} ${thing.name} away`,
   checkCommand: 'Is everything back in its place?',
   yesEverything: 'Yes, everything',

@@ -12,9 +12,13 @@ const FIRST_DAY = 1;
 /**
  * The numbers that decide how hard a day is, in one place: a level is later one row of such settings.
  * `otherChains`: chains after the opener. `silentChance`: the chance that a chain with a put-back of a chosen
- * thing is silent about it. `silentPerChain`: how many put-backs a silent chain leaves out.
+ * thing is silent about it. `silentPerChain`: how many put-backs a silent chain leaves out. `guideFirstOpener`:
+ * whether the opener of the very first session always tells the player to put things back.
+ * By default the app never tells the player to put a thing back (user decision 2026-11-17: the game trains the
+ * player to think of it, so it gives no clues): silent every time, about every thing, from the first session on.
+ * A level that guides the player is a row with a lower chance.
  */
-export const DEFAULT_RULES = Object.freeze({ otherChains: 2, silentChance: 1 / 2, silentPerChain: 1 });
+export const DEFAULT_RULES = Object.freeze({ otherChains: 2, silentChance: 1, silentPerChain: Infinity, guideFirstOpener: false });
 
 const hasEventOfKind = (events, kind) => events.some((event) => event.kind === kind);
 
@@ -68,7 +72,9 @@ function withLetGos(groups, chainId) {
 function eventsOfChain(chain, { chosen, silentAllowed, random, rules }) {
   let groups = expandSteps(chain, chosen);
   const hasPutBack = groups.some((group) => hasEventOfKind(group.events, 'putAway'));
-  if (hasPutBack && silentAllowed && random.chance(rules.silentChance)) groups = dropPutBacks(groups, rules.silentPerChain, random);
+  // a chance of one needs no luck: the app is then silent every time
+  const silent = hasPutBack && silentAllowed && (rules.silentChance >= 1 || random.chance(rules.silentChance));
+  if (silent) groups = dropPutBacks(groups, rules.silentPerChain, random);
   return withLetGos(groups, chain.id);
 }
 
@@ -94,7 +100,7 @@ export function buildDay({ dayNumber, chains = CHAINS, things, onPerson = [], ye
   const events = [{ kind: 'pause', text: 'day' }];
   // the closer ends every session; it has no put-back, so it can never be silent
   for (const chain of [...(opener ? [opener] : []), ...others, ...(closer ? [closer] : [])]) {
-    const firstDayOpener = dayNumber === FIRST_DAY && chain === opener;
+    const firstDayOpener = rules.guideFirstOpener && dayNumber === FIRST_DAY && chain === opener;
     events.push(...eventsOfChain(chain, { chosen, silentAllowed: !firstDayOpener, random, rules }));
   }
   return events;

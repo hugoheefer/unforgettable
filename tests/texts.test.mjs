@@ -249,8 +249,8 @@ test('the command to put a thing back names the room and the thing', () => {
 
 test('the labels of the tell, the check and Something else first are the ones of the story', () => {
   assert.deepEqual(
-    [TEXTS.goOn, TEXTS.somethingElse, TEXTS.elseCommand, TEXTS.holdNothing, TEXTS.checkCommand, TEXTS.yesEverything, TEXTS.noForgot, TEXTS.forgotCommand],
-    ['Go on', 'Something else first', 'What do you want to do first?', 'You hold nothing.', 'Is everything back in its place?', 'Yes, everything', 'No, I forgot something', 'What did you forget?'],
+    [TEXTS.goOn, TEXTS.somethingElse, TEXTS.elseCommand, TEXTS.checkCommand, TEXTS.yesEverything, TEXTS.noForgot, TEXTS.forgotCommand],
+    ['Go on', 'Something else first', 'What do you want to do first?', 'Is everything back in its place?', 'Yes, everything', 'No, I forgot something', 'What did you forget?'],
   );
 });
 
@@ -305,4 +305,9 @@ test('the settings have their choice, their question and the two ways to choose'
 
 test('finding a thing at once on its home spot has its own praise', () => {
   assert.equal(TEXTS.praiseFound({ thing: { icon: '🔑', name: 'keys' } }), '✨ Found your 🔑 keys at once, on the home spot.');
+});
+
+test('trying to put away a thing that is not in hand has its sentence, and nothing says what the player holds', () => {
+  assert.equal(TEXTS.notHolding({ thing: { icon: '🔑', name: 'keys' } }), 'You are not holding your 🔑 keys.');
+  assert.equal('holdNothing' in TEXTS, false);
 });

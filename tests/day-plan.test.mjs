@@ -36,7 +36,10 @@ const PLAIN = { id: 'plain', steps: [move('m', 'dining'), tell('t'), check('c')]
 const OTHER = { id: 'other', steps: [goTo('g', 'study'), tell('t')] };
 const CLOSE = { id: 'close', closer: true, steps: [tell('dusk'), check('look')] };
 
-const plan = (options) => buildDay({ dayNumber: 2, chains: [OPEN, TWO, PLAIN], things: THINGS, onPerson: [], yesterday: [], random: rand(), ...options });
+/** The rules of the early versions, to test the seam that levels will use: sometimes silent, the first opener guided. */
+const SOMETIMES_SILENT = Object.freeze({ otherChains: 2, silentChance: 1 / 2, silentPerChain: 1, guideFirstOpener: true });
+
+const plan = (options) => buildDay({ dayNumber: 2, chains: [OPEN, TWO, PLAIN], things: THINGS, onPerson: [], yesterday: [], random: rand(), rules: SOMETIMES_SILENT, ...options });
 const kinds = (events) => events.map((event) => event.kind);
 const ofChain = (events, id) => events.filter((event) => event.chain === id);
 const luck = (overrides = {}) => rand({ chance: () => true, ...overrides });
@@ -67,7 +70,7 @@ test('the closing chain is not one of the other chains, so it does not take thei
 
 test('the closing chain is never silent, also when every chain is', () => {
   const quiet = ofChain(plan({ chains: [OPEN, TWO, PLAIN, CLOSE] }), 'close');
-  const loud = ofChain(plan({ chains: [OPEN, TWO, PLAIN, CLOSE], rules: { ...DEFAULT_RULES, silentChance: 1 }, random: rand({ chance: (p) => p >= 1 }) }), 'close');
+  const loud = ofChain(plan({ chains: [OPEN, TWO, PLAIN, CLOSE], rules: { ...SOMETIMES_SILENT, silentChance: 1 }, random: rand({ chance: (p) => p >= 1 }) }), 'close');
   assert.equal(quiet.length, 2);
   assert.deepEqual(loud, quiet);
 });
@@ -185,7 +188,7 @@ test('the silent thing is still taken: only its put-back is left out', () => {
   assert.deepEqual(ofChain(events, 'two').filter((event) => event.kind === 'find').map((event) => event.thingId), ['keys', 'scissors']);
 });
 
-test('the opener of the very first day is never silent, even with luck', () => {
+test('the opener of the very first day can be guided by a rule, even with luck', () => {
   const events = plan({ dayNumber: 1, chains: [NEEDS_KEYS, TWO, PLAIN], onPerson: ['keys'], random: luck() });
   assert.deepEqual(putAwaysOf(events, 'needs-keys'), ['keys']);
   assert.deepEqual(putAwaysOf(events, 'two'), ['scissors']);
@@ -213,7 +216,7 @@ test('a chain without any put-back is never silent', () => {
 // ---- props and things: one chain, one catalogue ----
 
 const coffee = () => CHAINS.find((chain) => chain.id === 'coffee');
-const coffeeEvents = (things) => ofChain(buildDay({ dayNumber: 2, chains: [OPEN, coffee(), PLAIN], things, onPerson: [], yesterday: [], random: rand() }), 'coffee');
+const coffeeEvents = (things) => ofChain(buildDay({ dayNumber: 2, chains: [OPEN, coffee(), PLAIN], things, onPerson: [], yesterday: [], random: rand(), rules: SOMETIMES_SILENT }), 'coffee');
 const eventOfStep = (events, step) => events.find((event) => event.step === step);
 
 test('the tin of the coffee chain is only told while it is a prop', () => {
@@ -291,55 +294,56 @@ test('a chain whose things are all props has no let-go', () => {
 const presentDay = (things, rules) => buildDay({ dayNumber: 2, chains: [OPEN, CHAINS.find((chain) => chain.id === 'present'), PLAIN], things, onPerson: [], yesterday: [], random: luck(), rules });
 const chosen = (...ids) => THINGS.filter((thing) => ids.includes(thing.id));
 
-test('the default rules are two other chains, a silent chance of one in two and one silent put-back per chain', () => {
-  assert.deepEqual(DEFAULT_RULES, { otherChains: 2, silentChance: 1 / 2, silentPerChain: 1 });
+test('the default rules are two other chains, silence about every put-back and no guidance, not even in the first session', () => {
+  assert.deepEqual(DEFAULT_RULES, { otherChains: 2, silentChance: 1, silentPerChain: Infinity, guideFirstOpener: false });
 });
 
 test('without rules given, the default rules are used', () => {
-  const given = buildDay({ dayNumber: 2, chains: [OPEN, TWO, PLAIN], things: THINGS, onPerson: [], yesterday: [], random: rand(), rules: DEFAULT_RULES });
+  const day = { dayNumber: 2, chains: [OPEN, TWO, PLAIN], things: THINGS, onPerson: [], yesterday: [], random: rand() };
+  const given = buildDay({ ...day, rules: DEFAULT_RULES });
   assert.deepEqual(chainIdsOf(given), ['open', 'two', 'plain']);
-  assert.deepEqual(plan(), given);
+  assert.deepEqual(buildDay(day), given);
 });
 
 test('one other chain gives an opener and one chain', () => {
-  const events = plan({ chains: [OPEN, TWO, PLAIN, OTHER], rules: { ...DEFAULT_RULES, otherChains: 1 } });
+  const events = plan({ chains: [OPEN, TWO, PLAIN, OTHER], rules: { ...SOMETIMES_SILENT, otherChains: 1 } });
   assert.deepEqual(chainIdsOf(events), ['open', 'two']);
 });
 
 test('three other chains give an opener and three chains', () => {
-  const events = plan({ chains: [OPEN, TWO, PLAIN, OTHER, WALKING], rules: { ...DEFAULT_RULES, otherChains: 3 } });
+  const events = plan({ chains: [OPEN, TWO, PLAIN, OTHER, WALKING], rules: { ...SOMETIMES_SILENT, otherChains: 3 } });
   assert.deepEqual(chainIdsOf(events), ['open', 'two', 'plain', 'other']);
 });
 
 test('a silent chance of zero gives no silent chain, and the chance asked is the one of the rules', () => {
   const asked = [];
-  const events = plan({ rules: { ...DEFAULT_RULES, silentChance: 0 }, random: rand({ chance: (p) => { asked.push(p); return p > 0; } }) });
+  const events = plan({ rules: { ...SOMETIMES_SILENT, silentChance: 0 }, random: rand({ chance: (p) => { asked.push(p); return p > 0; } }) });
   assert.deepEqual(putAwaysOf(events, 'two'), ['keys', 'scissors']);
   assert.deepEqual(asked, [0]);
 });
 
-test('a silent chance of one makes every chain with a chosen put-back silent, except the opener of the first day', () => {
+test('a silent chance of one makes every chain with a chosen put-back silent, except the opener of the first day when a rule guides it', () => {
   const chance = (p) => p >= 1;
-  const rules = { ...DEFAULT_RULES, silentChance: 1 };
+  const rules = { ...SOMETIMES_SILENT, silentChance: 1 };
   const events = plan({ dayNumber: 1, chains: [NEEDS_KEYS, TWO, PLAIN], onPerson: ['keys'], rules, random: rand({ chance }) });
   assert.deepEqual(putAwaysOf(events, 'needs-keys'), ['keys']);
   assert.deepEqual(putAwaysOf(events, 'two'), ['scissors']);
 });
 
 test('two silent put-backs leave out two put-backs in a chain with two chosen things', () => {
-  const events = presentDay(chosen('scissors', 'phone'), { ...DEFAULT_RULES, silentPerChain: 2 });
+  const events = presentDay(chosen('scissors', 'phone'), { ...SOMETIMES_SILENT, silentPerChain: 2 });
   assert.deepEqual(putAwaysOf(events, 'present'), []);
   assert.deepEqual(letGosOf(events).flatMap((event) => event.thingIds).sort(), ['phone', 'scissors']);
 });
 
 test('two silent put-backs leave out only one in a chain that has one chosen thing', () => {
-  const events = presentDay(chosen('scissors'), { ...DEFAULT_RULES, silentPerChain: 2 });
+  const events = presentDay(chosen('scissors'), { ...SOMETIMES_SILENT, silentPerChain: 2 });
   assert.equal(events.some((event) => event.kind === 'putAway' && event.chain === 'present'), false);
   assert.equal(ofChain(events, 'present').filter((event) => event.kind === 'find').length, 1);
 });
 
 test('one silent put-back leaves out one of two', () => {
-  assert.equal(putAwaysOf(presentDay(chosen('scissors', 'phone'), DEFAULT_RULES), 'present').length, 1);
+  assert.equal(putAwaysOf(presentDay(chosen('scissors', 'phone'), SOMETIMES_SILENT), 'present').length, 1);
 });
 
 // ---- the very first day ----
@@ -363,4 +367,29 @@ test('when the chain that starts the game cannot open, the first day opens with 
 
 test('the real game starts at the front door: come-home starts the game', () => {
   assert.deepEqual(CHAINS.filter((chain) => chain.startsTheGame).map((chain) => chain.id), ['come-home']);
+});
+
+// ---- the app never tells the player to put a thing back ----
+
+const putAwaysIn = (events) => events.filter((event) => event.kind === 'putAway');
+const realDay = (dayNumber, random) => buildDay({ dayNumber, chains: CHAINS, things: THINGS, onPerson: ['keys'], yesterday: [], random });
+
+test('by default the app never tells the player to put a thing back: no put-away on any day, with any luck', () => {
+  for (const dayNumber of [1, 2, 7]) {
+    for (const random of [rand(), luck()]) assert.deepEqual(putAwaysIn(realDay(dayNumber, random)), [], `day ${dayNumber}`);
+  }
+});
+
+test('with the default rules the chance of silence is not even asked: it is one, whatever the luck', () => {
+  const asked = [];
+  realDay(2, rand({ chance: (p) => { asked.push(p); return false; } }));
+  assert.deepEqual(asked, []);
+});
+
+test('with the default rules every thing that is taken is laid down by a let-go, so that nothing is put back for the player', () => {
+  const events = realDay(1, rand());
+  const taken = events.filter((event) => event.kind === 'find').map((event) => event.thingId);
+  const laidDown = events.filter((event) => event.kind === 'letGo').flatMap((event) => event.thingIds);
+  assert.ok(taken.length > 0);
+  for (const thingId of taken) assert.ok(laidDown.includes(thingId), thingId);
 });

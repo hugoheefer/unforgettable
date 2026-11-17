@@ -456,37 +456,50 @@ test('after the find of the forgotten thing comes its put-away, and then the sto
 
 const handsWith = (...thingIds) => ({ state: { inHand: thingIds } });
 
-test('Something else first: the things in hand, the coat, and Go on', () => {
+const EVERY_THING = ['putaway:keys', 'putaway:wallet', 'putaway:phone', 'putaway:scissors'];
+
+test('Something else first: every chosen thing, the coat, and Go on', () => {
   const flow = flowFor(tellDay(handsWith('scissors')));
   pick(flow, 'else');
   assert.deepEqual(flow.step(), {
     lead: [],
     command: 'What do you want to do first?',
-    choices: [{ id: 'putaway:scissors', label: 'Put my ✂️ scissors away' }, { id: 'hang:coat', label: 'Take off my coat' }, { id: 'back', label: 'Go on' }],
+    choices: [
+      { id: 'putaway:keys', label: 'Put my 🔑 keys away' },
+      { id: 'putaway:wallet', label: 'Put my 👛 wallet away' },
+      { id: 'putaway:phone', label: 'Put my 📱 phone away' },
+      { id: 'putaway:scissors', label: 'Put my ✂️ scissors away' },
+      { id: 'hang:coat', label: 'Take off my coat' },
+      { id: 'back', label: 'Go on' },
+    ],
     selected: null,
     canLeave: true,
   });
 });
 
-test('with nothing in hand the lead says so and no thing is offered', () => {
-  const flow = flowFor(tellDay());
-  pick(flow, 'else');
-  assert.deepEqual(flow.step().lead, ['You hold nothing.']);
-  assert.deepEqual(ids(flow.step()), ['hang:coat', 'back']);
-  assert.equal(flow.step().selected, 'back');
+test('the screen does not depend on what is in hand: it gives no clue about it', () => {
+  const holding = flowFor(tellDay(handsWith('scissors', 'phone')));
+  const empty = flowFor(tellDay());
+  pick(holding, 'else');
+  pick(empty, 'else');
+  assert.deepEqual(holding.step(), empty.step());
+  assert.deepEqual(ids(empty.step()), [...EVERY_THING, 'hang:coat', 'back']);
 });
 
-test('with nothing in hand Go on is already selected, so one tap on Next returns to the story', () => {
+test('putting away a thing that is not in hand says so and changes nothing', () => {
   const flow = flowFor(tellDay());
   pick(flow, 'else');
-  flow.next();
+  pick(flow, 'putaway:keys');
+  assert.deepEqual(flow.step().lead, ['You are not holding your 🔑 keys.']);
   assert.equal(flow.step().command, 'Take a new pack of coffee from the top right cupboard.');
+  assert.equal(flow.day.state().inHand.length, 0);
 });
 
-test('every thing in hand is offered, one choice each', () => {
-  const flow = flowFor(tellDay(handsWith('scissors', 'phone')));
+test('putting away a thing that is in hand asks where to put it', () => {
+  const flow = flowFor(tellDay(handsWith('scissors')));
   pick(flow, 'else');
-  assert.deepEqual(ids(flow.step()), ['putaway:scissors', 'putaway:phone', 'hang:coat', 'back']);
+  pick(flow, 'putaway:scissors');
+  assert.equal(flow.step().command, 'You are in the kitchen. Put your ✂️ scissors back.');
 });
 
 test('Go on returns to the screen of the story', () => {
@@ -521,7 +534,7 @@ test('taking the coat off from Something else first asks where to hang it and th
   assert.deepEqual(flow.step().lead, ['You hung your coat on the worktop.']);
   assert.equal(flow.step().command, 'Take a new pack of coffee from the top right cupboard.');
   pick(flow, 'else');
-  assert.deepEqual(ids(flow.step()), ['puton:coat', 'back']);
+  assert.deepEqual(ids(flow.step()), [...EVERY_THING, 'puton:coat', 'back']);
 });
 
 // ---- putting a thing away on your own ----
