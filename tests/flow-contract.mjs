@@ -13,18 +13,19 @@ export function checkFlowContract(name, makeFlow) {
     assert.throws(() => makeFlow().choose('not-on-this-screen'), /not offered/i);
   });
 
-  test(`${name} (contract): Next without a choice changes nothing`, () => {
+  test(`${name} (contract): Next on a screen with nothing selected changes nothing`, () => {
     const flow = makeFlow();
     const before = flow.step();
     flow.next();
     assert.deepEqual(flow.step(), before);
   });
 
-  test(`${name} (contract): after Next acted on a choice, nothing is selected`, () => {
+  test(`${name} (contract): after Next acted on a choice, the choice is not carried over: the new screen has its own default or none`, () => {
     const flow = makeFlow();
     flow.choose(flow.step().choices[0].id);
     assert.notEqual(flow.step().selected, null);
     flow.next();
-    assert.equal(flow.step().selected, null);
+    const { selected, choices } = flow.step();
+    assert.ok(selected === null || choices.some((entry) => entry.id === selected));
   });
 }

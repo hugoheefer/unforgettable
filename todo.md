@@ -60,6 +60,10 @@ Every find records its steps and the shortest way; every put-away its steps. The
 
 1. A screen sometimes opens with its top above the edge of the screen. 2. The game is not natural: it starts by putting away things that should be in their place, and it always tells you to put a thing away. Decided: story 3b in `stories.md` (chains of events, sometimes silent about one thing, a check question the app never answers).
 
+## Story 3b done (2026-11-17)
+
+Chains of events replace the events of story 2: six chains (come home, go out, coffee, present, pizza, call), everything starts on its home spot, silent chains with `letGo`, the check question without an answer from the app, "Something else first", things and props, the difficulty numbers in one settings object, the summary without what lies where; the hurry is gone. Also the fix for the screen that opened too high (not reproduced in Chromium, not checked on a real iPad). 629 tests. Not checked: a real iPad, dark mode, a reload in the middle of each new event kind in the browser (unit tests only). `play-flow.js` is 375 lines, over the 300 the project aims for: split it before it grows further.
+
 ## Next
 
 The decided plan to a usable version is in `plan.md` (2026-11-16): story 0 refactor, 0b texts ready for a second language, 1 the world persists, 2 days made of events, 3 find cost and day summary, 4 progress, 5 first use and choosing things, 6 bridge to real life, 7 putting things back, 8 hand-over. Build them in that order; move each to "Done" here when it is finished.

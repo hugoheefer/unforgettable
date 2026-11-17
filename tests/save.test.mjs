@@ -19,12 +19,13 @@ const defaults = {
   plan: { keys: { placeId: 'hall', spotId: 'hook' }, wallet: { placeId: 'coat', spotId: 'pocket' } },
   progress: { streaks: {} },
   things: ['keys', 'wallet'],
+  chainIds: ['coffee', 'pizza', 'call'],
 };
 const world = {
   hasLocation: (location) => new World(layout).hasLocation(location),
   restore: (snapshot) => World.restore(layout, snapshot),
 };
-const freshSave = () => ({ version: 2, language: 'en', things: defaults.things, plan: defaults.plan, progress: { streaks: {} }, world: emptyWorld(), day: null, dayCount: 0, history: EMPTY_HISTORY, lastDayFinishedOn: null });
+const freshSave = () => ({ version: 2, language: 'en', things: defaults.things, plan: defaults.plan, progress: { streaks: {} }, world: emptyWorld(), day: null, dayCount: 0, history: EMPTY_HISTORY, lastDayFinishedOn: null, yesterdayChains: [] });
 
 function memoryStorage(initial = {}) {
   const data = new Map(Object.entries(initial));
@@ -47,8 +48,9 @@ test('what was saved is there at the next start', () => {
     world: { ...emptyWorld(), things: { keys: { placeId: 'hall', spotId: 'hook' } } },
     day: { number: 2, index: 1, events: [{ kind: 'pause' }] },
     dayCount: 1,
-    history: { finds: [{ day: 1, thingId: 'keys', steps: 3, shortest: 1, wasHome: false }], puts: [{ day: 1, thingId: 'keys', steps: 0, atHome: true, hurry: false }] },
+    history: { finds: [{ day: 1, thingId: 'keys', steps: 3, shortest: 1, wasHome: false }], puts: [{ day: 1, thingId: 'keys', steps: 0, atHome: true, left: false }] },
     lastDayFinishedOn: '2026-11-16',
+    yesterdayChains: ['coffee', 'call'],
   };
   storeOn(storage).save(saved);
   assert.deepEqual(storeOn(storage).load(), saved);
@@ -152,7 +154,7 @@ test('a save without a history gets an empty one, field by field with the rest',
 
 test('records of the saved history that are not objects or miss a number are dropped on load, the good ones stay', () => {
   const good = { day: 2, thingId: 'keys', steps: 4, shortest: 1, wasHome: true };
-  const history = { finds: [good, 'keys', { day: 2, thingId: 'keys', shortest: 1, wasHome: true }], puts: [null, { day: 2, thingId: 'keys', steps: 'x', atHome: true, hurry: false }] };
+  const history = { finds: [good, 'keys', { day: 2, thingId: 'keys', shortest: 1, wasHome: true }], puts: [null, { day: 2, thingId: 'keys', steps: 'x', atHome: true, left: false }] };
   assert.deepEqual(loadFrom({ version: 2, history }).history, { finds: [good], puts: [] });
 });
 
@@ -163,4 +165,20 @@ test('a saved history that is not an object gives an empty history', () => {
 test('the date on which the last day was finished is kept when it is year-month-day, and is null otherwise', () => {
   assert.equal(loadFrom({ version: 2, lastDayFinishedOn: '2026-11-16' }).lastDayFinishedOn, '2026-11-16');
   for (const bad of ['16-11-2026', '2026-1-5', 20261116, 'yesterday', null, ['2026-11-16']]) assert.equal(loadFrom({ version: 2, lastDayFinishedOn: bad }).lastDayFinishedOn, null, JSON.stringify(bad));
+});
+
+test('the ids of yesterday\'s chains are kept in the order they were played', () => {
+  assert.deepEqual(loadFrom({ version: 2, yesterdayChains: ['pizza', 'coffee', 'call'] }).yesterdayChains, ['pizza', 'coffee', 'call']);
+});
+
+test('a chain id that no chain has any more is dropped from yesterday\'s chains, the others stay', () => {
+  assert.deepEqual(loadFrom({ version: 2, yesterdayChains: ['coffee', 'dragons', 7, null, 'call'] }).yesterdayChains, ['coffee', 'call']);
+});
+
+test('yesterday\'s chains that are not a list give an empty list', () => {
+  for (const bad of ['coffee', 7, null, { coffee: true }]) assert.deepEqual(loadFrom({ version: 2, yesterdayChains: bad }).yesterdayChains, [], JSON.stringify(bad));
+});
+
+test('a save without yesterday\'s chains gets an empty list, field by field with the rest', () => {
+  assert.deepEqual(loadFrom({ version: 2, dayCount: 3 }).yesterdayChains, []);
 });

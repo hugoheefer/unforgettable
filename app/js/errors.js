@@ -8,7 +8,7 @@ export const REFUSALS = {
   'spot-not-here': 'Refused: that spot is not in this room',
   'garment-not-here': 'Refused: that garment is not in this room',
   'out-of-reach': 'Refused: that pocket is out of reach',
-  'too-far-in-a-hurry': 'Refused: in a hurry only a room next door can be reached',
+  'come-back': 'Refused: the story waits in another room; walk back first',
   'nothing-in-hand': 'Refused: there is nothing to put away now',
   'nothing-to-find': 'Refused: nothing is being looked for now',
   'not-now': 'Refused: that cannot be done in this event',
@@ -26,3 +26,4 @@ export class RefusedMove extends Error {
 export const choiceNotOffered = (choiceId) => new Error(`Choice not offered: ${choiceId}`);
 export const unknownLocation = (key) => new Error(`Unknown spot or pocket: ${key}`);
 export const unknownRoom = (roomId) => new Error(`Unknown room: ${roomId}`);
+export const unknownThing = (thingId) => new Error(`Unknown thing: ${thingId}`);

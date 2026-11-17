@@ -2,11 +2,15 @@
 // make. The player picks one and taps Next. Pure: it drives a Day and holds no DOM.
 //
 // A screen is { lead: string[], command: string, choices: { id, label, mark? }[], selected: string | null,
-// canLeave: true }. Choice ids: 'spots' | 'pockets' | 'doors' | 'hang:<garment>' | 'puton:<garment>' open a list;
-// inside a list 'spot:<id>' | 'pocket:<garment>/<pocket>' | 'door:<room>' act; 'back' returns to the first question.
+// canLeave: true }. Which screen a day shows is its *mode*: the kind of the running event, or 'putting' (the
+// player puts a thing away on their own) or 'back' (the story waits in another room). Choice ids:
+// 'go' | 'yes' | 'no' | 'else' | 'spots' | 'pockets' | 'doors' | 'hang:<garment>' | 'puton:<garment>' |
+// 'putaway:<thing>' | 'forgot:<thing>' open a list or act; inside a list 'spot:<id>' | 'pocket:<garment>/<pocket>' |
+// 'door:<room>' act; 'back' returns.
 //
-// The lead is, in time order: what the last action did, the text of the move it ended in (that screen only),
-// and the lines that explain the event (why you look, why you hurry, the plan).
+// The lead is, in time order: what the last action did, the sentence of the move that ended in this room (that
+// screen only), and the lines that explain the event (why you look, why you walk, the plan).
+// A tell and an empty "Something else first" have their Go on selected when they open, so they cost one tap.
 
 import { describeLocation, describeRoom } from './room-view.js';
 import { RefusedMove, choiceNotOffered } from './errors.js';
@@ -19,7 +23,7 @@ const withMark = (choice, hint) => (markOf(hint) ? { ...choice, mark: markOf(hin
 
 /** The texts that differ between putting a thing away and looking for it. */
 const askingFor = (texts) => ({
-  putAway: {
+  put: {
     command: texts.putCommand, spots: texts.spotsPutAway, pockets: texts.whichPocketPutAway, hereOption: texts.putInRoom, pocketOption: texts.putInPocket,
   },
   find: {
@@ -27,12 +31,79 @@ const askingFor = (texts) => ({
   },
 });
 
+/** The sentence a chain has for a step: a string, or a function of the names of the things. */
+function sentenceOf(texts, chain, step) {
+  const sentence = texts.chains[chain]?.[step];
+  return typeof sentence === 'function' ? sentence({ things: texts.things }) : sentence;
+}
+
+/**
+ * What each mode adds to the lead of its screens (`context`), and its first question (`root`). A root returns
+ * { command, choices, preselect? }.
+ */
+const MODES = {
+  pause: {
+    context: () => [],
+    root: (flow, state) => ({ command: flow.texts.pauses[state.event.text]({ number: state.number }), choices: [] }),
+  },
+  tell: {
+    context: () => [],
+    root: (flow, state) => ({
+      command: sentenceOf(flow.texts, state.event.chain, state.event.step),
+      choices: [{ id: 'go', label: flow.texts.goOn }, flow.elseChoice()],
+      preselect: 'go',
+    }),
+  },
+  goTo: {
+    context: (flow, state) => [sentenceOf(flow.texts, state.event.chain, state.event.step)],
+    root: (flow, state) => ({
+      command: flow.texts.goToCommand({ room: flow.roomNamed(state.event.roomId) }),
+      choices: [flow.walkChoice(), flow.elseChoice()],
+    }),
+  },
+  check: {
+    context: (flow, state) => [sentenceOf(flow.texts, state.event.chain, state.event.step)],
+    root: (flow) => ({
+      command: flow.texts.checkCommand,
+      choices: [{ id: 'yes', label: flow.texts.yesEverything }, { id: 'no', label: flow.texts.noForgot }, flow.elseChoice()],
+    }),
+  },
+  find: {
+    context: (flow, state) => (state.event.step === null ? [] : [sentenceOf(flow.texts, state.event.chain, state.event.step)]),
+    root: (flow, state, view) => ({
+      command: flow.texts.findCommand({ room: view.room, thing: flow.thingOf(state.event.thingId) }),
+      choices: flow.placeChoices('find', view),
+    }),
+  },
+  putAway: {
+    context: (flow, state, view) => (view.hintText ? [view.hintText] : []),
+    root: (flow, state, view) => ({
+      command: flow.texts.putCommand({ room: view.room, thing: flow.thingOf(state.event.thingId) }),
+      choices: flow.placeChoices('put', view),
+    }),
+  },
+  putting: {
+    context: (flow, state, view) => (view.hintText ? [view.hintText] : []),
+    root: (flow, state, view) => ({
+      command: flow.texts.putCommand({ room: view.room, thing: flow.thingOf(flow.putting) }),
+      choices: [...flow.placeChoices('put', view), flow.back],
+    }),
+  },
+  back: {
+    context: () => [],
+    root: (flow, state) => ({
+      command: flow.texts.goBackCommand({ room: flow.roomNamed(state.returnTo) }),
+      choices: [flow.walkChoice()],
+    }),
+  },
+};
+
 export class PlayFlow {
   /**
    * @param {import('./day.js').Day} day
    * @param {{ texts: object, onFinished?: () => void, onFound?: (record: object) => void, onPut?: (record: object) => void }} options
    *   `onFinished` is called once, when the last event is done; `onFound` and `onPut` get what each finished find
-   *   or put-away cost, before `onFinished`
+   *   or put-away cost, and each thing that was let go (`left: true`), before `onFinished`
    */
   constructor(day, { texts, onFinished = () => {}, onFound = () => {}, onPut = () => {} }) {
     this.day = day;
@@ -42,47 +113,52 @@ export class PlayFlow {
     this.onPut = onPut;
     this.back = { id: 'back', label: texts.back };
     this.menu = { type: 'root' };
-    this.selected = null;
+    this.putting = null; // the thing the player puts away on their own
     this.lead = [];
-    this.arrival = day.state().arrival; // a day restored right after a move shows its text again
+    this.arrival = day.state().arrival; // a day restored right after a move shows its sentence again
     this.reported = false;
+    this.selected = this.screen().preselect ?? null;
   }
 
   isFinished() {
     return this.day.state().finished;
   }
 
+  mode(state) {
+    if (this.putting) return 'putting';
+    return state.returnTo ? 'back' : state.event.kind;
+  }
+
+  /** The screen as { lead, command, choices, preselect? } for the menu the player is in. */
+  screen() {
+    const state = this.day.state();
+    if (state.finished) return { lead: [], command: '', choices: [] };
+    const mode = this.mode(state);
+    const view = describeRoom(this.day, this.texts, { thingId: this.putting ?? undefined });
+    const menus = { root: () => MODES[mode].root(this, state, view), else: () => this.elseScreen(), forgot: () => this.forgotScreen() };
+    const screen = menus[this.menu.type]?.() ?? this.listScreen(mode, view);
+    const explains = ['else', 'forgot'].includes(this.menu.type) ? [] : MODES[mode].context(this, state, view);
+    return { lead: [...(screen.lead ?? []), ...explains], ...screen };
+  }
+
   step() {
     const state = this.day.state();
+    const { lead, command, choices } = this.screen();
     if (state.finished) return { lead: this.lead, command: '', choices: [], selected: null, canLeave: true };
-    const view = describeRoom(this.day, this.texts);
-    const { command, choices } = state.event.kind === 'pause' ? this.pause(state) : this.question(state, view);
-    return { lead: [...this.lead, ...this.arrivalLines(state), ...this.contextLines(state, view)], command, choices, selected: this.selected, canLeave: true };
+    return { lead: [...this.lead, ...this.arrivalLines(), ...lead], command, choices, selected: this.selected, canLeave: true };
   }
 
-  pause(state) {
-    return { command: this.texts.pauses[state.event.text]({ number: state.number }), choices: [] };
+  arrivalLines() {
+    const { arrival } = this;
+    return arrival ? [sentenceOf(this.texts, arrival.chain, arrival.step)] : [];
   }
 
-  arrivalLines(state) {
-    const { arrival, texts } = this;
-    if (!arrival) return [];
-    if (arrival.text === 'after') return [texts.uses[arrival.thingId][arrival.useId].after];
-    const line = texts.arrivals[arrival.text];
-    return [typeof line === 'function' ? line({ room: named(texts.rooms, this.day.roomOf(state.roomId)) }) : line];
-  }
+  // ---- the lists behind the first question ----
 
-  contextLines({ event }, view) {
+  /** A list of spots, pockets or rooms, or the question where to hang the coat. */
+  listScreen(mode, view) {
     const { texts } = this;
-    if (event.kind === 'find') return event.useId ? [texts.uses[event.thingId][event.useId].need] : [];
-    if (event.kind !== 'putAway') return [];
-    const hurry = event.hurry ? [texts.hurryLine({ reason: texts.hurryReasons[event.hurry] })] : [];
-    return view.hintText ? [...hurry, view.hintText] : hurry;
-  }
-
-  question({ event }, view) {
-    const { texts } = this;
-    const asking = askingFor(texts)[event.kind];
+    const asking = askingFor(texts)[mode === 'find' ? 'find' : 'put'];
     switch (this.menu.type) {
       case 'spots':
         return { command: asking.spots({ room: view.room }), choices: this.spotChoices(view) };
@@ -90,12 +166,10 @@ export class PlayFlow {
         return { command: asking.pockets, choices: this.pocketChoices(view) };
       case 'doors':
         return { command: texts.walkWhere, choices: [...view.rooms.map((room) => withMark({ id: `door:${room.id}`, label: texts.walkOption({ room, steps: room.steps }) }, room.hint)), this.back] };
-      case 'hang': {
+      default: {
         const garment = named(texts.garments, this.day.garmentOf(this.menu.garmentId));
         return { command: texts.hangWhere({ garment }), choices: this.spotChoices(view) };
       }
-      default:
-        return { command: asking.command({ room: view.room, thing: this.thingOf(event.thingId) }), choices: this.rootChoices(event, view) };
     }
   }
 
@@ -103,15 +177,36 @@ export class PlayFlow {
     return named(this.texts.things, this.day.things.find((candidate) => candidate.id === thingId));
   }
 
-  rootChoices(event, view) {
-    const { texts } = this;
-    const asking = askingFor(texts)[event.kind];
-    const choices = [{ id: 'spots', label: asking.hereOption({ room: view.room }) }];
-    if (this.reachablePockets(view).length > 0) choices.push({ id: 'pockets', label: asking.pocketOption });
-    choices.push({ id: 'doors', label: texts.walkToRoom });
-    for (const garment of view.worn) if (garment.canTakeOff) choices.push({ id: `hang:${garment.id}`, label: texts.takeOff({ garment }) });
-    if (event.kind === 'putAway') for (const garment of view.hanging) choices.push({ id: `puton:${garment.id}`, label: texts.putOn({ garment }) });
+  roomNamed(roomId) {
+    return named(this.texts.rooms, this.day.roomOf(roomId));
+  }
+
+  walkChoice() {
+    return { id: 'doors', label: this.texts.walkToRoom };
+  }
+
+  elseChoice() {
+    return { id: 'else', label: this.texts.somethingElse };
+  }
+
+  /** Here, in a pocket, walk, and the coat: the four ways to answer a find or a put-back. */
+  placeChoices(asking, view) {
+    const ways = askingFor(this.texts)[asking];
+    const choices = [{ id: 'spots', label: ways.hereOption({ room: view.room }) }];
+    if (this.reachablePockets(view).length > 0) choices.push({ id: 'pockets', label: ways.pocketOption });
+    choices.push(this.walkChoice());
+    choices.push(...this.coatChoices(view));
     return choices;
+  }
+
+  /** Take a coat off, or put it on again, wherever the day allows it. */
+  coatChoices(view) {
+    const { texts } = this;
+    if (!this.day.canHandle()) return [];
+    return [
+      ...view.worn.filter((garment) => garment.canTakeOff).map((garment) => ({ id: `hang:${garment.id}`, label: texts.takeOff({ garment }) })),
+      ...view.hanging.map((garment) => ({ id: `puton:${garment.id}`, label: texts.putOn({ garment }) })),
+    ];
   }
 
   reachablePockets(view) {
@@ -129,6 +224,30 @@ export class PlayFlow {
     return [...pockets, this.back];
   }
 
+  // ---- Something else first, and what was forgotten ----
+
+  elseScreen() {
+    const { texts, day } = this;
+    const view = describeRoom(day, texts);
+    const inHand = day.state().inHand;
+    const choices = [
+      ...inHand.map((thingId) => ({ id: `putaway:${thingId}`, label: texts.putMineAway({ thing: this.thingOf(thingId) }) })),
+      ...this.coatChoices(view),
+      { id: 'back', label: texts.goOn },
+    ];
+    return inHand.length === 0
+      ? { lead: [texts.holdNothing], command: texts.elseCommand, choices, preselect: 'back' }
+      : { command: texts.elseCommand, choices };
+  }
+
+  forgotScreen() {
+    const { texts } = this;
+    const choices = this.menu.thingIds.map((thingId) => ({ id: `forgot:${thingId}`, label: texts.forgotOption({ thing: this.thingOf(thingId) }) }));
+    return { command: texts.forgotCommand, choices: [...choices, this.back] };
+  }
+
+  // ---- choosing and acting ----
+
   choose(choiceId) {
     if (!this.step().choices.some((choice) => choice.id === choiceId)) throw choiceNotOffered(choiceId);
     this.selected = choiceId;
@@ -139,25 +258,34 @@ export class PlayFlow {
     if (!event) return;
     if (event.kind === 'pause') {
       this.perform(() => this.day.continue());
-      return;
+    } else {
+      const choice = this.selected;
+      if (!choice) return;
+      this.apply(choice);
     }
-    const choice = this.selected;
-    if (!choice) return;
-    this.selected = null;
-    this.apply(choice);
+    this.selected = this.screen().preselect ?? null;
   }
 
   apply(choice) {
     this.lead = [];
     this.arrival = null;
     if (choice === 'back') {
+      if (this.menu.type === 'root') this.putting = null;
       this.menu = { type: 'root' };
       return;
     }
     const [kind, rest] = choice.split(/:(.*)/s);
-    if (kind === 'spots' || kind === 'pockets' || kind === 'doors') this.menu = { type: kind };
+    const openings = { spots: 'spots', pockets: 'pockets', doors: 'doors', else: 'else' };
+    if (openings[kind]) this.menu = { type: openings[kind] };
     else if (kind === 'hang') this.menu = { type: 'hang', garmentId: rest };
+    else if (kind === 'no') this.menu = { type: 'forgot', thingIds: this.day.answerCheck(false) };
+    else if (kind === 'putaway') this.startPuttingAway(rest);
     else this.act(kind, rest);
+  }
+
+  startPuttingAway(thingId) {
+    this.putting = thingId;
+    this.menu = { type: 'root' };
   }
 
   /** Does what the player chose, then goes back to the first question. */
@@ -176,6 +304,7 @@ export class PlayFlow {
       if (!(error instanceof RefusedMove)) throw error;
       this.lead = [this.texts.refusals[error.code]];
     }
+    for (const thingId of this.day.takeLeftBehind()) this.onPut({ thingId, steps: 0, atHome: false, left: true });
     const state = this.day.state();
     this.arrival = state.arrival;
     if (state.finished && !this.reported) {
@@ -186,26 +315,41 @@ export class PlayFlow {
 
   run(kind, rest, menu) {
     const { texts, day } = this;
-    if (kind === 'puton') {
-      day.putOn(rest);
-      return [texts.putOnDone({ garment: named(texts.garments, day.garmentOf(rest)) })];
-    }
-    if (kind === 'door') {
-      day.walkTo(rest);
-      return [];
-    }
-    if (menu.type === 'hang') {
-      day.takeOff(menu.garmentId, rest);
-      const spot = named(texts.spots, day.roomOf(day.state().roomId).spots.find((candidate) => candidate.id === rest));
-      return [texts.hungDone({ garment: named(texts.garments, day.garmentOf(menu.garmentId)), spot })];
-    }
+    const actions = {
+      go: () => { day.continue(); return []; },
+      yes: () => { day.answerCheck(true); return []; },
+      forgot: () => { day.forgot(rest); return []; },
+      puton: () => {
+        day.putOn(rest);
+        return [texts.putOnDone({ garment: named(texts.garments, day.garmentOf(rest)) })];
+      },
+      door: () => { day.walkTo(rest); return []; },
+    };
+    if (actions[kind]) return actions[kind]();
+    if (menu.type === 'hang') return this.hang(menu.garmentId, rest);
+    return this.mode(day.state()) === 'find' ? this.look(kind, rest) : this.place(kind, rest);
+  }
+
+  hang(garmentId, spotId) {
+    const { texts, day } = this;
+    day.takeOff(garmentId, spotId);
+    const spot = named(texts.spots, day.roomOf(day.state().roomId).spots.find((candidate) => candidate.id === spotId));
+    return [texts.hungDone({ garment: named(texts.garments, day.garmentOf(garmentId)), spot })];
+  }
+
+  place(kind, rest) {
     const [first, second] = rest.split('/');
-    if (day.state().event.kind === 'putAway') {
-      const placed = kind === 'pocket' ? day.putInPocket(first, second) : day.putDown(first);
-      const { thingId, steps, atHome, hurry } = placed;
-      this.onPut({ thingId, steps, atHome, hurry });
-      return [this.placedText(placed)];
-    }
+    const asked = this.putting ?? undefined;
+    const placed = kind === 'pocket' ? this.day.putInPocket(first, second, asked) : this.day.putDown(first, asked);
+    const { thingId, steps, atHome } = placed;
+    this.putting = null;
+    this.onPut({ thingId, steps, atHome, left: false });
+    return [this.placedText(placed)];
+  }
+
+  look(kind, rest) {
+    const { day } = this;
+    const [first, second] = rest.split('/');
     const thingId = day.state().event.thingId;
     const looked = kind === 'pocket' ? day.lookInPocket(first, second) : day.look(first);
     const { found, steps, shortest, wasHome } = looked;

@@ -4,10 +4,9 @@ import { LAYOUT } from '../app/js/layout.js';
 import { LANGUAGES, textsFor } from '../app/js/texts.js';
 import { REFUSALS } from '../app/js/errors.js';
 import { THINGS } from '../app/js/things.js';
-import { buildDay, HURRY_REASONS } from '../app/js/scenario.js';
+import { CHAINS } from '../app/js/chains.js';
 import { ADVICE } from '../app/js/summary.js';
 import { TEXTS } from './texts-helper.mjs';
-import { rand } from './day-helper.mjs';
 
 const ids = (list) => list.map((entry) => entry.id);
 
@@ -92,34 +91,112 @@ test('the check of languages notices a missing key and a key of the wrong kind',
 
 const isSentence = (value) => typeof value === 'string' && value.length > 0;
 
-test('every use of every thing has the line before the find and the line after the move', () => {
-  const missing = [];
-  for (const thing of THINGS) {
-    for (const use of thing.uses) {
-      for (const form of ['need', 'after']) {
-        if (!isSentence(TEXTS.uses?.[thing.id]?.[use.id]?.[form])) missing.push(`uses.${thing.id}.${use.id}.${form}`);
-      }
-    }
-  }
-  assert.deepEqual(missing, []);
+test('the sentences of the rules that are gone are gone: uses, hurry, the home and away lines, the old arrivals', () => {
+  const left = ['uses', 'hurryReasons', 'hurryLine', 'homeLine', 'awayLine', 'arrivals'].filter((key) => key in TEXTS);
+  assert.deepEqual(left, []);
+  assert.deepEqual(Object.keys(TEXTS.pauses), ['day']);
+  assert.deepEqual(Object.keys(TEXTS.refusals).filter((code) => code.includes('hurry')), []);
 });
 
-test('every reason to hurry has a sentence', () => {
-  assert.deepEqual(HURRY_REASONS.filter((reason) => !isSentence(TEXTS.hurryReasons?.[reason.id])), []);
+test('being asked to come back is a refusal with a sentence', () => {
+  assert.equal(typeof REFUSALS['come-back'], 'string');
+  assert.ok(isSentence(TEXTS.refusals['come-back']));
+  assert.equal('too-far-in-a-hurry' in REFUSALS, false);
 });
 
-test('every pause and every arrival that a day can have has a text', () => {
-  const things = THINGS;
-  const days = [
-    buildDay({ dayNumber: 1, things, nowhere: things.map((thing) => thing.id), random: rand() }),
-    buildDay({ dayNumber: 2, things, nowhere: [], random: rand({ chance: () => true }) }),
-  ];
-  const events = days.flat();
-  const pauses = new Set(events.filter((event) => event.kind === 'pause').map((event) => event.text));
-  const arrivals = new Set(events.filter((event) => event.kind === 'moveTo' && event.text !== 'after').map((event) => event.text));
-  assert.deepEqual([...pauses].filter((key) => TEXTS.pauses?.[key] === undefined), []);
-  assert.deepEqual([...arrivals].filter((key) => TEXTS.arrivals?.[key] === undefined), []);
-  assert.ok(pauses.has('outForTheDay') && arrivals.has('morning'), 'the sample days cover the leaving part');
+test('the spot where the scissors stay in the coffee chain is called the worktop', () => {
+  assert.deepEqual(TEXTS.spots.counter, { name: 'Worktop', at: 'on the worktop' });
+});
+
+test('the command of a walk-to and of coming back are one general sentence built from the room', () => {
+  const room = TEXTS.rooms.kitchen;
+  assert.equal(TEXTS.goToCommand({ room }), 'Go to the kitchen.');
+  assert.equal(TEXTS.goBackCommand({ room }), 'Go back to the kitchen.');
+});
+
+test('the pause that opens a day has a text', () => {
+  assert.equal(TEXTS.pauses.day({ number: 4 }), 'Day 4.');
+});
+
+// ---- the sentences of the chains ----
+
+const sentenceOf = (chain, step) => {
+  const sentence = TEXTS.chains?.[chain]?.[step];
+  return typeof sentence === 'function' ? sentence({ things: TEXTS.things }) : sentence;
+};
+
+/** The sentences of the story (section 4), word for word; a step without a sentence is not in the table. */
+const CHAIN_SENTENCES = {
+  'come-home': {
+    door: 'You come home and stand at your front door.',
+    keys: 'You need your keys to get in.',
+    inside: 'You open the door. You are inside.',
+    shoes: 'You take off your shoes.',
+  },
+  'go-out': {
+    start: 'You are in the hallway.',
+    plan: 'You are going out for some shopping.',
+    keys: 'You cannot leave without your keys.',
+    away: 'You lock the door. An hour later you are back with a full bag.',
+    inside: 'You open the door. You are inside.',
+    bag: 'You put the shopping bag down.',
+    unpack: 'The shopping belongs in the kitchen.',
+    done: 'Everything is unpacked.',
+  },
+  coffee: {
+    go: 'You feel like coffee.',
+    pack: 'Take a new pack of coffee from the top right cupboard.',
+    scissors: 'The pack has to be cut open.',
+    open: 'You cut the pack open.',
+    tin: 'Take the tin with the flowers from the worktop.',
+    fill: 'You pour the coffee into the tin and make a pot of filter coffee.',
+    'tin-back': 'You put the lid on the tin and put the tin back in the cupboard.',
+    sit: 'You want to drink your coffee in the living room.',
+    drink: 'You sit down and drink your coffee.',
+  },
+  present: {
+    go: 'A birthday present has to be wrapped at the dining table.',
+    paper: 'Take the wrapping paper from the sideboard.',
+    scissors: 'The paper has to be cut.',
+    wrap: 'You cut the paper and wrap the present.',
+    phone: 'You want to ask what time the party starts.',
+    call: 'The party starts at eight.',
+    'paper-back': 'You put the rest of the paper back in the sideboard.',
+    hall: 'The present has to stand ready in the hallway.',
+    ready: 'The present stands ready by the door.',
+  },
+  pizza: {
+    start: 'You are in the living room.',
+    bell: 'The doorbell rings: your pizza is here.',
+    go: 'Someone has to open the front door.',
+    wallet: 'The pizza has to be paid.',
+    pay: 'You pay and take the pizza.',
+    table: 'The pizza goes on the dining table.',
+    eat: 'The pizza is on the table.',
+  },
+  call: {
+    start: 'You are in the living room.',
+    ring: 'Somewhere your phone rings.',
+    phone: 'You want to answer the call.',
+    walk: 'You talk and walk around. The call ends in the garden.',
+    in: 'It gets chilly outside.',
+    sit: 'You sit down on the sofa.',
+  },
+};
+
+for (const [chain, steps] of Object.entries(CHAIN_SENTENCES)) {
+  test(`the sentences of the chain ${chain} are the ones of the story`, () => {
+    assert.deepEqual(Object.fromEntries(Object.keys(steps).map((step) => [step, sentenceOf(chain, step)])), steps);
+  });
+
+  test(`the chain ${chain} has no other sentences than the ones of the story`, () => {
+    assert.deepEqual(Object.keys(TEXTS.chains?.[chain] ?? {}).sort(), Object.keys(steps).sort());
+  });
+}
+
+test('the chains in the texts are the six chains of the list', () => {
+  assert.deepEqual(Object.keys(TEXTS.chains ?? {}).sort(), ['call', 'coffee', 'come-home', 'go-out', 'pizza', 'present']);
+  assert.deepEqual(Object.keys(TEXTS.chains ?? {}).sort(), CHAINS.map((chain) => chain.id).sort());
 });
 
 // ---- the summary of a day ----
@@ -127,16 +204,6 @@ test('every pause and every arrival that a day can have has a text', () => {
 test('every advice that the summary can give has a sentence', () => {
   assert.deepEqual(ADVICE.filter((row) => typeof TEXTS.advice?.[row.key] !== 'function'), []);
   assert.ok(ADVICE.length > 0, 'the summary has advice rows');
-});
-
-test('the home line lists the names of the things that are on their home spot', () => {
-  assert.equal(TEXTS.homeLine({ things: [{ name: 'keys' }, { name: 'wallet' }] }), 'On the home spot tonight: keys, wallet.');
-  assert.equal(TEXTS.homeLine({ things: [{ name: 'keys' }] }), 'On the home spot tonight: keys.');
-});
-
-test('the away line gives each thing with where it is, in brackets', () => {
-  const things = [{ thing: { name: 'phone' }, where: 'on the garden table' }, { thing: { name: 'keys' }, where: 'on the sofa' }];
-  assert.equal(TEXTS.awayLine({ things }), 'Somewhere else: phone (on the garden table), keys (on the sofa).');
 });
 
 test('the searching line says one step in the singular and several in the plural', () => {
@@ -150,15 +217,38 @@ test('the putting-away line says one step in the singular and several in the plu
   assert.equal(TEXTS.puttingLine({ steps: 0 }), 'Putting things away cost 0 steps.');
 });
 
-test('the advice sentences are the ones of the story, the someAway one without a verb that depends on the count', () => {
-  const things = [{ name: 'phone' }, { name: 'keys' }];
-  assert.equal(TEXTS.advice.noSearch({ things }), 'Nothing to search for today.');
-  assert.equal(TEXTS.advice.costly({ things }), "Most of today's steps went into searching. A fixed place costs a few steps once.");
-  assert.equal(TEXTS.advice.allHome({ things }), 'Everything is in its place. Tomorrow you will find it without thinking.');
-  assert.equal(TEXTS.advice.someAway({ things }), 'Remember where you left: phone, keys. Tomorrow you will know.');
-  assert.equal(TEXTS.advice.someAway({ things: [{ name: 'phone' }] }), 'Remember where you left: phone. Tomorrow you will know.');
+test('the advice sentences are the ones of the story', () => {
+  assert.equal(TEXTS.advice.noSearch(), 'Nothing to search for today.');
+  assert.equal(TEXTS.advice.costly(), "Most of today's steps went into searching. A fixed place costs a few steps once.");
+  assert.equal(TEXTS.advice.straight(), 'You went straight to your things. That is what a fixed place gives you.');
+  assert.deepEqual(Object.keys(TEXTS.advice).sort(), ['costly', 'noSearch', 'straight']);
 });
 
 test('the line about coming back tomorrow is the one of the story', () => {
   assert.equal(TEXTS.comeBackTomorrow, 'Come back tomorrow. A night in between is the real test.');
+});
+
+// ---- the screens of a day ----
+
+const keys = { ...TEXTS.things.keys, icon: '🔑' };
+const hall = TEXTS.rooms.hall;
+
+test('the command to find a thing names it with its icon and asks where to look, without a pronoun that depends on the thing', () => {
+  assert.equal(TEXTS.findCommand({ room: hall, thing: keys }), 'You need your 🔑 keys. Where do you look? You are in the hallway.');
+});
+
+test('the command to put a thing back names the room and the thing', () => {
+  assert.equal(TEXTS.putCommand({ room: hall, thing: keys }), 'You are in the hallway. Put your 🔑 keys back.');
+});
+
+test('the labels of the tell, the check and Something else first are the ones of the story', () => {
+  assert.deepEqual(
+    [TEXTS.goOn, TEXTS.somethingElse, TEXTS.elseCommand, TEXTS.holdNothing, TEXTS.checkCommand, TEXTS.yesEverything, TEXTS.noForgot, TEXTS.forgotCommand],
+    ['Go on', 'Something else first', 'What do you want to do first?', 'You hold nothing.', 'Is everything back in its place?', 'Yes, everything', 'No, I forgot something', 'What did you forget?'],
+  );
+});
+
+test('the choices that name a thing carry its icon and name', () => {
+  assert.equal(TEXTS.putMineAway({ thing: keys }), 'Put my 🔑 keys away');
+  assert.equal(TEXTS.forgotOption({ thing: keys }), '🔑 keys');
 });

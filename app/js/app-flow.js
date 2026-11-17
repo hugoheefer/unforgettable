@@ -8,8 +8,7 @@ import { World } from './world.js';
 import { choiceNotOffered } from './errors.js';
 import { recordFind, recordPut } from './history.js';
 import { summarize } from './summary.js';
-import { describeLocation } from './room-view.js';
-import { named } from './names.js';
+import { chainIdsOf } from './day-plan.js';
 
 /** A screen with fixed text whose choices lead somewhere. */
 class ChoiceScreen {
@@ -47,7 +46,11 @@ export class AppFlow {
     this.dayCount = saved.dayCount;
     this.history = saved.history;
     this.lastDayFinishedOn = saved.lastDayFinishedOn;
+    this.yesterdayChains = saved.yesterdayChains;
     this.world = World.restore(layout, saved.world);
+    // until a day has been started, every thing stands on its home spot, whatever the save says
+    this.started = saved.dayCount > 0 || saved.day !== null;
+    this.placeThingsOnPlan();
     // a day that cannot be continued (it names something that is gone) is dropped; the world stays
     this.day = canContinue(saved.day, { layout, things })
       ? new Day({ layout, things, world: this.world, plan: this.plan, progress: this.progress, state: saved.day })
@@ -65,7 +68,14 @@ export class AppFlow {
       dayCount: this.dayCount,
       history: this.history,
       lastDayFinishedOn: this.lastDayFinishedOn,
+      yesterdayChains: this.yesterdayChains,
     });
+  }
+
+  /** Before the first day a home spot is where the thing is: choosing one moves the thing with it. */
+  placeThingsOnPlan() {
+    if (this.started) return;
+    for (const thing of this.things) this.world.put(thing.id, this.plan[thing.id]);
   }
 
   welcome() {
@@ -83,8 +93,10 @@ export class AppFlow {
   }
 
   startDay() {
+    this.started = true;
     this.day ??= Day.start({
-      layout: this.layout, things: this.things, world: this.world, plan: this.plan, progress: this.progress, random: this.random, number: this.dayCount + 1,
+      layout: this.layout, things: this.things, world: this.world, plan: this.plan, progress: this.progress, random: this.random,
+      number: this.dayCount + 1, yesterday: this.yesterdayChains,
     });
     const dayNumber = this.day.state().number;
     return new PlayFlow(this.day, {
@@ -123,6 +135,7 @@ export class AppFlow {
   finishSetup() {
     this.plan = this.current.plan();
     this.day?.usePlan(this.plan);
+    this.placeThingsOnPlan();
     this.current = this.welcome();
   }
 
@@ -131,6 +144,7 @@ export class AppFlow {
     const number = this.day.state().number;
     this.progress = this.day.progress();
     const lead = this.summaryLines(number);
+    this.yesterdayChains = chainIdsOf(this.day.snapshot().events);
     this.day = null;
     this.dayCount += 1;
     this.lastDayFinishedOn = this.clock.today();
@@ -146,19 +160,13 @@ export class AppFlow {
     );
   }
 
-  /** The lines of the summary screen, in the order of the story; a line with nothing to say is left out. */
+  /** The lines of the summary screen, in the order of the story. It never says what lies where. */
   summaryLines(dayNumber) {
     const { texts } = this;
-    const summary = summarize({ dayNumber, history: this.history, world: this.world, plan: this.plan, things: this.things });
-    const thingNamed = (thingId) => named(texts.things, this.things.find((thing) => thing.id === thingId));
-    const lookup = { garmentOf: (id) => this.layout.garments.find((garment) => garment.id === id), roomOf: (id) => this.layout.places.find((place) => place.id === id) };
-    const advice = texts.advice[summary.advice]({ things: summary.away.map((entry) => thingNamed(entry.thingId)) });
+    const summary = summarize({ dayNumber, history: this.history });
+    const advice = texts.advice[summary.advice]();
     const noSearch = summary.advice === 'noSearch';
     const lines = [
-      summary.home.length > 0 && texts.homeLine({ things: summary.home.map(thingNamed) }),
-      summary.away.length > 0 && texts.awayLine({
-        things: summary.away.map((entry) => ({ thing: thingNamed(entry.thingId), where: describeLocation(lookup, entry.location, texts, { withRoom: false }) })),
-      }),
       noSearch ? advice : texts.searchedLine({ searched: summary.searched, possible: summary.possible }),
       texts.puttingLine({ steps: summary.putSteps }),
       !noSearch && advice,

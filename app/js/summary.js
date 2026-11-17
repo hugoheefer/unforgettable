@@ -1,6 +1,6 @@
-// Turns the records of one day and the world into the data of the day's summary screen. Pure.
+// Turns the records of one day into the data of the day's summary screen. Pure. It never says what lies where:
+// the player finds that out the next time a thing is needed.
 
-import { sameLocation } from './world.js';
 import { findsOfDay, putsOfDay } from './history.js';
 
 /** Searching more than this many times the possible steps is costly. */
@@ -12,23 +12,18 @@ const sum = (records, field) => records.reduce((total, record) => total + record
 export const ADVICE = Object.freeze([
   { key: 'noSearch', when: (summary) => summary.finds === 0 },
   { key: 'costly', when: (summary) => summary.searched > COSTLY_FACTOR * summary.possible },
-  { key: 'allHome', when: (summary) => summary.away.length === 0 },
-  { key: 'someAway', when: () => true },
+  { key: 'straight', when: () => true },
 ]);
 
 /**
- * @param {{ dayNumber: number, history: { finds: object[], puts: object[] }, world: object, plan: object, things: { id: string }[] }} options
+ * @param {{ dayNumber: number, history: { finds: object[], puts: object[] } }} options
  */
-export function summarize({ dayNumber, history, world, plan, things }) {
+export function summarize({ dayNumber, history }) {
   const finds = findsOfDay(history, dayNumber);
-  const puts = putsOfDay(history, dayNumber);
-  const lying = things.map((thing) => ({ thingId: thing.id, location: world.whereIs(thing.id) }));
   const summary = {
-    home: lying.filter(({ thingId, location }) => sameLocation(location, plan[thingId])).map(({ thingId }) => thingId),
-    away: lying.filter(({ thingId, location }) => !sameLocation(location, plan[thingId])),
     searched: sum(finds, 'steps'),
     possible: sum(finds, 'shortest'),
-    putSteps: sum(puts, 'steps'),
+    putSteps: sum(putsOfDay(history, dayNumber), 'steps'),
     finds: finds.length, // how many, so the first advice row can ask whether there was any search
   };
   return { ...summary, advice: ADVICE.find((row) => row.when(summary)).key };

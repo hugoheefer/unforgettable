@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { describeLocation, describeRoom } from '../app/js/room-view.js';
 import { TEXTS } from './texts-helper.mjs';
-import { find, findDay, makeDay, pocket, putAway, putAwayDay, spot, worldWith } from './day-helper.mjs';
+import { check, find, findDay, goTo, makeDay, pocket, putAway, putAwayDay, spot, tell, worldWith } from './day-helper.mjs';
 
 const describe = (day) => describeRoom(day, TEXTS);
 const tile = (tiles, id) => tiles.find((entry) => entry.id === id);
@@ -24,11 +24,6 @@ test('the view lists every other room with its distance, nearest first, then in 
   assert.deepEqual(view.rooms.slice(0, 7).map((room) => [room.id, room.steps]),
     [['living', 1], ['kitchen', 1], ['toilet', 1], ['landing', 1], ['garden', 1], ['dining', 2], ['bedroom', 2]]);
   assert.equal(view.rooms.length, 12);
-});
-
-test('in a hurry only rooms at one step are listed', () => {
-  const view = describe(putAwayDay('keys', { hurry: 'pan' }));
-  assert.deepEqual(view.rooms.map((room) => room.id), ['living', 'kitchen', 'toilet', 'landing', 'garden']);
 });
 
 test('the view shows what you wear, with its pockets', () => {
@@ -134,4 +129,32 @@ test('a location is told with its room for a spot, and by itself for a pocket', 
 test('the view works for a find event too', () => {
   const day = makeDay([find('keys'), putAway('keys')]);
   assert.equal(describe(day).room.name, 'Hallway');
+});
+
+test('the coat can come off during a tell, a walk-to and a check as well, not only while putting away', () => {
+  for (const event of [tell('hall'), goTo('kitchen'), check('hall')]) {
+    const view = describe(makeDay([event, tell('hall')]));
+    assert.equal(tile(view.worn, 'coat').canTakeOff, true, event.kind);
+    assert.equal(tile(view.worn, 'trousers').canTakeOff, false, event.kind);
+  }
+});
+
+test('without a thing named, a tell stars no spot: there is nothing to put away', () => {
+  const view = describe(makeDay([tell('hall'), tell('hall')]));
+  assert.ok(view.spots.every((entry) => entry.hint === 'hidden'));
+  assert.equal(view.hintText, '');
+});
+
+test('a thing put away on your own gets its home spot starred and its plan named, whatever the event is', () => {
+  const day = makeDay([tell('hall'), tell('hall')], { state: { inHand: ['keys'] } });
+  const view = describeRoom(day, TEXTS, { thingId: 'keys' });
+  assert.equal(tile(view.spots, 'hook').hint, 'shown');
+  assert.equal(view.hintText, 'Your plan: on the key hook in the hallway.');
+});
+
+test('the home spot of a thing put away on your own fades with its streak like any other', () => {
+  const day = makeDay([tell('hall'), tell('hall')], { state: { inHand: ['keys'] }, streaks: { keys: 2 } });
+  const view = describeRoom(day, TEXTS, { thingId: 'keys' });
+  assert.equal(tile(view.spots, 'hook').hint, 'dimmed');
+  assert.equal(view.hintText, '');
 });

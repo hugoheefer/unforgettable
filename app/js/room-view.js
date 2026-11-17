@@ -21,11 +21,17 @@ export function describeLocation(day, location, texts, { withRoom = true } = {})
 /** The room a player has to go to for a home spot: its own room, or where the garment of the pocket hangs. */
 const homeRoomOf = (day, home) => (isPocket(home) ? day.world.garmentRoom(home.garmentId) : home.placeId);
 
-export function describeRoom(day, texts) {
+/**
+ * @param {import('./day.js').Day} day
+ * @param {object} texts
+ * @param {{ thingId?: string }} options `thingId`: a thing the player puts away on their own; without it the thing
+ *   of the put-away being asked for, if any, is the one whose home spot is hinted
+ */
+export function describeRoom(day, texts, { thingId } = {}) {
   const { event } = day.state();
   const room = day.roomOf(day.state().roomId);
-  const putting = event?.kind === 'putAway';
-  const home = putting ? { thingId: event.thingId, location: day.plan[event.thingId] } : null;
+  const puttingId = thingId ?? (event?.kind === 'putAway' ? event.thingId : null);
+  const home = puttingId ? { thingId: puttingId, location: day.plan[puttingId] } : null;
   const level = home ? day.hintFor(home.thingId) : 'hidden';
   const iconOf = (thingId) => day.things.find((thing) => thing.id === thingId).icon;
 
@@ -44,7 +50,7 @@ export function describeRoom(day, texts) {
   const garments = day.layout.garments ?? [];
   const worn = garments
     .filter((garment) => day.world.isWorn(garment.id))
-    .map((garment) => garmentView(garment, { canTakeOff: putting && garment.removable !== false }));
+    .map((garment) => garmentView(garment, { canTakeOff: day.canHandle() && garment.removable !== false }));
   const hanging = garments
     .filter((garment) => day.world.garmentRoom(garment.id) === room.id)
     .map((garment) => garmentView(garment, { canPutOn: true, onSpot: day.world.garmentSpot(garment.id).spotId }));

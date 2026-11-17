@@ -1,5 +1,5 @@
-// One day of the game: a list of events (see scenario.js) run on a World. Pure: no DOM, no clock, no randomness
-// of its own (the scenario gets `random` injected).
+// One day of the game: a list of events (see day-plan.js) run on a World. Pure: no DOM, no clock, no randomness
+// of its own (the day plan gets `random` injected).
 //
 // The day can give its plain state back (`snapshot()`) and be built from it again, so a reload continues
 // exactly where the player was. Invariant: the event at `index` has always been entered, and a move never
@@ -10,88 +10,13 @@
 
 import { isPocket, locationKey, sameLocation } from './world.js';
 import { hintLevel, recordPlacement, streakOf } from './habit.js';
-import { RefusedMove, unknownRoom } from './errors.js';
-import { buildDay, HURRY_REASONS } from './scenario.js';
+import { RefusedMove, unknownRoom, unknownThing } from './errors.js';
+import { buildDay } from './day-plan.js';
+import { CHAINS } from './chains.js';
+import { EVENT_KINDS, canContinue } from './event-kinds.js';
 
-/** In a hurry only a room this many steps away can be walked to or reached. */
-const HURRY_REACH = 1;
-
-/** Looking where a thing lies is one step, however near. */
-const LOOK_STEPS = 1;
-
-const PAUSE_TEXTS = ['day', 'outForTheDay'];
-const MOVE_TEXTS = ['arrive', 'morning', 'after'];
-
-const isObject = (value) => typeof value === 'object' && value !== null && !Array.isArray(value);
-const isWholeNumber = (value) => Number.isInteger(value) && value >= 0;
-const isFindStart = (note) => isObject(note) && Number.isInteger(note.shortest) && note.shortest >= 1 && typeof note.wasHome === 'boolean';
-const hasUse = (thingId, useId, context) => context.things.get(thingId)?.uses.some((use) => use.id === useId) === true;
-
-/** The text of a move, in the event itself and in the pending text of the screen after it. */
-function isValidMoveText(entry, context) {
-  if (!MOVE_TEXTS.includes(entry.text)) return false;
-  return entry.text !== 'after' || hasUse(entry.thingId, entry.useId, context);
-}
-
-/**
- * What each kind of event does when it begins, when it is over, and what a saved event of its kind must
- * hold (`isValid`, checked before a saved day is continued). `day.js` never switches on the kind.
- * A move is done at once: it sets the room and leaves its text for the next screen.
- */
-export const EVENT_KINDS = {
-  pause: {
-    enter() {},
-    isDone: (day) => day.acknowledged,
-    isValid: (event) => PAUSE_TEXTS.includes(event.text),
-  },
-  moveTo: {
-    enter(day, event) {
-      const { kind, roomId, ...text } = event;
-      day.roomId = roomId;
-      day.arrival = text;
-    },
-    isDone: () => true,
-    isValid: (event, context) => context.rooms.has(event.roomId) && isValidMoveText(event, context),
-  },
-  find: {
-    enter(day, event) {
-      const where = day.world.whereIs(event.thingId);
-      day.findStart = where && { shortest: day.roomDistanceTo(where) + LOOK_STEPS, wasHome: sameLocation(where, day.plan[event.thingId]) };
-    },
-    isDone: (day, event) => day.inHand.includes(event.thingId),
-    isValid: (event, context) => context.things.has(event.thingId) && (event.useId === null || hasUse(event.thingId, event.useId, context)),
-  },
-  putAway: {
-    enter(day, event) {
-      // a thing that lay nowhere arrives with you
-      if (!day.inHand.includes(event.thingId)) day.inHand.push(event.thingId);
-    },
-    isDone: (day, event) => !day.inHand.includes(event.thingId),
-    isValid: (event, context) =>
-      context.things.has(event.thingId) && (event.hurry === null || HURRY_REASONS.some((reason) => reason.id === event.hurry)),
-  },
-};
-
-/**
- * Whether a day from the save can be continued: every part is of the right kind and names things, rooms and
- * uses that exist now. A day that fails is dropped by the caller; the constructor trusts its state.
- * @param {unknown} state
- * @param {{ layout: object, things: object[] }} options `things` are the chosen catalogue entries
- */
-export function canContinue(state, { layout, things }) {
-  if (!isObject(state)) return false;
-  const context = { rooms: new Set(layout.places.map((place) => place.id)), things: new Map(things.map((thing) => [thing.id, thing])) };
-  const { number, events, index, roomId, startedIn, inHand, steps, opened, arrival, findStart } = state;
-  const validEvents = Array.isArray(events) && events.length > 0
-    && events.every((event) => isObject(event) && Object.hasOwn(EVENT_KINDS, event.kind) && EVENT_KINDS[event.kind].isValid(event, context));
-  return validEvents && isWholeNumber(number) && isWholeNumber(index) && index < events.length
-    && context.rooms.has(roomId) && context.rooms.has(startedIn)
-    && Array.isArray(inHand) && inHand.every((id) => context.things.has(id))
-    && isWholeNumber(steps)
-    && Array.isArray(opened) && opened.every((key) => typeof key === 'string')
-    && (events[index].kind === 'find' ? isFindStart(findStart) : (findStart ?? null) === null)
-    && (arrival === null || (isObject(arrival) && isValidMoveText(arrival, context)));
-}
+// the table of event kinds and the check of a saved day live in event-kinds.js; day.js stays their public home
+export { EVENT_KINDS, canContinue };
 
 export class Day {
   /**
@@ -107,13 +32,19 @@ export class Day {
     const copy = structuredClone(state);
     Object.assign(this, copy);
     this.acknowledged = false;
+    this.leftBehind = [];
   }
 
-  /** Starts a new day. Every chosen thing that lies nowhere arrives with the player (the scenario sees to that). */
-  static start({ layout, things, world, plan, progress, random, number }) {
-    const nowhere = things.filter((thing) => world.whereIs(thing.id) === null).map((thing) => thing.id);
-    const events = buildDay({ dayNumber: number, things, nowhere, random });
-    const state = { number, events, index: 0, roomId: layout.startRoomId, inHand: [], steps: 0, startedIn: layout.startRoomId, opened: [], arrival: null };
+  /**
+   * Starts a new day. A chosen thing that lies nowhere (a new game, a thing added later) is put on its home
+   * spot first, silently.
+   * @param {{ yesterday?: string[], chains?: object[] }} options the ids of yesterday's chains; the chains to pick from
+   */
+  static start({ layout, things, world, plan, progress, random, number, yesterday = [], chains = CHAINS }) {
+    for (const thing of things) if (world.whereIs(thing.id) === null) world.put(thing.id, plan[thing.id]);
+    const onPerson = things.filter((thing) => isOnPerson(world, thing.id)).map((thing) => thing.id);
+    const events = buildDay({ dayNumber: number, chains, things, onPerson, yesterday, random });
+    const state = { number, events, index: 0, roomId: layout.startRoomId, inHand: [], steps: 0, startedIn: layout.startRoomId, opened: [], arrival: null, leftAt: {} };
     const day = new Day({ layout, things, world, plan, progress, state });
     EVENT_KINDS[events[0].kind].enter(day, events[0]);
     day.settle();
@@ -122,8 +53,8 @@ export class Day {
 
   /** Plain data of the day as it goes into the save. A copy, so later actions do not change it. */
   snapshot() {
-    const { number, events, index, roomId, inHand, steps, startedIn, opened, arrival, findStart } = this;
-    return structuredClone({ number, events, index, roomId, inHand, steps, startedIn, opened, arrival, findStart: findStart ?? null });
+    const { number, events, index, roomId, inHand, steps, startedIn, opened, arrival, findStart, leftAt } = this;
+    return structuredClone({ number, events, index, roomId, inHand, steps, startedIn, opened, arrival, findStart: findStart ?? null, leftAt });
   }
 
   /** Everything a view needs to know about the running event. */
@@ -136,13 +67,33 @@ export class Day {
       roomId: this.roomId,
       inHand: [...this.inHand],
       steps: this.steps,
-      hurry: event?.hurry ?? null,
       arrival: this.arrival && { ...this.arrival },
+      returnTo: this.returnTo(),
     };
+  }
+
+  /** The room the story waits in, when the player walked off from it; otherwise null. */
+  returnTo() {
+    const event = this.event();
+    const room = event && EVENT_KINDS[event.kind].room?.(event);
+    return room && room !== this.roomId ? room : null;
   }
 
   progress() {
     return this.habits;
+  }
+
+  /** Whether the running event lets the player put things away and handle the coat meanwhile. */
+  canHandle() {
+    const event = this.event();
+    return event !== null && EVENT_KINDS[event.kind].canHandle === true;
+  }
+
+  /** The ids of the things that `letGo` laid down since the last call, so the caller can record them. */
+  takeLeftBehind() {
+    const left = this.leftBehind;
+    this.leftBehind = [];
+    return left;
   }
 
   /** Home spots chosen between two events apply from the next put-away. */
@@ -150,13 +101,11 @@ export class Day {
     this.plan = plan;
   }
 
-  /** The other rooms with their distance, nearest first, then in the order of the layout; in a hurry only next door. */
+  /** The other rooms with their distance, nearest first, then in the order of the layout. */
   reachableRooms() {
-    const hurry = this.event()?.hurry;
     return this.layout.places
       .filter((place) => place.id !== this.roomId)
       .map((place) => ({ id: place.id, steps: this.world.stepsBetween(this.roomId, place.id) }))
-      .filter((room) => !hurry || room.steps <= HURRY_REACH)
       .sort((a, b) => a.steps - b.steps);
   }
 
@@ -193,17 +142,58 @@ export class Day {
     if (event) EVENT_KINDS[event.kind].enter(this, event);
   }
 
-  /** Every action clears the pending text of the last move, whether or not it is accepted. */
-  begin(kind, whenOther = {}) {
+  /**
+   * Every action clears the pending text of the last move, whether or not it is accepted. Gives the running event
+   * when its kind allows the ability, otherwise refuses with the code for that kind (or 'not-now').
+   * @param {'canWalk' | 'canHandle' | 'waitsForNext' | 'find' | 'check'} ability
+   */
+  begin(ability, whenOther = {}) {
     this.arrival = null;
     const event = this.event();
-    if (event?.kind !== kind) throw new RefusedMove(whenOther[event?.kind] ?? 'not-now');
+    const allowed = event && (ability === event.kind || EVENT_KINDS[event.kind][ability] === true);
+    if (!allowed) throw new RefusedMove(whenOther[event?.kind] ?? 'not-now');
     return event;
   }
 
-  /** Next on a pause. */
+  /**
+   * The story waits in another room: until the player walks back it does not go on. Walking and handling things
+   * stay possible, because putting something away on your own can take a walk to another room.
+   */
+  assertPresent() {
+    if (this.returnTo() !== null) throw new RefusedMove('come-back');
+  }
+
+  /** Next on a pause or a tell. */
   continue() {
-    this.begin('pause');
+    this.begin('waitsForNext');
+    this.assertPresent();
+    this.acknowledged = true;
+    this.settle();
+  }
+
+  // ---- the check ----
+
+  /**
+   * "Is everything back in its place?" Yes ends the check. No changes nothing and gives the ids of the chosen
+   * things to pick from; the app never says whether the answer was right.
+   */
+  answerCheck(allBack) {
+    this.begin('check');
+    this.assertPresent();
+    if (!allBack) return this.things.map((thing) => thing.id);
+    this.acknowledged = true;
+    this.settle();
+    return undefined;
+  }
+
+  /** The player forgot a thing: it is searched for and put away next, whether or not it lay in its place. */
+  forgot(thingId) {
+    this.begin('check');
+    this.assertPresent();
+    if (!this.things.some((thing) => thing.id === thingId)) throw unknownThing(thingId);
+    this.events.splice(this.index + 1, 0,
+      { kind: 'find', chain: null, step: null, thingId, leftAt: this.plan[thingId] },
+      { kind: 'putAway', chain: null, step: null, thingId });
     this.acknowledged = true;
     this.settle();
   }
@@ -211,20 +201,17 @@ export class Day {
   // ---- walking and clothes ----
 
   walkTo(roomId) {
-    this.arrival = null;
-    const event = this.event();
-    if (event?.kind !== 'find' && event?.kind !== 'putAway') throw new RefusedMove('not-now');
+    this.begin('canWalk');
     if (!this.roomOf(roomId)) throw unknownRoom(roomId);
     if (roomId === this.roomId) throw new RefusedMove('already-here');
-    const distance = this.world.stepsBetween(this.roomId, roomId);
-    if (event.hurry && distance > HURRY_REACH) throw new RefusedMove('too-far-in-a-hurry');
+    this.steps += this.world.stepsBetween(this.roomId, roomId);
     this.roomId = roomId;
-    this.steps += distance;
+    this.settle();
   }
 
   /** Takes a worn garment off and hangs it on a spot of this room. */
   takeOff(garmentId, spotId) {
-    this.begin('putAway');
+    this.begin('canHandle');
     if (this.garmentOf(garmentId).removable === false) throw new RefusedMove('not-removable');
     if (!this.world.isWorn(garmentId)) throw new RefusedMove('not-worn');
     this.assertSpotInRoom(spotId);
@@ -234,7 +221,7 @@ export class Day {
 
   /** Puts on a garment that hangs in this room. */
   putOn(garmentId) {
-    this.begin('putAway');
+    this.begin('canHandle');
     if (this.world.garmentRoom(garmentId) !== this.roomId) throw new RefusedMove('garment-not-here');
     this.world.wear(garmentId);
     this.steps += 1;
@@ -264,30 +251,38 @@ export class Day {
 
   // ---- putting away ----
 
-  putDown(spotId) {
-    this.begin('putAway', { find: 'nothing-in-hand' });
+  /** Puts a thing in hand on a spot of this room; without `thingId`, the thing of the put-away being asked for. */
+  putDown(spotId, thingId) {
+    const id = this.thingToPlace(thingId);
     this.assertSpotInRoom(spotId);
-    return this.place({ placeId: this.roomId, spotId });
+    return this.place({ placeId: this.roomId, spotId }, id);
   }
 
-  putInPocket(garmentId, pocketId) {
-    this.begin('putAway', { find: 'nothing-in-hand' });
+  putInPocket(garmentId, pocketId, thingId) {
+    const id = this.thingToPlace(thingId);
     const location = { garmentId, pocketId };
     this.assertReach(location);
-    return this.place(location);
+    return this.place(location, id);
   }
 
-  place(location) {
-    const { thingId, hurry } = this.event();
+  /** The thing a put-away is about: the given one, or the one the event asks for. It must be in hand. */
+  thingToPlace(thingId) {
+    const event = this.begin('canHandle', { find: 'nothing-in-hand' });
+    const id = thingId ?? (event.kind === 'putAway' ? event.thingId : undefined);
+    if (!this.inHand.includes(id)) throw new RefusedMove('nothing-in-hand');
+    return id;
+  }
+
+  place(location, thingId) {
     const atHome = sameLocation(location, this.plan[thingId]);
-    // a hurry excuses a stray placement only when the home spot was out of reach from where the event began
-    const excused = !atHome && hurry && !this.homeWithinHurryReach(this.plan[thingId]);
-    if (!excused) this.habits = recordPlacement(this.habits, thingId, atHome);
+    this.habits = recordPlacement(this.habits, thingId, atHome);
     this.world.put(thingId, location);
     this.inHand = this.inHand.filter((id) => id !== thingId);
+    // the steps walked so far belong to this put-away; the next one starts counting again
     const { steps } = this;
+    this.steps = 0;
     this.settle();
-    return { thingId, location, atHome, steps, hurry: Boolean(hurry) };
+    return { thingId, location, atHome, steps };
   }
 
   /** Steps from the room where the event started to the room a location is reached from; 0 for a worn garment. */
@@ -295,10 +290,6 @@ export class Day {
     if (isPocket(location) && this.world.isWorn(location.garmentId)) return 0;
     const roomId = isPocket(location) ? this.world.garmentRoom(location.garmentId) : location.placeId;
     return this.world.stepsBetween(this.startedIn, roomId);
-  }
-
-  homeWithinHurryReach(home) {
-    return this.roomDistanceTo(home) <= HURRY_REACH;
   }
 
   // ---- finding ----
@@ -331,4 +322,10 @@ export class Day {
     this.settle();
     return result;
   }
+}
+
+/** Whether a thing is on the person: in a pocket of a garment that is worn. */
+function isOnPerson(world, thingId) {
+  const at = world.whereIs(thingId);
+  return at !== null && isPocket(at) && world.isWorn(at.garmentId);
 }

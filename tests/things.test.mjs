@@ -15,8 +15,8 @@ test('every thing has its own id', () => {
   assert.equal(new Set(THINGS.map((thing) => thing.id)).size, THINGS.length);
 });
 
-test('keys, wallet and phone go with you when you leave, scissors stay at home', () => {
-  assert.deepEqual(THINGS.filter((thing) => thing.carry).map((thing) => thing.id), ['keys', 'wallet', 'phone']);
+test('nothing says which things go with you: the openers say what must be on the person', () => {
+  for (const thing of THINGS) assert.equal('carry' in thing, false, thing.id);
 });
 
 test('the suggested home of every thing is a spot or pocket that exists', () => {
@@ -24,33 +24,21 @@ test('the suggested home of every thing is a spot or pocket that exists', () => 
   for (const thing of THINGS) assert.ok(world.hasLocation(thing.home), thing.id);
 });
 
-test('every use takes place in a room that exists, and a thing has at least one use', () => {
-  const rooms = LAYOUT.places.map((place) => place.id);
-  for (const thing of THINGS) {
-    assert.ok(thing.uses.length >= 1, thing.id);
-    for (const use of thing.uses) assert.ok(rooms.includes(use.roomId), `${thing.id}/${use.id}`);
-  }
+test('the catalogue has no uses any more: the chains say how a thing is used', () => {
+  for (const thing of THINGS) assert.equal('uses' in thing, false, thing.id);
 });
 
-test('the use ids of one thing are different from each other', () => {
-  for (const thing of THINGS) assert.equal(new Set(thing.uses.map((use) => use.id)).size, thing.uses.length, thing.id);
-});
-
-test('the keys are used in the shed and at the car', () => {
-  assert.deepEqual(byId('keys').uses.map((use) => use.roomId), ['shed', 'car']);
-});
-
-test('the default plan is the suggested home of every thing of the catalogue', () => {
+test('the default plan is the suggested home of every thing of the catalogue: keys in the coat, scissors in the kitchen drawer', () => {
   assert.deepEqual(defaultPlan(), {
-    keys: { placeId: 'hall', spotId: 'hook' },
+    keys: { garmentId: 'coat', pocketId: 'coat-right' },
     wallet: { garmentId: 'coat', pocketId: 'coat-inside' },
     phone: { placeId: 'kitchen', spotId: 'counter' },
-    scissors: { placeId: 'study', spotId: 'desk-drawer' },
+    scissors: { placeId: 'kitchen', spotId: 'drawer' },
   });
 });
 
 test('the default plan follows whatever catalogue it is given, so there is one source of truth', () => {
-  const other = [{ id: 'umbrella', icon: '☂️', carry: false, home: { placeId: 'hall', spotId: 'umbrella' }, uses: [] }];
+  const other = [{ id: 'umbrella', icon: '☂️', home: { placeId: 'hall', spotId: 'umbrella' } }];
   assert.deepEqual(defaultPlan(other), { umbrella: { placeId: 'hall', spotId: 'umbrella' } });
 });
 

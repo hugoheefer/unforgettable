@@ -22,7 +22,7 @@ const validDay = (day) => (isObject(day) && isWholeNumber(day.number) && isWhole
 
 /**
  * @param {() => Storage} getStorage
- * @param {{ defaults: { plan: object, progress: object, things: string[] },
+ * @param {{ defaults: { plan: object, progress: object, things: string[], chainIds: string[] },
  *           world: { hasLocation: (location: object) => boolean, restore: (snapshot: unknown) => { snapshot: () => object } } }} options
  */
 export function createSaveStore(getStorage, { defaults, world }) {
@@ -43,6 +43,8 @@ export function createSaveStore(getStorage, { defaults, world }) {
     return plan;
   }
 
+  const validChainIds = (ids) => (Array.isArray(ids) ? ids.filter((id) => defaults.chainIds.includes(id)) : []);
+
   const validThings = (things) => (Array.isArray(things) ? things.filter((id) => defaults.things.includes(id)) : [...defaults.things]);
 
   return {
@@ -59,6 +61,7 @@ export function createSaveStore(getStorage, { defaults, world }) {
         day: validDay(saved?.day),
         dayCount: isWholeNumber(saved?.dayCount) ? saved.dayCount : 0,
         history: validHistory(saved?.history),
+        yesterdayChains: validChainIds(saved?.yesterdayChains),
         lastDayFinishedOn: typeof saved?.lastDayFinishedOn === 'string' && DATE_FORMAT.test(saved.lastDayFinishedOn) ? saved.lastDayFinishedOn : null,
       };
     },

@@ -1,4 +1,4 @@
-// The records of finds and put-aways, kept so the player's own numbers can be shown. Pure: a history is plain
+// The records of finds and put-aways (a put-away has `left` set when the thing was let go, not put away), kept so the player's own numbers can be shown. Pure: a history is plain
 // data, and every change gives a new one. Statistics are computed from the records, never stored.
 
 /** Only the most recent records are kept: enough for the progress the game shows, small enough for the save. */
@@ -11,7 +11,7 @@ const isPositiveNumber = (value) => Number.isInteger(value) && value >= 1;
 const isFind = (r) => isWholeNumber(r.day) && typeof r.thingId === 'string' && isWholeNumber(r.steps)
   && isPositiveNumber(r.shortest) && typeof r.wasHome === 'boolean';
 const isPut = (r) => isWholeNumber(r.day) && typeof r.thingId === 'string' && isWholeNumber(r.steps)
-  && typeof r.atHome === 'boolean' && typeof r.hurry === 'boolean';
+  && typeof r.atHome === 'boolean' && typeof r.left === 'boolean';
 
 const append = (list, record) => [...list, record].slice(-KEEP);
 const loaded = (list, isValid) => (Array.isArray(list) ? list.filter((r) => isObject(r) && isValid(r)).slice(-KEEP) : []);

@@ -21,17 +21,17 @@ test('the first question is about the first item and offers every room and every
 
 test('the area where the item is kept now is starred', () => {
   const step = newFlow().step();
-  assert.equal(step.choices.find((choice) => choice.id === 'area:hall').mark, '★');
+  assert.equal(step.choices.find((choice) => choice.id === 'area:coat').mark, '★');
   assert.equal(step.choices.find((choice) => choice.id === 'area:kitchen').mark, undefined);
 });
 
 test('after the area the places in it are offered, and the current one is starred', () => {
   const flow = newFlow();
-  pick(flow, 'area:hall');
+  pick(flow, 'area:coat');
   const step = flow.step();
-  assert.match(step.command, /hallway/);
-  assert.ok(ids(step).includes('place:hook'));
-  assert.equal(step.choices.find((choice) => choice.id === 'place:hook').mark, '★');
+  assert.match(step.command, /coat/);
+  assert.ok(ids(step).includes('place:coat-right'));
+  assert.equal(step.choices.find((choice) => choice.id === 'place:coat-right').mark, '★');
 });
 
 test('the pockets of a garment are offered like places', () => {

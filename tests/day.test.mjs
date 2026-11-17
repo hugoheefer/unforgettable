@@ -5,36 +5,49 @@ import { RefusedMove } from '../app/js/errors.js';
 import { LAYOUT } from '../app/js/layout.js';
 import { THINGS, defaultPlan } from '../app/js/things.js';
 import { World } from '../app/js/world.js';
-import { dayState, find, findDay, makeDay, moveTo, pause, playOut, pocket, putAway, putAwayDay, rand, refusalOf, spot, worldWith } from './day-helper.mjs';
+import { PLAN, check, dayState, find, findDay, goTo, letGo, makeDay, moveTo, pause, playOut, pocket, putAway, putAwayDay, rand, refusalOf, spot, tell, worldWith } from './day-helper.mjs';
 
 const coatHooks = spot('hall', 'coat-hooks');
+const start = (world, options = {}) => Day.start({ layout: LAYOUT, things: THINGS, world, plan: defaultPlan(), progress: { streaks: {} }, random: rand(), number: 2, ...options });
 
-// ---- the days of the story ----
+// ---- the start of a game and of a day ----
 
-test('a thing left on the sofa on day 1 is on the sofa at the start of day 2', () => {
-  const world = new World(LAYOUT);
-  const dayOne = Day.start({ layout: LAYOUT, things: THINGS, world, plan: defaultPlan(), progress: { streaks: {} }, random: rand(), number: 1 });
-  playOut(dayOne);
-  const dayTwo = Day.start({ layout: LAYOUT, things: THINGS, world, plan: defaultPlan(), progress: dayOne.progress(), random: rand(), number: 2 });
-  assert.deepEqual(dayTwo.world.whereIs('keys'), spot('living', 'sofa'));
+test('a new game has every chosen thing on its home spot', () => {
+  const day = start(new World(LAYOUT), { number: 1 });
+  for (const thing of THINGS) assert.deepEqual(day.world.whereIs(thing.id), defaultPlan()[thing.id], thing.id);
+});
+
+test('a thing that is nowhere is on its home spot when the next day starts, the others stay where they are', () => {
+  const world = worldWith({ keys: spot('living', 'sofa'), wallet: pocket('coat', 'coat-inside'), phone: spot('kitchen', 'counter') });
+  const day = start(world);
+  assert.deepEqual(day.world.whereIs('scissors'), defaultPlan().scissors);
+  assert.deepEqual(day.world.whereIs('keys'), spot('living', 'sofa'));
+});
+
+test('a thing left on the sofa is still on the sofa when the next day starts', () => {
+  const world = worldWith({ keys: spot('living', 'sofa') });
+  assert.deepEqual(start(world, { number: 3 }).world.whereIs('keys'), spot('living', 'sofa'));
 });
 
 test('a new day begins on a pause that shows its number', () => {
-  const day = Day.start({ layout: LAYOUT, things: THINGS, world: new World(LAYOUT), plan: defaultPlan(), progress: { streaks: {} }, random: rand(), number: 3 });
+  const day = start(new World(LAYOUT), { number: 3 });
   assert.equal(day.state().number, 3);
   assert.deepEqual(day.state().event, pause('day'));
 });
 
-test('every chosen thing that is nowhere comes home with you, and no other', () => {
-  const world = worldWith({ keys: spot('living', 'sofa') });
-  const day = Day.start({ layout: LAYOUT, things: THINGS, world, plan: defaultPlan(), progress: { streaks: {} }, random: rand(), number: 2 });
-  const comingHome = day.snapshot().events.filter((event) => event.kind === 'putAway').map((event) => event.thingId);
-  assert.deepEqual(comingHome.slice(0, 3), ['wallet', 'phone', 'scissors']);
+test('the day starts with nothing in hand and the player in the start room', () => {
+  const state = start(new World(LAYOUT)).state();
+  assert.deepEqual([state.inHand, state.roomId], [[], LAYOUT.startRoomId]);
+});
+
+test('a whole day made by the game can be played to its end', () => {
+  const day = playOut(start(new World(LAYOUT), { number: 1 }));
+  assert.equal(day.state().finished, true);
 });
 
 // ---- moving between events ----
 
-const arriving = () => makeDay([pause('day'), moveTo('hall', 'arrive'), putAway('keys')], { state: { roomId: 'bedroom', startedIn: 'bedroom' } });
+const arriving = () => makeDay([pause('day'), moveTo('hall'), putAway('keys')], { state: { roomId: 'bedroom', startedIn: 'bedroom', inHand: ['keys'] } });
 
 test('a move to a room puts you there at once, without a screen of its own', () => {
   const day = arriving();
@@ -43,16 +56,16 @@ test('a move to a room puts you there at once, without a screen of its own', () 
   assert.equal(day.state().event.kind, 'putAway');
 });
 
-test('a thing that was nowhere is in your hand when its put-away begins', () => {
-  const day = arriving();
+test('a put-away for a thing that is not in your hand is done at once: you put it away on your own earlier', () => {
+  const day = makeDay([pause('day'), putAway('keys'), putAway('wallet')], { state: { inHand: ['wallet'] } });
   day.continue();
-  assert.deepEqual(day.state().inHand, ['keys']);
+  assert.deepEqual(day.state().event, putAway('wallet'));
 });
 
 test('the text of a move is pending on the screen after it', () => {
   const day = arriving();
   day.continue();
-  assert.deepEqual(day.state().arrival, { text: 'arrive' });
+  assert.deepEqual(day.state().arrival, { chain: 'come-home', step: 'door' });
 });
 
 test('the pending text of a move is gone after the next action', () => {
@@ -77,7 +90,7 @@ test('a pause waits for Next and does not move on by itself', () => {
 
 test('things found in the morning are all still in hand when you come home', () => {
   const world = worldWith({ keys: spot('hall', 'hook'), wallet: spot('hall', 'console') });
-  const day = makeDay([find('keys'), find('wallet'), pause('outForTheDay'), moveTo('hall', 'arrive'), putAway('keys'), putAway('wallet')], { world });
+  const day = makeDay([find('keys'), find('wallet'), tell('hall'), moveTo('hall'), putAway('keys'), putAway('wallet')], { world });
   day.look('hook');
   day.look('console');
   day.continue();
@@ -101,16 +114,286 @@ test('nothing can be done in a finished day', () => {
   assert.equal(refusalOf(() => day.walkTo('kitchen')), 'not-now');
 });
 
-// ---- uses ----
+// ---- the new kinds of event ----
 
-test('a use ends with you in the use room, holding the thing, asked to put it away', () => {
-  const world = worldWith({ phone: spot('kitchen', 'counter') });
-  const day = makeDay([find('phone', 'call'), moveTo('garden', 'after', { thingId: 'phone', useId: 'call' }), putAway('phone')], { world, state: { roomId: 'kitchen' } });
-  day.look('counter');
-  assert.equal(day.state().roomId, 'garden');
-  assert.deepEqual(day.state().event, putAway('phone'));
+test('a find for a thing that is in hand is done at once and the day goes on', () => {
+  const day = makeDay([pause('day'), find('keys'), putAway('keys')], { state: { inHand: ['keys'] } });
+  day.continue();
+  assert.deepEqual(day.state().event, putAway('keys'));
+});
+
+test('a find keeps where the thing stays when nobody puts it back, in the state of the day', () => {
+  const day = findDay('keys', { world: worldWith({ keys: spot('hall', 'hook') }) });
+  assert.deepEqual(day.snapshot().leftAt, { keys: spot('hall', 'console') });
+});
+
+test('a find that is done at once keeps where the thing stays as well', () => {
+  const day = makeDay([pause('day'), find('keys'), tell('hall')], { state: { inHand: ['keys'] } });
+  day.continue();
+  assert.deepEqual(day.snapshot().leftAt, { keys: spot('hall', 'console') });
+});
+
+test('a walk-to event is not done before you stand in the room', () => {
+  const day = makeDay([goTo('kitchen'), tell('kitchen')]);
+  assert.equal(day.state().event.kind, 'goTo');
+  day.walkTo('dining');
+  assert.equal(day.state().event.kind, 'goTo');
+});
+
+test('a walk-to event for the room you already stand in is done at once, and its reason waits as the text of the next screen', () => {
+  const day = makeDay([tell('hall'), goTo('hall'), tell('hall')]);
+  day.continue();
+  assert.equal(day.state().event.kind, 'tell');
+  assert.deepEqual(day.state().arrival, { chain: 'coffee', step: 'go' });
+});
+
+test('a walk-to event for another room leaves no text waiting', () => {
+  const day = makeDay([tell('hall'), goTo('kitchen'), tell('kitchen')]);
+  day.continue();
+  assert.equal(day.state().arrival, null);
+});
+
+test('a walk-to event is done the moment you arrive in the room, also after a longer way', () => {
+  const day = makeDay([goTo('kitchen'), tell('kitchen')]);
+  day.walkTo('kitchen');
+  assert.equal(day.state().event.kind, 'tell');
+});
+
+test('the steps of a walk-to event do not carry over to the next event', () => {
+  const day = makeDay([goTo('kitchen'), tell('kitchen')]);
+  day.walkTo('kitchen');
+  assert.equal(day.state().steps, 0);
+});
+
+test('a tell waits for Next', () => {
+  const day = makeDay([tell('hall'), tell('hall')]);
+  assert.equal(day.state().event.kind, 'tell');
+  day.continue();
+  assert.equal(day.state().finished, false);
+  day.continue();
+  assert.equal(day.state().finished, true);
+});
+
+// ---- letting go ----
+
+const silentCoffee = () => {
+  const day = makeDay(
+    [pause('day'), find('scissors'), tell('kitchen'), letGo(['scissors']), tell('kitchen')],
+    { world: worldWith({ scissors: spot('kitchen', 'drawer') }), plan: defaultPlan(), streaks: { scissors: 3 }, state: { roomId: 'kitchen', startedIn: 'kitchen' } },
+  );
+  day.continue();
+  return day;
+};
+
+test('in a silent chain the thing lies on its left-at spot after the chain, without a word', () => {
+  const day = silentCoffee();
+  day.look('drawer');
+  day.continue();
+  assert.deepEqual(day.world.whereIs('scissors'), spot('kitchen', 'counter'));
+  assert.deepEqual(day.state().inHand, []);
+  assert.deepEqual(day.state().event, tell('kitchen'));
+});
+
+test('letting go sets the streak of the thing to zero', () => {
+  const day = silentCoffee();
+  day.look('drawer');
+  day.continue();
+  assert.equal(day.progress().streaks.scissors, 0);
+});
+
+test('what was let go is handed over once, for the history', () => {
+  const day = silentCoffee();
+  day.look('drawer');
+  day.continue();
+  assert.deepEqual(day.takeLeftBehind(), ['scissors']);
+  assert.deepEqual(day.takeLeftBehind(), []);
+});
+
+test('letting go does not touch a thing that is not in hand any more', () => {
+  const day = makeDay([letGo(['scissors']), tell('kitchen')], { world: worldWith({ scissors: spot('study', 'desk') }), streaks: { scissors: 3 } });
+  assert.deepEqual(day.world.whereIs('scissors'), spot('study', 'desk'));
+  assert.equal(day.progress().streaks.scissors, 3);
+});
+
+test('letting go leaves a thing alone that is not in its list, so the call chain keeps the phone in the garden', () => {
+  const day = makeDay([letGo([]), tell('garden')], { state: { inHand: ['phone'], roomId: 'garden' } });
   assert.deepEqual(day.state().inHand, ['phone']);
-  assert.deepEqual(day.state().arrival, { text: 'after', thingId: 'phone', useId: 'call' });
+});
+
+test('in a guided chain nothing is let go: the put-away puts the thing where the player wants it', () => {
+  const day = makeDay(
+    [find('scissors'), putAway('scissors'), letGo([])],
+    { world: worldWith({ scissors: spot('kitchen', 'drawer') }), plan: defaultPlan(), state: { roomId: 'kitchen', startedIn: 'kitchen' } },
+  );
+  day.look('drawer');
+  day.putDown('sofa'.replace('sofa', 'fruit-bowl'));
+  assert.deepEqual(day.world.whereIs('scissors'), spot('kitchen', 'fruit-bowl'));
+  assert.deepEqual(day.takeLeftBehind(), []);
+});
+
+// ---- doing something else first ----
+
+const FREE_EVENTS = { tell: () => tell('kitchen'), goTo: () => goTo('dining'), check: () => check('kitchen') };
+
+for (const [kind, event] of Object.entries(FREE_EVENTS)) {
+  test(`during a ${kind} you can walk, take your coat off and put it on again`, () => {
+    const day = makeDay([event(), tell('kitchen')], { state: { roomId: 'kitchen', startedIn: 'kitchen' } });
+    day.takeOff('coat', 'counter');
+    assert.equal(day.world.isWorn('coat'), false);
+    day.putOn('coat');
+    assert.equal(day.world.isWorn('coat'), true);
+    day.walkTo('hall');
+    assert.equal(day.state().roomId, 'hall');
+  });
+
+  test(`during a ${kind} you can put a thing in your hand away on your own, and it counts for the streak`, () => {
+    const day = makeDay([event(), tell('kitchen')], { state: { roomId: 'kitchen', startedIn: 'kitchen', inHand: ['phone'] }, streaks: { phone: 1 } });
+    const result = day.putDown('counter', 'phone');
+    assert.deepEqual(day.world.whereIs('phone'), spot('kitchen', 'counter'));
+    assert.deepEqual(day.state().inHand, []);
+    assert.equal(result.atHome, true);
+    assert.equal(day.progress().streaks.phone, 2);
+  });
+
+  test(`during a ${kind} you can put a thing in a pocket on your own`, () => {
+    const day = makeDay([event(), tell('kitchen')], { state: { roomId: 'kitchen', startedIn: 'kitchen', inHand: ['wallet'] } });
+    assert.equal(day.putInPocket('coat', 'coat-left', 'wallet').atHome, false);
+    assert.deepEqual(day.world.whereIs('wallet'), pocket('coat', 'coat-left'));
+  });
+}
+
+test('putting a thing away on your own, somewhere else than home, sets its streak to zero', () => {
+  const day = makeDay([tell('kitchen')], { state: { roomId: 'kitchen', startedIn: 'kitchen', inHand: ['phone'] }, streaks: { phone: 3 } });
+  day.putDown('sink', 'phone');
+  assert.equal(day.progress().streaks.phone, 0);
+});
+
+test('putting a thing away on your own costs the steps walked since the last put-away, and no more', () => {
+  const day = makeDay([tell('kitchen')], { state: { roomId: 'kitchen', startedIn: 'kitchen', inHand: ['phone', 'wallet'] } });
+  day.walkTo('hall');
+  assert.equal(day.putDown('hook', 'phone').steps, 1);
+  assert.equal(day.putDown('console', 'wallet').steps, 0);
+});
+
+test('a thing you do not hold cannot be put away on your own', () => {
+  const day = makeDay([tell('kitchen')], { state: { roomId: 'kitchen', startedIn: 'kitchen' } });
+  assert.equal(refusalOf(() => day.putDown('counter', 'phone')), 'nothing-in-hand');
+});
+
+test('during a put-away you can put another thing in your hand away first', () => {
+  const day = makeDay([putAway('keys'), tell('hall')], { state: { inHand: ['keys', 'phone'] } });
+  day.putDown('console', 'phone');
+  assert.deepEqual(day.state().inHand, ['keys']);
+  assert.equal(day.state().event.kind, 'putAway');
+});
+
+test('during a find you can only walk: nothing is put away and no coat is handled', () => {
+  const day = findDay('keys', { world: worldWith({ keys: spot('hall', 'hook') }), state: { inHand: ['phone'] } });
+  assert.equal(refusalOf(() => day.putDown('console', 'phone')), 'nothing-in-hand');
+  assert.equal(refusalOf(() => day.takeOff('coat', 'coat-hooks')), 'not-now');
+  day.walkTo('kitchen');
+  assert.equal(day.state().roomId, 'kitchen');
+});
+
+// ---- coming back ----
+
+test('when you walked off from a tell, the story asks you back to the room it stands in', () => {
+  const day = makeDay([tell('kitchen'), tell('kitchen')], { state: { roomId: 'kitchen', startedIn: 'kitchen' } });
+  assert.equal(day.state().returnTo, null);
+  day.walkTo('study');
+  assert.equal(day.state().returnTo, 'kitchen');
+});
+
+test('when you walked off from a check, the story asks you back to the room it stands in', () => {
+  const day = makeDay([check('living'), tell('living')], { state: { roomId: 'living', startedIn: 'living' } });
+  day.walkTo('dining');
+  assert.equal(day.state().returnTo, 'living');
+});
+
+test('while the story asks you back it does not go on: Next and the answers of the check are refused', () => {
+  const day = makeDay([tell('kitchen'), tell('kitchen')], { state: { roomId: 'study', startedIn: 'study' } });
+  assert.equal(refusalOf(() => day.continue()), 'come-back');
+  const checking = makeDay([check('kitchen'), tell('kitchen')], { state: { roomId: 'study', startedIn: 'study' } });
+  assert.equal(refusalOf(() => checking.answerCheck(true)), 'come-back');
+  assert.equal(refusalOf(() => checking.answerCheck(false)), 'come-back');
+  assert.equal(refusalOf(() => checking.forgot('keys')), 'come-back');
+  assert.equal(refusalOf(() => day.answerCheck(true)), 'not-now');
+});
+
+test('while the story asks you back you can still put a thing away on your own in the room you walked to', () => {
+  const day = makeDay([tell('kitchen'), tell('kitchen')], { state: { roomId: 'kitchen', startedIn: 'kitchen', inHand: ['scissors'] } });
+  day.walkTo('study');
+  assert.equal(day.state().returnTo, 'kitchen');
+  assert.equal(day.putDown('desk-drawer', 'scissors').steps, 3);
+  day.walkTo('kitchen');
+  assert.equal(day.state().returnTo, null);
+  day.continue();
+  assert.equal(day.state().event.kind, 'tell');
+});
+
+test('a check asks you back too, and refuses the answer until you are there', () => {
+  const day = makeDay([check('living'), tell('living')], { state: { roomId: 'dining', startedIn: 'dining' } });
+  assert.equal(refusalOf(() => day.answerCheck(true)), 'come-back');
+});
+
+test('a walk-to event never asks you back: walking to its room is what it asks', () => {
+  const day = makeDay([goTo('kitchen'), tell('kitchen')], { state: { roomId: 'study', startedIn: 'study' } });
+  assert.equal(day.state().returnTo, null);
+});
+
+// ---- the check ----
+
+test('answering yes ends the check and changes nothing', () => {
+  const world = worldWith({ scissors: spot('kitchen', 'counter') });
+  const day = makeDay([check('living'), tell('living')], { world, state: { roomId: 'living', startedIn: 'living' }, streaks: { scissors: 2 } });
+  const before = JSON.stringify([day.world.snapshot(), day.progress(), day.state().inHand]);
+  day.answerCheck(true);
+  assert.equal(day.state().event.kind, 'tell');
+  assert.equal(JSON.stringify([day.world.snapshot(), day.progress(), day.state().inHand]), before);
+});
+
+test('answering no does not end the check and offers every chosen thing to pick from', () => {
+  const day = makeDay([check('living'), tell('living')], { state: { roomId: 'living', startedIn: 'living' } });
+  assert.deepEqual(day.answerCheck(false), ['keys', 'wallet', 'phone', 'scissors']);
+  assert.equal(day.state().event.kind, 'check');
+});
+
+test('forgetting a thing puts a find and a put-away for it right after the check, and ends the check', () => {
+  const world = worldWith({ scissors: spot('kitchen', 'counter') });
+  const day = makeDay([check('living'), tell('living')], { world, plan: defaultPlan(), state: { roomId: 'living', startedIn: 'living' } });
+  day.forgot('scissors');
+  assert.deepEqual(day.state().event.kind, 'find');
+  assert.equal(day.state().event.thingId, 'scissors');
+  assert.deepEqual(day.snapshot().events.map((event) => event.kind), ['check', 'find', 'putAway', 'tell']);
+  assert.deepEqual(day.snapshot().events[2].thingId, 'scissors');
+});
+
+test('the forgotten thing is searched for and put away with the normal events, also when it lies on its home spot', () => {
+  const world = worldWith({ scissors: spot('kitchen', 'drawer') });
+  const day = makeDay([check('kitchen'), tell('kitchen')], { world, plan: defaultPlan(), state: { roomId: 'kitchen', startedIn: 'kitchen' }, streaks: { scissors: 1 } });
+  day.forgot('scissors');
+  assert.equal(day.look('drawer').found, true);
+  assert.equal(day.state().event.kind, 'putAway');
+  assert.equal(day.putDown('drawer').atHome, true);
+  assert.equal(day.progress().streaks.scissors, 2);
+  assert.equal(day.state().event.kind, 'tell');
+});
+
+test('a thing that is not chosen cannot be forgotten', () => {
+  const day = makeDay([check('living'), tell('living')], { state: { roomId: 'living', startedIn: 'living' } });
+  assert.throws(() => day.forgot('dragon'), (error) => !(error instanceof RefusedMove));
+});
+
+test('forgetting outside a check is refused', () => {
+  assert.equal(refusalOf(() => makeDay([tell('hall')]).forgot('keys')), 'not-now');
+});
+
+test('the events a forgotten thing adds survive saving and are not chains of the story', () => {
+  const day = makeDay([check('living'), tell('living')], { world: worldWith({ keys: spot('hall', 'hook') }), state: { roomId: 'living', startedIn: 'living' } });
+  day.forgot('keys');
+  const added = day.snapshot().events.slice(1, 3);
+  assert.deepEqual(added.map((event) => [event.chain, event.step]), [[null, null], [null, null]]);
+  assert.deepEqual(JSON.parse(JSON.stringify(day.snapshot())), day.snapshot());
 });
 
 // ---- finding ----
@@ -194,11 +477,11 @@ test('while putting away you see everything within reach, and nothing in a pocke
 // ---- putting away ----
 
 test('putting a thing down on a spot of the room leaves it there, out of your hand', () => {
-  const day = makeDay([putAway('keys'), putAway('wallet')], { state: { roomId: 'living', startedIn: 'living', inHand: ['keys'] } });
+  const day = makeDay([putAway('keys'), putAway('wallet')], { state: { roomId: 'living', startedIn: 'living', inHand: ['keys', 'wallet'] } });
   const result = day.putDown('sofa');
   assert.deepEqual(day.world.whereIs('keys'), spot('living', 'sofa'));
   assert.deepEqual(day.state().inHand, ['wallet']);
-  assert.deepEqual(result, { thingId: 'keys', location: spot('living', 'sofa'), atHome: false, steps: 0, hurry: false });
+  assert.deepEqual(result, { thingId: 'keys', location: spot('living', 'sofa'), atHome: false, steps: 0 });
 });
 
 test('putting a thing in a pocket of the coat you wear leaves it in that pocket', () => {
@@ -326,37 +609,6 @@ test('a room that does not exist is a mistake in the code, not a refusal', () =>
   assert.throws(() => putAwayDay('keys').walkTo('moon'), (error) => !(error instanceof RefusedMove) && /room/i.test(error.message));
 });
 
-// ---- hurry ----
-
-test('the day says why you are in a hurry', () => {
-  assert.equal(putAwayDay('keys', { hurry: 'doorbell' }).state().hurry, 'doorbell');
-  assert.equal(putAwayDay('keys').state().hurry, null);
-});
-
-test('in a hurry a room at two steps is refused', () => {
-  const day = putAwayDay('keys', { hurry: 'doorbell' });
-  assert.equal(refusalOf(() => day.walkTo('dining')), 'too-far-in-a-hurry');
-});
-
-test('in a hurry a room at one step is accepted', () => {
-  const day = putAwayDay('keys', { hurry: 'doorbell' });
-  day.walkTo('kitchen');
-  assert.equal(day.state().roomId, 'kitchen');
-});
-
-test('in a hurry the distance counts from where you stand, so you can still go on step by step', () => {
-  const day = putAwayDay('keys', { hurry: 'doorbell' });
-  day.walkTo('kitchen');
-  day.walkTo('dining');
-  assert.equal(day.state().roomId, 'dining');
-});
-
-test('in a hurry everything else still works', () => {
-  const day = putAwayDay('keys', { hurry: 'doorbell' });
-  day.takeOff('coat', 'coat-hooks');
-  assert.equal(day.state().steps, 1);
-});
-
 // ---- the streak ----
 
 const streakOf = (day, thingId) => day.progress().streaks[thingId];
@@ -379,42 +631,10 @@ test('putting a thing on another spot sets its streak to zero', () => {
   assert.equal(streakOf(day, 'keys'), 0);
 });
 
-test('in a hurry with the home spot out of reach, another spot leaves the streak as it was', () => {
-  const day = putAwayDay('scissors', { hurry: 'pan', streaks: { scissors: 3 } }); // home: the desk drawer, two steps away
-  day.putDown('console');
-  assert.equal(streakOf(day, 'scissors'), 3);
-});
-
-test('in a hurry with the home spot in reach, another spot sets the streak to zero', () => {
-  const day = putAwayDay('phone', { hurry: 'pan', streaks: { phone: 3 } }); // home: the kitchen counter, one step away
-  day.putDown('console');
-  assert.equal(streakOf(day, 'phone'), 0);
-});
-
-test('in a hurry with the home spot in a pocket of a coat that hangs two steps away, the streak stays', () => {
-  const world = worldWith({}, { coat: spot('study', 'desk') });
-  const day = putAwayDay('wallet', { hurry: 'pan', world, streaks: { wallet: 3 } });
-  day.putDown('console');
-  assert.equal(streakOf(day, 'wallet'), 3);
-});
-
-test('in a hurry with the home spot in a pocket of the coat you wear, another spot sets the streak to zero', () => {
-  const day = putAwayDay('wallet', { hurry: 'pan', streaks: { wallet: 3 } });
-  day.putDown('console');
-  assert.equal(streakOf(day, 'wallet'), 0);
-});
-
-test('without a hurry a home spot far away is no excuse', () => {
+test('a home spot far away is no excuse: another spot sets the streak to zero', () => {
   const day = putAwayDay('scissors', { streaks: { scissors: 3 } });
   day.putDown('console');
   assert.equal(streakOf(day, 'scissors'), 0);
-});
-
-test('the home spot counts from where the event started, not from where you walked to', () => {
-  const day = putAwayDay('scissors', { hurry: 'pan', streaks: { scissors: 3 } });
-  day.walkTo('toilet'); // one step from the hall, but the study is still two steps from where you started
-  day.putDown('cistern');
-  assert.equal(streakOf(day, 'scissors'), 3);
 });
 
 test('the streaks you hand in are not changed behind your back', () => {
@@ -439,7 +659,7 @@ function midFind() {
 }
 
 const resumed = (day) => new Day({
-  layout: LAYOUT, things: THINGS, world: World.restore(LAYOUT, day.world.snapshot()), plan: defaultPlan(),
+  layout: LAYOUT, things: THINGS, world: World.restore(LAYOUT, day.world.snapshot()), plan: PLAN,
   progress: day.progress(), state: JSON.parse(JSON.stringify(day.snapshot())),
 });
 
@@ -469,7 +689,7 @@ test('a restored day remembers which spots you already looked at', () => {
 test('a day restored right after a move still has the text of that move pending', () => {
   const day = arriving();
   day.continue();
-  assert.deepEqual(resumed(day).state().arrival, { text: 'arrive' });
+  assert.deepEqual(resumed(day).state().arrival, { chain: 'come-home', step: 'door' });
 });
 
 test('the saved state is plain data that survives a JSON round trip unchanged', () => {
@@ -499,63 +719,75 @@ test('the saved state is a copy: later actions do not change it', () => {
 
 test('a plan chosen between two events applies to the next put-away', () => {
   const day = putAwayDay('keys', { roomId: 'kitchen' });
-  day.usePlan({ ...defaultPlan(), keys: spot('kitchen', 'counter') });
+  day.usePlan({ ...PLAN, keys: spot('kitchen', 'counter') });
   assert.equal(day.putDown('counter').atHome, true);
   assert.equal(day.progress().streaks.keys, 1);
 });
 
 test('the hint follows the plan that was chosen last', () => {
   const day = putAwayDay('keys');
-  day.usePlan({ ...defaultPlan(), keys: spot('kitchen', 'counter') });
+  day.usePlan({ ...PLAN, keys: spot('kitchen', 'counter') });
   assert.deepEqual(day.plan.keys, spot('kitchen', 'counter'));
 });
 
 // ---- a saved day that cannot be continued ----
 
 const context = { layout: LAYOUT, things: THINGS };
-/** A day in the middle of a use, with every field filled in. */
+/** A day in the middle of a chain, with an event of every kind and every field filled in. */
 const goodState = () => structuredClone(dayState(
-  [pause('day'), find('keys', 'shed'), moveTo('shed', 'after', { thingId: 'keys', useId: 'shed' }), putAway('keys', 'doorbell')],
-  { index: 3, roomId: 'shed', startedIn: 'shed', inHand: ['keys'], steps: 2, opened: ['hall/hook'], arrival: { text: 'after', thingId: 'keys', useId: 'shed' } },
+  [pause('day'), moveTo('hall'), goTo('kitchen'), tell('kitchen'), find('keys'), check('kitchen'), letGo(['keys']), putAway('keys')],
+  { index: 7, roomId: 'kitchen', startedIn: 'kitchen', inHand: ['keys'], steps: 2, opened: ['hall/hook'], arrival: { chain: 'come-home', step: 'door' }, leftAt: { keys: spot('hall', 'console') } },
 ));
 
 test('a day made by the game can be continued, at its start and in the middle of an event', () => {
-  const day = Day.start({ layout: LAYOUT, things: THINGS, world: new World(LAYOUT), plan: defaultPlan(), progress: { streaks: {} }, random: rand({ chance: () => true }), number: 2 });
+  const day = start(new World(LAYOUT));
   assert.equal(canContinue(day.snapshot(), context), true);
   day.continue();
   day.walkTo('kitchen');
   assert.equal(canContinue(day.snapshot(), context), true);
 });
 
-test('a state with every field filled in can be continued', () => {
+test('a state with every field filled in, and an event of every kind, can be continued', () => {
   assert.equal(canContinue(goodState(), context), true);
 });
 
-test('a state without a pending text and without a hurry can be continued', () => {
+test('a state without a pending text can be continued', () => {
   const state = goodState();
   state.arrival = null;
-  state.events[3].hurry = null;
+  assert.equal(canContinue(state, context), true);
+});
+
+test('a day with events that a forgotten thing added can be continued', () => {
+  const state = goodState();
+  state.events[4] = { ...find('keys'), chain: null, step: null };
+  state.events[7] = { ...putAway('keys'), chain: null, step: null };
   assert.equal(canContinue(state, context), true);
 });
 
 const BROKEN = {
-  'something that is not an object': () => 'a day',
-  'a list instead of an object': () => [],
-  'no number': (s) => { delete s.number; return s; },
   'no events': (s) => { s.events = []; return s; },
   'events that are not a list': (s) => { s.events = 'many'; return s; },
-  'an unknown kind of event': (s) => { s.events[1] = { kind: 'dance' }; return s; },
-  'an event that is not an object': (s) => { s.events[1] = 'find'; return s; },
-  'a pause with an unknown text': (s) => { s.events[0].text = 'nap'; return s; },
-  'a move to a room that does not exist': (s) => { s.events[2].roomId = 'moon'; return s; },
-  'a move with an unknown text': (s) => { s.events[2].text = 'teleport'; return s; },
-  'a move after a use without the thing': (s) => { delete s.events[2].thingId; return s; },
-  'a move after a use that the thing does not have': (s) => { s.events[2].useId = 'moon'; return s; },
-  'a find for a thing that does not exist': (s) => { s.events[1].thingId = 'ghost'; return s; },
-  'a find with a use that the thing does not have': (s) => { s.events[1].useId = 'moon'; return s; },
-  'a put-away for a thing that does not exist': (s) => { s.events[3].thingId = 'ghost'; return s; },
-  'a put-away with an unknown reason to hurry': (s) => { s.events[3].hurry = 'earthquake'; return s; },
-  'an index past the last event': (s) => { s.index = 4; return s; },
+  'an event of an unknown kind': (s) => { s.events[1] = { kind: 'teleport' }; return s; },
+  'an event that is not an object': (s) => { s.events[1] = 'x'; return s; },
+  'a pause with an unknown text': (s) => { s.events[0] = pause('teatime'); return s; },
+  'a move to a room that does not exist': (s) => { s.events[1].roomId = 'moon'; return s; },
+  'a move for a step that no chain has': (s) => { s.events[1].step = 'teleport'; return s; },
+  'a move for a chain that does not exist': (s) => { s.events[1].chain = 'dragons'; return s; },
+  'a walk-to for a room that does not exist': (s) => { s.events[2].roomId = 'moon'; return s; },
+  'a walk-to for a step that no chain has': (s) => { s.events[2].step = 'teleport'; return s; },
+  'a tell in a room that does not exist': (s) => { s.events[3].roomId = 'moon'; return s; },
+  'a tell for a chain that does not exist': (s) => { s.events[3].chain = 'dragons'; return s; },
+  'a find for a thing that does not exist': (s) => { s.events[4].thingId = 'ghost'; return s; },
+  'a find without a left-at spot': (s) => { delete s.events[4].leftAt; return s; },
+  'a find with a left-at spot that does not exist': (s) => { s.events[4].leftAt = spot('moon', 'rock'); return s; },
+  'a find for a step that no chain has': (s) => { s.events[4].step = 'teleport'; return s; },
+  'a check in a room that does not exist': (s) => { s.events[5].roomId = 'moon'; return s; },
+  'a check for a step that no chain has': (s) => { s.events[5].step = 'teleport'; return s; },
+  'a let-go that is not a list': (s) => { s.events[6].thingIds = 'keys'; return s; },
+  'a let-go of a thing that does not exist': (s) => { s.events[6].thingIds = ['ghost']; return s; },
+  'a put-away for a thing that does not exist': (s) => { s.events[7].thingId = 'ghost'; return s; },
+  'a put-away for a step that no chain has': (s) => { s.events[7].step = 'teleport'; return s; },
+  'an index past the last event': (s) => { s.index = 8; return s; },
   'a negative index': (s) => { s.index = -1; return s; },
   'an index that is not a whole number': (s) => { s.index = 1.5; return s; },
   'a room that does not exist': (s) => { s.roomId = 'moon'; return s; },
@@ -567,7 +799,11 @@ const BROKEN = {
   'spots looked at that are not strings': (s) => { s.opened = [1]; return s; },
   'spots looked at that are not a list': (s) => { s.opened = 'hall/hook'; return s; },
   'a pending text that is not an object': (s) => { s.arrival = 'arrive'; return s; },
-  'a pending text with an unknown key': (s) => { s.arrival = { text: 'teleport' }; return s; },
+  'a pending text for a step that no chain has': (s) => { s.arrival = { chain: 'come-home', step: 'teleport' }; return s; },
+  'left-at spots that are not an object': (s) => { s.leftAt = 'console'; return s; },
+  'a left-at spot of a thing that does not exist': (s) => { s.leftAt = { ghost: spot('hall', 'console') }; return s; },
+  'a left-at spot that does not exist': (s) => { s.leftAt = { keys: spot('moon', 'rock') }; return s; },
+  'no left-at spots at all': (s) => { delete s.leftAt; return s; },
 };
 
 for (const [name, spoil] of Object.entries(BROKEN)) {
@@ -579,6 +815,21 @@ for (const [name, spoil] of Object.entries(BROKEN)) {
 test('a saved day for a thing that is no longer chosen cannot be continued', () => {
   const withoutKeys = { layout: LAYOUT, things: THINGS.filter((thing) => thing.id !== 'keys') };
   assert.equal(canContinue(goodState(), withoutKeys), false);
+});
+
+test('a day saved in the middle of each new kind of event survives saving and goes on', () => {
+  const world = worldWith({ keys: spot('hall', 'hook') });
+  const days = {
+    goTo: makeDay([goTo('kitchen'), tell('kitchen')], { world }),
+    tell: makeDay([tell('hall'), tell('hall')], { world }),
+    check: makeDay([check('hall'), tell('hall')], { world }),
+    find: findDay('keys', { world }),
+  };
+  for (const [kind, day] of Object.entries(days)) {
+    const saved = JSON.parse(JSON.stringify(day.snapshot()));
+    assert.equal(canContinue(saved, context), true, kind);
+    assert.deepEqual(resumed(day).state(), day.state(), kind);
+  }
 });
 
 // ---- what a find costs ----
@@ -637,7 +888,7 @@ test('the shortest way is counted from the room where the event started, not fro
 });
 
 test('a find that begins after a move counts from the room that move ended in', () => {
-  const events = [pause('day'), moveTo('living', 'morning'), find('keys')];
+  const events = [pause('day'), moveTo('living'), find('keys')];
   const day = makeDay(events, { world: keysAt(spot('dining', 'sideboard')) });
   day.continue();
   day.walkTo('dining');
@@ -654,7 +905,7 @@ test('a find that is continued after a reload keeps its shortest way', () => {
 
 test('home spots chosen in the middle of a find do not change whether the thing was home when the event began', () => {
   const day = findDay('keys', { world: keysAt(spot('hall', 'console')) });
-  day.usePlan({ ...defaultPlan(), keys: spot('hall', 'console') });
+  day.usePlan({ ...PLAN, keys: spot('hall', 'console') });
   assert.equal(day.look('console').wasHome, false);
 });
 
@@ -668,23 +919,9 @@ test('the note about the find is part of the saved state and is gone when the fi
   assert.equal(canContinue(day.snapshot(), context), true);
 });
 
-// ---- a put-away tells whether it was done in a hurry ----
-
-test('a put-away in a hurry says so', () => {
-  assert.equal(putAwayDay('keys', { hurry: 'doorbell' }).putDown('hook').hurry, true);
-});
-
-test('a put-away without a hurry says so too', () => {
-  assert.equal(putAwayDay('keys').putDown('hook').hurry, false);
-});
-
-test('a put-away in a pocket tells about the hurry as well', () => {
-  assert.equal(putAwayDay('wallet', { hurry: 'pan' }).putInPocket('coat', 'coat-inside').hurry, true);
-});
-
 // ---- a saved day in the middle of a find needs its note ----
 
-const goodFindState = () => structuredClone(dayState([pause('day'), find('keys', 'shed')], { index: 1, findStart: { shortest: 2, wasHome: false } }));
+const goodFindState = () => structuredClone(dayState([pause('day'), find('keys')], { index: 1, findStart: { shortest: 2, wasHome: false }, leftAt: { keys: spot('hall', 'console') } }));
 
 test('a day in the middle of a find, with its note, can be continued', () => {
   assert.equal(canContinue(goodFindState(), context), true);
@@ -706,6 +943,12 @@ for (const [name, spoil] of Object.entries(BROKEN_NOTES)) {
     assert.equal(canContinue(spoil(goodFindState()), context), false);
   });
 }
+
+test('a saved day in the middle of a find without the left-at spot of that thing cannot be continued', () => {
+  const state = goodFindState();
+  state.leftAt = {};
+  assert.equal(canContinue(state, context), false);
+});
 
 test('a saved day with a note left over from a find that is over cannot be continued', () => {
   const state = goodState();

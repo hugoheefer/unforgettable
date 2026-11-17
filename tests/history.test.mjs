@@ -4,7 +4,7 @@ import { findsOfDay, putsOfDay, recordFind, recordPut, validHistory } from '../a
 
 const EMPTY = { finds: [], puts: [] };
 const found = (day, thingId = 'keys', steps = 1, shortest = 1, wasHome = true) => ({ day, thingId, steps, shortest, wasHome });
-const put = (day, thingId = 'keys', steps = 0, atHome = true, hurry = false) => ({ day, thingId, steps, atHome, hurry });
+const put = (day, thingId = 'keys', steps = 0, atHome = true, left = false) => ({ day, thingId, steps, atHome, left });
 
 // ---- recording ----
 
@@ -73,7 +73,7 @@ test('a day without records gives empty lists', () => {
 // ---- loading a history that may be damaged ----
 
 test('a well-formed history is loaded as it is', () => {
-  const history = { finds: [found(1), found(2, 'wallet', 4, 3, false)], puts: [put(1), put(2, 'wallet', 2, false, true)] };
+  const history = { finds: [found(1), found(2, 'wallet', 4, 3, false)], puts: [put(1), put(2, 'wallet', 2, false), put(2, 'keys', 0, false, true)] };
   assert.deepEqual(validHistory(history), history);
 });
 
@@ -115,7 +115,9 @@ const BROKEN_PUTS = {
   'no steps': (r) => { delete r.steps; return r; },
   'steps that are not a whole number': (r) => ({ ...r, steps: 0.5 }),
   'an atHome that is not true or false': (r) => ({ ...r, atHome: 1 }),
-  'a hurry that is not true or false': (r) => ({ ...r, hurry: 'doorbell' }),
+  'a left that is not true or false': (r) => ({ ...r, left: 'yes' }),
+  'no left at all': (r) => { delete r.left; return r; },
+  'an old hurry instead of left': (r) => { delete r.left; return { ...r, hurry: false }; },
   'a find where a put-away should be': () => found(1),
 };
 
@@ -124,6 +126,11 @@ for (const [name, spoil] of Object.entries(BROKEN_PUTS)) {
     assert.deepEqual(validHistory({ finds: [], puts: [spoil(put(1)), put(2)] }).puts, [put(2)]);
   });
 }
+
+test('a put-away that was let go is a record like any other, with left set', () => {
+  const history = recordPut(EMPTY, put(1, 'scissors', 0, false, true));
+  assert.deepEqual(putsOfDay(history, 1), [{ day: 1, thingId: 'scissors', steps: 0, atHome: false, left: true }]);
+});
 
 test('a loaded history keeps only the last 300 records of each kind', () => {
   const finds = Array.from({ length: 350 }, (_, index) => found(index + 1));
