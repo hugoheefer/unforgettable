@@ -13,23 +13,24 @@ const catalogueIds = new Set(THINGS.map((thing) => thing.id));
 const hasLocation = (location) => world.hasLocation(location);
 const counter = { placeId: 'kitchen', spotId: 'counter' };
 
-/** The facts of the six chains, as the story writes them: id:kind:data of every step. */
+/** The facts of the seven chains, as the story writes them: id:kind:data@room of every step (`at` is the room a step is tied to). */
 const STORY = {
-  'come-home': ['door:move:garden', 'keys:take:keys', 'inside:move:hall', 'keys-back:putBack:keys', 'shoes:tell'],
-  'go-out': ['start:move:hall', 'plan:tell', 'keys:take:keys', 'away:tell', 'inside:move:hall', 'bag:tell', 'keys-back:putBack:keys', 'unpack:goTo:kitchen', 'done:check'],
-  coffee: ['go:goTo:kitchen', 'pack:take:coffee-pack', 'scissors:take:scissors', 'open:tell', 'scissors-back:putBack:scissors', 'tin:take:coffee-tin', 'fill:tell', 'tin-back:putBack:coffee-tin', 'sit:goTo:living', 'drink:check'],
-  present: ['go:goTo:dining', 'paper:take:wrapping-paper', 'scissors:take:scissors', 'wrap:tell', 'scissors-back:putBack:scissors', 'phone:take:phone', 'call:tell', 'phone-back:putBack:phone', 'paper-back:putBack:wrapping-paper', 'hall:goTo:hall', 'ready:check'],
-  pizza: ['start:move:living', 'bell:tell', 'go:goTo:hall', 'wallet:take:wallet', 'pay:tell', 'wallet-back:putBack:wallet', 'table:goTo:dining', 'eat:check'],
-  call: ['start:move:living', 'ring:tell', 'phone:take:phone', 'walk:move:garden', 'phone-back:putBack:phone', 'in:goTo:living', 'sit:check'],
+  'come-home': ['door:move:garden', 'keys:take:keys', 'inside:move:hall', 'keys-back:putBack:keys', 'shoes:tell@hall'],
+  'go-out': ['start:move:hall', 'plan:tell', 'keys:take:keys', 'away:tell', 'inside:move:hall', 'bag:tell@hall', 'keys-back:putBack:keys', 'unpack:goTo:kitchen', 'done:tell@kitchen'],
+  coffee: ['go:goTo:kitchen', 'pack:take:coffee-pack@kitchen', 'scissors:take:scissors', 'open:tell@kitchen', 'scissors-back:putBack:scissors', 'tin:take:coffee-tin@kitchen', 'fill:tell@kitchen', 'tin-back:putBack:coffee-tin@kitchen', 'sit:goTo:living', 'drink:tell@living'],
+  present: ['go:goTo:dining', 'paper:take:wrapping-paper@dining', 'scissors:take:scissors', 'wrap:tell@dining', 'scissors-back:putBack:scissors', 'phone:take:phone', 'call:tell', 'phone-back:putBack:phone', 'paper-back:putBack:wrapping-paper@dining', 'hall:goTo:hall', 'ready:tell@hall'],
+  pizza: ['bell:tell', 'go:goTo:hall', 'wallet:take:wallet', 'pay:tell@hall', 'wallet-back:putBack:wallet', 'table:goTo:dining', 'eat:tell@dining'],
+  call: ['ring:tell', 'phone:take:phone', 'walk:move:garden', 'phone-back:putBack:phone', 'in:goTo:living', 'sit:tell@living'],
+  evening: ['dusk:tell', 'look:check'],
 };
 
-const signature = (step) => [step.id, step.kind, step.roomId ?? step.object].filter((part) => part !== undefined).join(':');
+const signature = (step) => `${[step.id, step.kind, step.roomId ?? step.object].filter((part) => part !== undefined).join(':')}${step.at === undefined ? '' : `@${step.at}`}`;
 const chainNamed = (id) => CHAINS.find((chain) => chain.id === id);
 const contextFor = (sentences) => ({ rooms, catalogueIds, hasLocation, kinds: STEP_KINDS, sentences });
 
 // ---- the list of chains ----
 
-test('the list holds the six chains of the story, in that order', () => {
+test('the list holds the seven chains of the story, in that order', () => {
   assert.deepEqual(CHAINS.map((chain) => chain.id), Object.keys(STORY));
 });
 
@@ -40,6 +41,21 @@ test('every chain id is different', () => {
 test('two chains open a day: come-home needs the keys on the person, go-out needs nothing', () => {
   const openers = CHAINS.filter((chain) => chain.opener === true);
   assert.deepEqual(openers.map((chain) => [chain.id, chain.needsOnPerson ?? []]), [['come-home', ['keys']], ['go-out', []]]);
+});
+
+test('exactly one chain closes a session: evening', () => {
+  assert.deepEqual(CHAINS.filter((chain) => chain.closer === true).map((chain) => chain.id), ['evening']);
+});
+
+test('the check is asked once, in the closing chain, and nowhere else', () => {
+  const checks = CHAINS.flatMap((chain) => chain.steps.filter((step) => step.kind === 'check').map(() => chain.id));
+  assert.deepEqual(checks, ['evening']);
+});
+
+test('no chain after the opener starts with a move: pizza and call start with a tell', () => {
+  assert.deepEqual(CHAINS.filter((chain) => chain.opener !== true && chain.steps[0].kind === 'move'), []);
+  assert.equal(chainNamed('pizza')?.steps[0].kind, 'tell');
+  assert.equal(chainNamed('call')?.steps[0].kind, 'tell');
 });
 
 test('at least one opener needs nothing, so a day can always begin', () => {
@@ -140,11 +156,15 @@ test('every kind needs a sentence, except the put-back of a thing of the catalog
 
 // ---- how a step becomes events ----
 
-const ctx = (chosen = []) => ({ chainId: 'x', chosen: new Set(chosen), roomId: 'kitchen' });
+const ctx = (chosen = []) => ({ chainId: 'x', chosen: new Set(chosen) });
 const expand = (step, chosen) => STEP_KINDS[step.kind].expand(step, ctx(chosen));
 
-test('a tell becomes a tell event in the room where the story stands', () => {
-  assert.deepEqual(expand({ id: 'a', kind: 'tell' }), [{ kind: 'tell', chain: 'x', step: 'a', roomId: 'kitchen' }]);
+test('a tell with a room becomes a tell event tied to that room', () => {
+  assert.deepEqual(expand({ id: 'a', kind: 'tell', at: 'kitchen' }), [{ kind: 'tell', chain: 'x', step: 'a', roomId: 'kitchen' }]);
+});
+
+test('a tell without a room becomes a tell event that happens wherever the player is', () => {
+  assert.deepEqual(expand({ id: 'a', kind: 'tell' }), [{ kind: 'tell', chain: 'x', step: 'a', roomId: null }]);
 });
 
 test('a move becomes a move event to its room', () => {
@@ -155,34 +175,41 @@ test('a walk-to becomes a walk-to event to its room', () => {
   assert.deepEqual(expand({ id: 'a', kind: 'goTo', roomId: 'living' }), [{ kind: 'goTo', chain: 'x', step: 'a', roomId: 'living' }]);
 });
 
-test('a check becomes a check event in the room where the story stands', () => {
-  assert.deepEqual(expand({ id: 'a', kind: 'check' }), [{ kind: 'check', chain: 'x', step: 'a', roomId: 'kitchen' }]);
+test('a check becomes a check event without a room: it is a thought', () => {
+  assert.deepEqual(expand({ id: 'a', kind: 'check' }), [{ kind: 'check', chain: 'x', step: 'a', roomId: null }]);
 });
 
 test('the take of a chosen thing becomes a find that knows where the thing stays', () => {
   assert.deepEqual(expand({ id: 'a', kind: 'take', object: 'scissors', leftAt: counter }, ['scissors']), [{ kind: 'find', chain: 'x', step: 'a', thingId: 'scissors', leftAt: counter }]);
 });
 
-test('the take of a prop becomes a tell', () => {
-  assert.deepEqual(expand({ id: 'a', kind: 'take', object: 'coffee-pack' }, ['scissors']), [{ kind: 'tell', chain: 'x', step: 'a', roomId: 'kitchen' }]);
+test('the take of a prop becomes a tell tied to its room', () => {
+  assert.deepEqual(expand({ id: 'a', kind: 'take', object: 'coffee-pack', at: 'kitchen' }, ['scissors']), [{ kind: 'tell', chain: 'x', step: 'a', roomId: 'kitchen' }]);
 });
 
 test('the take of a thing that is in the catalogue but not chosen is a tell as well', () => {
-  assert.deepEqual(expand({ id: 'a', kind: 'take', object: 'scissors', leftAt: counter }, ['keys']), [{ kind: 'tell', chain: 'x', step: 'a', roomId: 'kitchen' }]);
+  assert.deepEqual(expand({ id: 'a', kind: 'take', object: 'scissors', leftAt: counter }, ['keys']), [{ kind: 'tell', chain: 'x', step: 'a', roomId: null }]);
 });
 
 test('the put-back of a chosen thing becomes a put-away', () => {
   assert.deepEqual(expand({ id: 'a', kind: 'putBack', object: 'scissors' }, ['scissors']), [{ kind: 'putAway', chain: 'x', step: 'a', thingId: 'scissors' }]);
 });
 
-test('the put-back of a prop becomes a tell', () => {
-  assert.deepEqual(expand({ id: 'a', kind: 'putBack', object: 'coffee-tin' }, ['scissors']), [{ kind: 'tell', chain: 'x', step: 'a', roomId: 'kitchen' }]);
+test('the put-back of a prop becomes a tell tied to its room', () => {
+  assert.deepEqual(expand({ id: 'a', kind: 'putBack', object: 'coffee-tin', at: 'kitchen' }, ['scissors']), [{ kind: 'tell', chain: 'x', step: 'a', roomId: 'kitchen' }]);
+});
+
+test('a tell, a take and a put-back may name a room with `at`, and it must exist', () => {
+  for (const step of [{ id: 'a', kind: 'tell' }, { id: 'a', kind: 'take', object: 'coffee-pack' }, { id: 'a', kind: 'putBack', object: 'coffee-pack' }]) {
+    assert.equal(STEP_KINDS[step.kind].isValid({ ...step, at: 'kitchen' }, context), true, step.kind);
+    assert.equal(STEP_KINDS[step.kind].isValid({ ...step, at: 'moon' }, context), false, step.kind);
+  }
 });
 
 // ---- the contract notices what is wrong ----
 
 const TEXTS_OF = { good: { a: 'Go.', b: 'Cut.', c: 'Done?' } };
-const GOOD = { id: 'good', steps: [{ id: 'a', kind: 'goTo', roomId: 'kitchen' }, { id: 'b', kind: 'take', object: 'scissors', leftAt: counter }, { id: 'c', kind: 'check' }] };
+const GOOD = { id: 'good', steps: [{ id: 'a', kind: 'goTo', roomId: 'kitchen' }, { id: 'b', kind: 'take', object: 'scissors', leftAt: counter }, { id: 'c', kind: 'tell' }] };
 const problems = (chain, sentences = TEXTS_OF) => problemsOf(chain, contextFor(sentences));
 const withSteps = (steps) => ({ ...GOOD, steps });
 
@@ -212,13 +239,38 @@ test('a put-back before the take of the same object is a problem', () => {
 });
 
 test('two steps with the same id are a problem', () => {
-  const chain = withSteps([GOOD.steps[0], { id: 'a', kind: 'check' }]);
+  const chain = withSteps([GOOD.steps[0], { id: 'a', kind: 'tell' }]);
   assert.deepEqual(problems(chain, { good: { a: 'x' } }), ['two steps have the same id']);
 });
 
-test('a chain that does not start by putting you in a room is a problem', () => {
-  const chain = withSteps([GOOD.steps[2], GOOD.steps[0]]);
-  assert.deepEqual(problems(chain, { good: { a: 'Go.', c: 'Done?' } }), ['the chain does not start by putting you in a room']);
+test('a chain after the opener that starts with a move is a problem', () => {
+  const chain = withSteps([{ id: 'a', kind: 'move', roomId: 'kitchen' }, GOOD.steps[2]]);
+  assert.deepEqual(problems(chain, { good: { a: 'Go.', c: 'Done?' } }), ['the chain starts with a move, but only an opener may']);
+});
+
+test('an opener may start with a move', () => {
+  const chain = { ...withSteps([{ id: 'a', kind: 'move', roomId: 'kitchen' }, GOOD.steps[2]]), opener: true };
+  assert.deepEqual(problems(chain, { good: { a: 'Go.', c: 'Done?' } }), []);
+});
+
+test('a step tied to a room that does not exist is a problem', () => {
+  const chain = withSteps([GOOD.steps[0], { id: 'c', kind: 'tell', at: 'moon' }]);
+  assert.deepEqual(problems(chain, { good: { a: 'Go.', c: 'Done?' } }), ['c: the fields of a tell are wrong']);
+});
+
+test('a check outside the closing chain is a problem', () => {
+  const chain = withSteps([GOOD.steps[0], { id: 'c', kind: 'check' }]);
+  assert.deepEqual(problems(chain, { good: { a: 'Go.', c: 'Done?' } }), ['c: a check belongs to the closing chain only']);
+});
+
+test('a closing chain may hold a check', () => {
+  const chain = { id: 'good', closer: true, steps: [{ id: 'a', kind: 'tell' }, { id: 'c', kind: 'check' }] };
+  assert.deepEqual(problems(chain, { good: { a: 'Dusk.', c: 'Done?' } }), []);
+});
+
+test('a closing chain that takes or puts back something is a problem', () => {
+  const chain = { id: 'good', closer: true, steps: [{ id: 'a', kind: 'tell' }, { id: 'b', kind: 'take', object: 'scissors', leftAt: counter }, { id: 'c', kind: 'putBack', object: 'scissors' }] };
+  assert.deepEqual(problems(chain, { good: { a: 'x', b: 'y' } }), ['b: the closing chain takes and puts back nothing', 'c: the closing chain takes and puts back nothing']);
 });
 
 test('an opener that needs a thing that does not exist is a problem', () => {

@@ -8,9 +8,9 @@ export const goOut = {
     { id: 'keys', kind: 'take', object: 'keys', leftAt: { placeId: 'hall', spotId: 'console' } },
     { id: 'away', kind: 'tell' },
     { id: 'inside', kind: 'move', roomId: 'hall' },
-    { id: 'bag', kind: 'tell' },
+    { id: 'bag', kind: 'tell', at: 'hall' },
     { id: 'keys-back', kind: 'putBack', object: 'keys' },
     { id: 'unpack', kind: 'goTo', roomId: 'kitchen' },
-    { id: 'done', kind: 'check' },
+    { id: 'done', kind: 'tell', at: 'kitchen' },
   ],
 };

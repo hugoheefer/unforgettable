@@ -34,6 +34,7 @@ const CALL = {
 };
 const PLAIN = { id: 'plain', steps: [move('m', 'dining'), tell('t'), check('c')] };
 const OTHER = { id: 'other', steps: [goTo('g', 'study'), tell('t')] };
+const CLOSE = { id: 'close', closer: true, steps: [tell('dusk'), check('look')] };
 
 const plan = (options) => buildDay({ dayNumber: 2, chains: [OPEN, TWO, PLAIN], things: THINGS, onPerson: [], yesterday: [], random: rand(), ...options });
 const kinds = (events) => events.map((event) => event.kind);
@@ -43,13 +44,42 @@ const lastOf = (list) => list[list.length - 1];
 
 // ---- the shape of a day ----
 
-test('a day is a pause, an opener and two other chains', () => {
+test('a day is a pause, an opener, two other chains and the closing chain', () => {
   const events = buildDay({ dayNumber: 2, chains: CHAINS, things: THINGS, onPerson: ['keys'], yesterday: [], random: rand() });
   assert.deepEqual(events[0], pause('day'));
   const ids = chainIdsOf(events);
-  assert.equal(ids.length, 3);
-  assert.ok(CHAINS.find((chain) => chain.id === ids[0]).opener);
-  assert.ok(ids.slice(1).every((id) => !CHAINS.find((chain) => chain.id === id).opener));
+  const chainOf = (id) => CHAINS.find((chain) => chain.id === id);
+  assert.equal(ids.length, 4);
+  assert.ok(chainOf(ids[0]).opener);
+  assert.ok(ids.slice(1, 3).every((id) => !chainOf(id).opener && !chainOf(id).closer));
+  assert.ok(chainOf(ids[3]).closer);
+});
+
+test('a session ends with the events of the closing chain, however many other chains there are', () => {
+  const events = plan({ chains: [OPEN, TWO, PLAIN, OTHER, CLOSE] });
+  assert.deepEqual(chainIdsOf(events), ['open', 'two', 'plain', 'close']);
+  assert.deepEqual(events.slice(-2).map((event) => [event.kind, event.step]), [['tell', 'dusk'], ['check', 'look']]);
+});
+
+test('the closing chain is not one of the other chains, so it does not take their place', () => {
+  assert.deepEqual(chainIdsOf(plan({ chains: [OPEN, CLOSE, TWO, PLAIN] })), ['open', 'two', 'plain', 'close']);
+});
+
+test('the closing chain is never silent, also when every chain is', () => {
+  const quiet = ofChain(plan({ chains: [OPEN, TWO, PLAIN, CLOSE] }), 'close');
+  const loud = ofChain(plan({ chains: [OPEN, TWO, PLAIN, CLOSE], rules: { ...DEFAULT_RULES, silentChance: 1 }, random: rand({ chance: (p) => p >= 1 }) }), 'close');
+  assert.equal(quiet.length, 2);
+  assert.deepEqual(loud, quiet);
+});
+
+test('a session of the real chains holds exactly one check, whatever the luck', () => {
+  for (const random of [rand(), luck(), luck({ pick: lastOf, shuffle: (list) => [...list].reverse() })]) {
+    for (const onPerson of [[], ['keys']]) {
+      const events = buildDay({ dayNumber: 2, chains: CHAINS, things: THINGS, onPerson, yesterday: [], random });
+      assert.equal(events.filter((event) => event.kind === 'check').length, 1);
+      assert.equal(events.at(-1).kind, 'check');
+    }
+  }
 });
 
 test('the chains of a day follow each other: the events of one chain are together', () => {
@@ -203,10 +233,11 @@ test('the scissors of the coffee chain are a find in both cases', () => {
   for (const things of [THINGS, [...THINGS, TIN]]) assert.equal(eventOfStep(coffeeEvents(things), 'scissors').kind, 'find');
 });
 
-test('a tell, a walk-to and a check carry the room where the story stands', () => {
-  const events = ofChain(plan({ chains: [OPEN, WALKING, PLAIN] }), 'walking');
-  assert.deepEqual(events.filter((event) => ['goTo', 'tell', 'check'].includes(event.kind)).map((event) => [event.kind, event.roomId]),
-    [['goTo', 'kitchen'], ['goTo', 'living'], ['tell', 'living'], ['check', 'living']]);
+test('a tell tied to a room carries it, a tell without one and a check carry none', () => {
+  const tied = { id: 'tied', steps: [goTo('g', 'kitchen'), { id: 't1', kind: 'tell', at: 'kitchen' }, tell('t2'), check('c')] };
+  const events = ofChain(plan({ chains: [OPEN, tied, PLAIN] }), 'tied');
+  assert.deepEqual(events.filter((event) => ['tell', 'check'].includes(event.kind)).map((event) => [event.step, event.roomId]),
+    [['t1', 'kitchen'], ['t2', null], ['c', null]]);
 });
 
 test('every event of a chain carries the chain and the step it comes from', () => {

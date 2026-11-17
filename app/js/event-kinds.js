@@ -16,6 +16,8 @@ const isFindStart = (note) => isObject(note) && Number.isInteger(note.shortest) 
 
 /** The step an event comes from. The events a forgotten thing adds belong to no chain (both are null). */
 const isStep = (event, context) => hasStep(event.chain, event.step, context.chains);
+// a tell is tied to a room only when its step says so; a check is a thought and has none
+const isRoomOrNone = (event, context) => event.roomId === null || context.rooms.has(event.roomId);
 const isStepOrNone = (event, context) => (event.chain === null && event.step === null) || isStep(event, context);
 
 /**
@@ -39,7 +41,7 @@ export const EVENT_KINDS = {
     room: (event) => event.roomId,
     enter() {},
     isDone: (day) => day.acknowledged,
-    isValid: (event, context) => context.rooms.has(event.roomId) && isStep(event, context),
+    isValid: (event, context) => isRoomOrNone(event, context) && isStep(event, context),
   },
   moveTo: {
     enter(day, event) {
@@ -80,10 +82,9 @@ export const EVENT_KINDS = {
   check: {
     canWalk: true,
     canHandle: true,
-    room: (event) => event.roomId,
     enter() {},
     isDone: (day) => day.acknowledged,
-    isValid: (event, context) => context.rooms.has(event.roomId) && isStep(event, context),
+    isValid: (event, context) => isRoomOrNone(event, context) && isStep(event, context),
   },
   letGo: {
     // Lays down, without a word, what is listed and still in hand where the story leaves it.

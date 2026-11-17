@@ -28,13 +28,15 @@ export function problemsOf(chain, { rooms, catalogueIds, hasLocation, kinds, sen
       continue;
     }
     if (!kind.isValid(step, context)) problems.push(`${step.id}: the fields of a ${step.kind} are wrong`);
+    if (step.kind === 'check' && chain.closer !== true) problems.push(`${step.id}: a check belongs to the closing chain only`);
+    if (chain.closer === true && (step.kind === 'take' || step.kind === 'putBack')) problems.push(`${step.id}: the closing chain takes and puts back nothing`);
     if (step.kind === 'take') taken.add(step.object);
     if (step.kind === 'putBack' && !taken.has(step.object)) problems.push(`${step.id}: ${step.object} is put back before it is taken`);
     if (kind.needsSentence(step, context) && !isText(sentences?.[chain.id]?.[step.id])) problems.push(`${step.id}: no sentence`);
   }
 
-  const first = kinds[chain.steps[0].kind];
-  if (first && !first.leavesRoom) problems.push('the chain does not start by putting you in a room');
+  // only the opener sets the scene of a session; every other story starts where the player is
+  if (chain.opener !== true && chain.steps[0].kind === 'move') problems.push('the chain starts with a move, but only an opener may');
 
   const known = new Set(ids);
   for (const key of Object.keys(sentences?.[chain.id] ?? {})) if (!known.has(key)) problems.push(`${key}: a sentence without a step`);

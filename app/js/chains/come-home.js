@@ -9,6 +9,6 @@ export const comeHome = {
     { id: 'keys', kind: 'take', object: 'keys', leftAt: { placeId: 'hall', spotId: 'console' } },
     { id: 'inside', kind: 'move', roomId: 'hall' },
     { id: 'keys-back', kind: 'putBack', object: 'keys' },
-    { id: 'shoes', kind: 'tell' },
+    { id: 'shoes', kind: 'tell', at: 'hall' },
   ],
 };

@@ -3,12 +3,11 @@
 export const call = {
   id: 'call',
   steps: [
-    { id: 'start', kind: 'move', roomId: 'living' },
     { id: 'ring', kind: 'tell' },
     { id: 'phone', kind: 'take', object: 'phone', leftAt: { placeId: 'garden', spotId: 'garden-table' } },
     { id: 'walk', kind: 'move', roomId: 'garden' },
     { id: 'phone-back', kind: 'putBack', object: 'phone' },
     { id: 'in', kind: 'goTo', roomId: 'living' },
-    { id: 'sit', kind: 'check' },
+    { id: 'sit', kind: 'tell', at: 'living' },
   ],
 };

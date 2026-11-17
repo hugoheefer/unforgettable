@@ -11,12 +11,15 @@ import { coffee } from './chains/coffee.js';
 import { present } from './chains/present.js';
 import { pizza } from './chains/pizza.js';
 import { call } from './chains/call.js';
+import { evening } from './chains/evening.js';
 
-export const CHAINS = Object.freeze([comeHome, goOut, coffee, present, pizza, call]);
+export const CHAINS = Object.freeze([comeHome, goOut, coffee, present, pizza, call, evening]);
 
 const eventOf = (kind, step, { chainId }, extra) => ({ kind, chain: chainId, step: step.id, ...extra });
-const told = (step, context) => eventOf('tell', step, context, { roomId: context.roomId });
+// a step is tied to a room only when `at` says so; otherwise it happens wherever the player is
+const told = (step, context) => eventOf('tell', step, context, { roomId: step.at ?? null });
 const hasRoom = (step, { rooms }) => rooms.has(step.roomId);
+const atExists = (step, { rooms }) => step.at === undefined || rooms.has(step.at);
 const isObject = (step) => typeof step.object === 'string' && step.object.length > 0;
 const inCatalogue = (step, { catalogueIds }) => catalogueIds.has(step.object);
 
@@ -26,7 +29,7 @@ const inCatalogue = (step, { catalogueIds }) => catalogueIds.has(step.object);
  */
 export const STEP_KINDS = Object.freeze({
   tell: {
-    isValid: () => true,
+    isValid: atExists,
     needsSentence: () => true,
     expand: (step, context) => [told(step, context)],
   },
@@ -45,7 +48,7 @@ export const STEP_KINDS = Object.freeze({
   take: {
     isValid: (step, context) => {
       const placed = step.leftAt === undefined ? !inCatalogue(step, context) : context.hasLocation(step.leftAt);
-      return isObject(step) && placed;
+      return isObject(step) && placed && atExists(step, context);
     },
     needsSentence: () => true,
     expand: (step, context) => (context.chosen.has(step.object)
@@ -53,7 +56,7 @@ export const STEP_KINDS = Object.freeze({
       : [told(step, context)]),
   },
   putBack: {
-    isValid: isObject,
+    isValid: (step, context) => isObject(step) && atExists(step, context),
     // the put-back of a thing of the catalogue needs no sentence: the put-away command is enough
     needsSentence: (step, context) => !inCatalogue(step, context),
     expand: (step, context) => (context.chosen.has(step.object)
@@ -63,7 +66,7 @@ export const STEP_KINDS = Object.freeze({
   check: {
     isValid: () => true,
     needsSentence: () => true,
-    expand: (step, context) => [eventOf('check', step, context, { roomId: context.roomId })],
+    expand: (step, context) => [eventOf('check', step, context, { roomId: null })],
   },
 });
 

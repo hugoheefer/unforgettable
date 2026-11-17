@@ -74,7 +74,7 @@ Chains of events replace the events of story 2: six chains (come home, go out, c
 
 ## Findings 1 to 3 of 2026-11-17 (evening)
 
-No hints while playing; one tap by default with a setting for two; praise for a thing put on its home spot. 705 tests. Next: story 3c (a natural flow), then the user tests.
+No hints while playing; one tap by default with a setting for two; praise for a thing put on its home spot. 705 tests. Story 3c (a natural flow) is done too: stories join where the player is, steps are tied to a room only when the story needs it, one check per session at the end ("It is evening."), "front garden". 732 tests. Next: the user tests.
 
 ## Next
 

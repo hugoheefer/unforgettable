@@ -1,7 +1,7 @@
 // Builds the events of one day as plain data (see "Story 3b" in stories.md). Pure: all randomness comes in through
 // `random`, so a day is deterministic in tests, and the list is stored in the save so a reload gives the same day.
 //
-// A day is a pause, one opener chain and a few other chains. Each step of a chain becomes events through its
+// A day is a pause, one opener chain, a few other chains and the closing chain. Each step of a chain becomes events through its
 // kind in STEP_KINDS. The events are plain data: { kind, chain, step, ... } (the shapes are in chains.js and
 // day.js). `chain` and `step` are keys into the texts of the language, never sentences.
 
@@ -34,15 +34,9 @@ function dropPutBacks(groups, count, random) {
   return remaining;
 }
 
-/** The steps of a chain as groups of events; the room where the story stands is followed along the way. */
-function expandSteps(chain, chosen) {
-  let roomId;
-  return chain.steps.map((step) => {
-    const events = STEP_KINDS[step.kind].expand(step, { chainId: chain.id, chosen, roomId });
-    roomId = events.findLast((event) => event.roomId !== undefined)?.roomId ?? roomId;
-    return { step, events };
-  });
-}
+/** The steps of a chain as groups of events. */
+const expandSteps = (chain, chosen) =>
+  chain.steps.map((step) => ({ step, events: STEP_KINDS[step.kind].expand(step, { chainId: chain.id, chosen }) }));
 
 /**
  * Lays the groups out as events and adds a `letGo` where things that nobody puts back are laid down: before
@@ -91,13 +85,15 @@ export function buildDay({ dayNumber, chains = CHAINS, things, onPerson = [], ye
   // the very first day begins the way the game is introduced (at the front door), not with a random opener
   const starter = dayNumber === FIRST_DAY ? openers.find((chain) => chain.startsTheGame === true) : undefined;
   const opener = starter ?? (openers.length > 0 ? random.pick(openers) : null);
-  const rest = chains.filter((chain) => chain.opener !== true);
+  const closer = chains.find((chain) => chain.closer === true);
+  const rest = chains.filter((chain) => chain.opener !== true && chain.closer !== true);
   const fresh = rest.filter((chain) => !yesterday.includes(chain.id));
   const stale = rest.filter((chain) => yesterday.includes(chain.id));
   const others = [...random.shuffle(fresh), ...random.shuffle(stale)].slice(0, rules.otherChains);
 
   const events = [{ kind: 'pause', text: 'day' }];
-  for (const chain of opener ? [opener, ...others] : others) {
+  // the closer ends every session; it has no put-back, so it can never be silent
+  for (const chain of [...(opener ? [opener] : []), ...others, ...(closer ? [closer] : [])]) {
     const firstDayOpener = dayNumber === FIRST_DAY && chain === opener;
     events.push(...eventsOfChain(chain, { chosen, silentAllowed: !firstDayOpener, random, rules }));
   }

@@ -304,19 +304,23 @@ test('when you walked off from a tell, the story asks you back to the room it st
   assert.equal(day.state().returnTo, 'kitchen');
 });
 
-test('when you walked off from a check, the story asks you back to the room it stands in', () => {
-  const day = makeDay([check('living'), tell('living')], { state: { roomId: 'living', startedIn: 'living' } });
+test('a tell without a room never asks you back, also when you walked to another room', () => {
+  const day = makeDay([tell(null), tell(null)], { state: { roomId: 'kitchen', startedIn: 'kitchen' } });
+  day.walkTo('study');
+  assert.equal(day.state().returnTo, null);
+  day.continue();
+  assert.equal(day.state().event.kind, 'tell');
+});
+
+test('a check never asks you back: it is a thought, so walking off does not move it', () => {
+  const day = makeDay([check(null), tell(null)], { state: { roomId: 'living', startedIn: 'living' } });
   day.walkTo('dining');
-  assert.equal(day.state().returnTo, 'living');
+  assert.equal(day.state().returnTo, null);
 });
 
 test('while the story asks you back it does not go on: Next and the answers of the check are refused', () => {
   const day = makeDay([tell('kitchen'), tell('kitchen')], { state: { roomId: 'study', startedIn: 'study' } });
   assert.equal(refusalOf(() => day.continue()), 'come-back');
-  const checking = makeDay([check('kitchen'), tell('kitchen')], { state: { roomId: 'study', startedIn: 'study' } });
-  assert.equal(refusalOf(() => checking.answerCheck(true)), 'come-back');
-  assert.equal(refusalOf(() => checking.answerCheck(false)), 'come-back');
-  assert.equal(refusalOf(() => checking.forgot('keys')), 'come-back');
   assert.equal(refusalOf(() => day.answerCheck(true)), 'not-now');
 });
 
@@ -331,9 +335,10 @@ test('while the story asks you back you can still put a thing away on your own i
   assert.equal(day.state().event.kind, 'tell');
 });
 
-test('a check asks you back too, and refuses the answer until you are there', () => {
-  const day = makeDay([check('living'), tell('living')], { state: { roomId: 'dining', startedIn: 'dining' } });
-  assert.equal(refusalOf(() => day.answerCheck(true)), 'come-back');
+test('a check can be answered from any room', () => {
+  const day = makeDay([check(null), tell(null)], { state: { roomId: 'dining', startedIn: 'dining' } });
+  assert.equal(refusalOf(() => day.answerCheck(true)), undefined);
+  assert.equal(day.state().event.kind, 'tell');
 });
 
 test('a walk-to event never asks you back: walking to its room is what it asks', () => {
@@ -734,6 +739,16 @@ const goodState = () => structuredClone(dayState(
   { index: 7, roomId: 'kitchen', startedIn: 'kitchen', inHand: ['keys'], steps: 2, opened: ['hall/hook'], arrival: { chain: 'come-home', step: 'door' }, leftAt: { keys: spot('hall', 'console') } },
 ));
 
+test('a saved day standing on a tell or a check without a room can be continued', () => {
+  for (const event of [tell(null), check(null)]) {
+    const state = goodState();
+    state.events[3] = event;
+    state.index = 3;
+    state.inHand = [];
+    assert.equal(canContinue(state, context), true, event.kind);
+  }
+});
+
 test('a day made by the game can be continued, at its start and in the middle of an event', () => {
   const day = start(new World(LAYOUT));
   assert.equal(canContinue(day.snapshot(), context), true);
@@ -817,7 +832,8 @@ test('a day saved in the middle of each new kind of event survives saving and go
   const days = {
     goTo: makeDay([goTo('kitchen'), tell('kitchen')], { world }),
     tell: makeDay([tell('hall'), tell('hall')], { world }),
-    check: makeDay([check('hall'), tell('hall')], { world }),
+    'tell without a room': makeDay([tell(null), tell(null)], { world }),
+    check: makeDay([check(null), tell(null)], { world }),
     find: findDay('keys', { world }),
   };
   for (const [kind, day] of Object.entries(days)) {

@@ -7,6 +7,7 @@ import { LAYOUT } from '../app/js/layout.js';
 import { THINGS, defaultPlan } from '../app/js/things.js';
 import { World, isPocket } from '../app/js/world.js';
 import { checkFlowContract } from './flow-contract.mjs';
+import { playSession } from './play-bot.mjs';
 import { TEXTS } from './texts-helper.mjs';
 import { dayState, find, letGo, pocket, putAway, rand, spot, tell, worldWith } from './day-helper.mjs';
 
@@ -98,8 +99,8 @@ test('after the pause of the first day you stand at your front door and need you
   pick(app, 'play');
   app.next();
   assert.deepEqual(app.step().lead, ['You come home and stand at your front door.', 'You need your keys to get in.']);
-  assert.equal(app.step().command, 'You need your 🔑 keys. Where do you look? You are in the garden.');
-  assert.deepEqual(labels(app), ['Look here, in the garden', 'Look in a pocket', 'Walk to another room']);
+  assert.equal(app.step().command, 'You need your 🔑 keys. Where do you look? You are in the front garden.');
+  assert.deepEqual(labels(app), ['Look here, in the front garden', 'Look in a pocket', 'Walk to another room']);
 });
 
 // ---- the Menu ----
@@ -278,10 +279,10 @@ test('the chains a day played are saved when it ends, in the order they were pla
 test('a new day is built from what was played yesterday: those chains are left for later', () => {
   const fresh = newApp();
   pick(fresh.app, 'play');
-  assert.deepEqual(chainIdsOf(fresh.saves.at(-1).day.events), ['come-home', 'coffee', 'present']);
+  assert.deepEqual(chainIdsOf(fresh.saves.at(-1).day.events), ['come-home', 'coffee', 'present', 'evening']);
   const next = newApp({ saved: { yesterdayChains: ['coffee', 'present'] } });
   pick(next.app, 'play');
-  assert.deepEqual(chainIdsOf(next.saves.at(-1).day.events), ['come-home', 'pizza', 'call']);
+  assert.deepEqual(chainIdsOf(next.saves.at(-1).day.events), ['come-home', 'pizza', 'call', 'evening']);
 });
 
 test('with the keys not on the person the day opens with going out', () => {
@@ -563,7 +564,7 @@ test('looking back shows the screen the player just left and what they chose on 
   const { app } = afterThePause();
   pick(app, 'doors');
   app.lookBack();
-  assert.match(app.step().command, /Where do you look\? You are in the garden\. You chose: Walk to another room\.$/);
+  assert.match(app.step().command, /Where do you look\? You are in the front garden\. You chose: Walk to another room\.$/);
   assert.equal(app.step().lead[0], TEXTS.lookBackNote);
 });
 
@@ -938,4 +939,46 @@ test('a saved state without the one-tap field behaves as one tap', () => {
   assert.equal(app.step().showNext, false);
   assert.equal(app.tap('play'), true);
   assert.equal(app.saveState().oneTap, true);
+});
+
+// ---- a natural flow from story to story (real chains, fixed random, a player who knows the house) ----
+
+const session = (saved = {}) => playSession(newApp({ saved }).app);
+const commandsOf = (screens) => screens.map((screen) => screen.command);
+const textOf = (screens) => screens.flatMap((screen) => [...screen.lead, screen.command]);
+// the day of the story: come-home, pizza, call (coffee and present were yesterday)
+const PIZZA_DAY = { yesterdayChains: ['coffee', 'present'] };
+
+test('a story after another one starts where the player is: nothing says "You are in the living room."', () => {
+  assert.equal(textOf(session(PIZZA_DAY)).includes('You are in the living room.'), false);
+});
+
+test('the pizza story opens with the doorbell, straight after the last screen of the story before it and with no lead of its own', () => {
+  const screens = session(PIZZA_DAY);
+  const bell = screens.findIndex((screen) => screen.command === 'The doorbell rings: your pizza is here.');
+  assert.ok(bell > 0, 'the doorbell rings');
+  assert.equal(screens[bell - 1].command, 'You take off your shoes.');
+  assert.deepEqual(screens[bell].lead, []);
+});
+
+test('in the present story, the call is told in the kitchen where the phone was fetched, and the phone goes back without walking away first', () => {
+  const screens = session();
+  const call = screens.findIndex((screen) => screen.command === 'The party starts at eight.');
+  assert.ok(call > 0, 'the call is told');
+  assert.equal(screens[call].room, 'kitchen');
+  const away = screens.findIndex((screen, index) => index > call && screen.command === 'You are in the kitchen. Put your 📱 phone back.');
+  assert.ok(away > call, 'the phone is put back in the kitchen');
+  assert.equal(screens.slice(call, away).some((screen) => screen.command.startsWith('Go back')), false);
+});
+
+test('a session ends with the evening and the check, and asks "Is everything back in its place?" only once', () => {
+  const screens = session();
+  const commands = commandsOf(screens);
+  assert.deepEqual(commands.slice(-2), ['It is evening.', 'Is everything back in its place?']);
+  assert.equal(commands.filter((command) => command === 'Is everything back in its place?').length, 1);
+});
+
+test('a well-played session of come-home, coffee and present asks the player back at most twice', () => {
+  const commands = commandsOf(session());
+  assert.equal(commands.filter((command) => command.startsWith('Go back')).length <= 2, true);
 });

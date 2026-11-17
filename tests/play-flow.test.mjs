@@ -136,7 +136,7 @@ test('the walk list shows every other room with its distance, nearest first, the
   pick(flow, 'doors');
   assert.equal(flow.step().command, 'Where do you walk to?');
   assert.deepEqual(flow.step().choices.map((entry) => entry.label), [
-    'Living room · 1 step', 'Kitchen · 1 step', 'Toilet · 1 step', 'Landing · 1 step', 'Garden · 1 step',
+    'Living room · 1 step', 'Kitchen · 1 step', 'Toilet · 1 step', 'Landing · 1 step', 'Front garden · 1 step',
     'Dining room · 2 steps', 'Bedroom · 2 steps', 'Bathroom · 2 steps', 'Study · 2 steps', 'Garage · 2 steps', 'Shed · 2 steps', 'Car · 2 steps',
     '↩ Choose something else',
   ]);
@@ -296,10 +296,16 @@ test('when you walked off from a tell, the screen asks you back and offers only 
   assert.deepEqual(flow.step(), { lead: [], command: 'Go back to the kitchen.', choices: [WALK], selected: null, canLeave: true });
 });
 
-test('when you walked off from a check, the screen asks you back too', () => {
-  const day = makeDay([check('living', 'coffee', 'drink'), tell('living')], { state: { roomId: 'dining', startedIn: 'dining' } });
-  assert.deepEqual(flowFor(day).step().command, 'Go back to the living room.');
-  assert.deepEqual(ids(flowFor(day).step()), ['doors']);
+test('a tell without a room is shown wherever the player stands, without asking them back', () => {
+  const day = makeDay([tell(null, 'pizza', 'bell'), tell(null, 'pizza', 'pay')], { state: { roomId: 'study', startedIn: 'study' } });
+  assert.equal(flowFor(day).step().command, 'The doorbell rings: your pizza is here.');
+  assert.deepEqual(ids(flowFor(day).step()), ['go', 'else']);
+});
+
+test('the check is shown wherever the player stands, without asking them back', () => {
+  const day = makeDay([check(null, 'evening', 'look'), tell(null, 'evening', 'dusk')], { state: { roomId: 'dining', startedIn: 'dining' } });
+  assert.equal(flowFor(day).step().command, 'Is everything back in its place?');
+  assert.deepEqual(flowFor(day).step().lead, ['Before you go to bed, you look around once more.']);
 });
 
 test('walking back shows the screen of the story again', () => {
@@ -380,8 +386,8 @@ test('a home pocket of a coat that hangs in another room stars no room in the wa
 
 // ---- the check ----
 
-const CHECK_SENTENCE = 'You sit down and drink your coffee.';
-const checkDay = (options = {}) => makeDay([check('living', 'coffee', 'drink'), tell('living', 'coffee', 'open')], { ...options, state: { roomId: 'living', startedIn: 'living', ...options.state } });
+const CHECK_SENTENCE = 'Before you go to bed, you look around once more.';
+const checkDay = (options = {}) => makeDay([check(null, 'evening', 'look'), tell('living', 'coffee', 'open')], { ...options, state: { roomId: 'living', startedIn: 'living', ...options.state } });
 
 test('the check: the sentence of the step is the lead, the question the command, three ways to answer', () => {
   assert.deepEqual(flowFor(checkDay()).step(), {

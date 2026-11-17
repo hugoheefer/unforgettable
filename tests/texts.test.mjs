@@ -166,7 +166,6 @@ const CHAIN_SENTENCES = {
     ready: 'The present stands ready by the door.',
   },
   pizza: {
-    start: 'You are in the living room.',
     bell: 'The doorbell rings: your pizza is here.',
     go: 'Someone has to open the front door.',
     wallet: 'The pizza has to be paid.',
@@ -175,12 +174,15 @@ const CHAIN_SENTENCES = {
     eat: 'The pizza is on the table.',
   },
   call: {
-    start: 'You are in the living room.',
     ring: 'Somewhere your phone rings.',
     phone: 'You want to answer the call.',
-    walk: 'You talk and walk around. The call ends in the garden.',
+    walk: 'You talk and walk around. The call ends in the front garden.',
     in: 'It gets chilly outside.',
     sit: 'You sit down on the sofa.',
+  },
+  evening: {
+    dusk: 'It is evening.',
+    look: 'Before you go to bed, you look around once more.',
   },
 };
 
@@ -194,9 +196,13 @@ for (const [chain, steps] of Object.entries(CHAIN_SENTENCES)) {
   });
 }
 
-test('the chains in the texts are the six chains of the list', () => {
-  assert.deepEqual(Object.keys(TEXTS.chains ?? {}).sort(), ['call', 'coffee', 'come-home', 'go-out', 'pizza', 'present']);
+test('the chains in the texts are the seven chains of the list', () => {
+  assert.deepEqual(Object.keys(TEXTS.chains ?? {}).sort(), ['call', 'coffee', 'come-home', 'evening', 'go-out', 'pizza', 'present']);
   assert.deepEqual(Object.keys(TEXTS.chains ?? {}).sort(), CHAINS.map((chain) => chain.id).sort());
+});
+
+test('the place outside the front door is the front garden in every form a sentence needs', () => {
+  assert.deepEqual(TEXTS.rooms.garden, { name: 'Front garden', in: 'in the front garden', to: 'to the front garden' });
 });
 
 // ---- the summary of a day ----
