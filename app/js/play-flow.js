@@ -11,7 +11,8 @@
 //
 // The lead is, in time order: what the last action did, the sentence of the move that ended in this room (that
 // screen only), and the lines that explain the event (why you look, why you walk).
-// A put-away on the home spot adds `praise` to the step instead of a lead line.
+// A put-away on the home spot, and a thing found at once on its home spot, add `praise` to the step instead of a
+// lead line.
 // A tell and an empty "Something else first" have their Go on selected when they open, so they cost one tap.
 
 import { describeLocation, describeRoom } from './room-view.js';
@@ -115,7 +116,7 @@ export class PlayFlow {
     this.menu = { type: 'root' };
     this.putting = null; // the thing the player puts away on their own
     this.lead = [];
-    this.praise = null; // set when the last put-away landed on its home spot
+    this.praise = null; // set when the last put-away landed on its home spot, or a thing was found there at once
     this.arrival = day.state().arrival; // a day restored right after a move shows its sentence again
     this.reported = false;
     this.selected = this.screen().preselect ?? null;
@@ -362,6 +363,11 @@ export class PlayFlow {
     const looked = kind === 'pocket' ? day.lookInPocket(first, second) : day.look(first);
     const { found, steps, shortest, wasHome } = looked;
     if (found) this.onFound({ thingId, steps, shortest, wasHome });
+    // the moment the habit pays off: the thing lay on its home spot and was found by going straight to it
+    if (found && wasHome && steps === shortest) {
+      this.praise = this.texts.praiseFound({ thing: this.thingOf(thingId) });
+      return [];
+    }
     return [this.lookedText(thingId, looked)];
   }
 

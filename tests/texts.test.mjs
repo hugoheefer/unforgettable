@@ -302,3 +302,7 @@ test('the settings have their choice, their question and the two ways to choose'
   assert.equal(TEXTS.oneTapOn, 'One tap: a choice happens at once');
   assert.equal(TEXTS.oneTapOff, 'Two taps: choose, then Next');
 });
+
+test('finding a thing at once on its home spot has its own praise', () => {
+  assert.equal(TEXTS.praiseFound({ thing: { icon: '🔑', name: 'keys' } }), '✨ Found your 🔑 keys at once, on the home spot.');
+});

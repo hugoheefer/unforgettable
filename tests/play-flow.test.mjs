@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { Day } from '../app/js/day.js';
+import { Day, EVENT_KINDS } from '../app/js/day.js';
 import { PlayFlow } from '../app/js/play-flow.js';
 import { RefusedMove } from '../app/js/errors.js';
 import { checkFlowContract } from './flow-contract.mjs';
@@ -647,11 +647,35 @@ test('a refused move is not praised', () => {
   assert.equal(flow.step().praise ?? null, null);
 });
 
-test('finding a thing is not praised, not even on its home spot', () => {
-  const world = worldWith({ keys: spot('hall', 'hook') });
-  const flow = flowFor(makeDay([find('keys'), putAway('keys')], { world }));
+/** The keys are needed in the hallway, where they lie as the world says; the story goes on afterwards. */
+function keysFoundDay(world) {
+  const day = makeDay([{ ...find('keys'), chain: null, step: null }, tell('hall')], { world, state: { roomId: 'hall', startedIn: 'hall' } });
+  EVENT_KINDS.find.enter(day, day.event());
+  return day;
+}
+
+test('finding a thing at once on its home spot is praised at once, instead of the grey line', () => {
+  const flow = flowFor(keysFoundDay(worldWith({ keys: spot('hall', 'hook') })));
   pick(flow, 'spots');
   pick(flow, 'spot:hook');
+  assert.equal(flow.step().praise, '✨ Found your 🔑 keys at once, on the home spot.');
+  assert.deepEqual(flow.step().lead, []);
+});
+
+test('a thing found on its home spot only after looking elsewhere first is not praised', () => {
+  const flow = flowFor(keysFoundDay(worldWith({ keys: spot('hall', 'hook') })));
+  pick(flow, 'spots');
+  pick(flow, 'spot:console');
+  pick(flow, 'spots');
+  pick(flow, 'spot:hook');
+  assert.equal(flow.step().praise ?? null, null);
+  assert.match(flow.step().lead[0], /^Found your 🔑 keys on the key hook\. 2 steps\.$/);
+});
+
+test('a thing found somewhere else than its home spot is not praised, however fast', () => {
+  const flow = flowFor(keysFoundDay(worldWith({ keys: spot('hall', 'shoes') })));
+  pick(flow, 'spots');
+  pick(flow, 'spot:shoes');
   assert.equal(flow.step().praise ?? null, null);
 });
 

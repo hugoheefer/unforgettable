@@ -258,6 +258,7 @@ export const en = {
 
   putOnDone: ({ garment }) => `You put ${garment.your} on.`,
   hungDone: ({ garment, spot }) => `You hung ${garment.your} ${spot.at}.`,
+  praiseFound: ({ thing }) => `✨ Found your ${thing.icon} ${thing.name} at once, on the home spot.`,
   praise: ({ thing }) => `✨ Well done! You put your ${thing.icon} ${thing.name} on the home spot.`,
   placedAway: ({ thing, where, home }) => `You put your ${thing.icon} ${thing.name} ${where}. Home spot: ${home}.`,
   found: ({ thing, where, steps: count }) => `Found your ${thing.icon} ${thing.name} ${where}. ${steps(count)}.`,
