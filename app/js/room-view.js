@@ -1,7 +1,7 @@
 // What the player sees of the room they stand in and of what they wear. Pure: turns the state of a day into
 // plain data that the flows only have to turn into screens.
 
-import { isPocket, sameLocation } from './world.js';
+import { isPocket } from './world.js';
 import { named } from './names.js';
 
 /**
@@ -18,27 +18,19 @@ export function describeLocation(day, location, texts, { withRoom = true } = {})
   return withRoom ? texts.locationSpot({ spot, room: named(texts.rooms, place) }) : texts.locationHere({ spot });
 }
 
-/** The room a player has to go to for a home spot: its own room, or where the garment of the pocket hangs. */
-const homeRoomOf = (day, home) => (isPocket(home) ? day.world.garmentRoom(home.garmentId) : home.placeId);
-
 /**
+ * What the player sees of the room and of what they wear. It never points at a home spot: the player chooses
+ * from memory.
  * @param {import('./day.js').Day} day
  * @param {object} texts
- * @param {{ thingId?: string }} options `thingId`: a thing the player puts away on their own; without it the thing
- *   of the put-away being asked for, if any, is the one whose home spot is hinted
  */
-export function describeRoom(day, texts, { thingId } = {}) {
-  const { event } = day.state();
+export function describeRoom(day, texts) {
   const room = day.roomOf(day.state().roomId);
-  const puttingId = thingId ?? (event?.kind === 'putAway' ? event.thingId : null);
-  const home = puttingId ? { thingId: puttingId, location: day.plan[puttingId] } : null;
-  const level = home ? day.hintFor(home.thingId) : 'hidden';
   const iconOf = (thingId) => day.things.find((thing) => thing.id === thingId).icon;
 
   const tileFor = (entry, table, location) => ({
     ...named(table, entry),
     seen: day.seenAt(location).map(iconOf),
-    hint: home && sameLocation(home.location, location) ? level : 'hidden',
   });
 
   const garmentView = (garment, extra) => ({
@@ -54,18 +46,12 @@ export function describeRoom(day, texts, { thingId } = {}) {
   const hanging = garments
     .filter((garment) => day.world.garmentRoom(garment.id) === room.id)
     .map((garment) => garmentView(garment, { canPutOn: true, onSpot: day.world.garmentSpot(garment.id).spotId }));
-  const homeRoomId = home ? homeRoomOf(day, home.location) : null;
 
   return {
     room: named(texts.rooms, room),
     spots: room.spots.map((spot) => tileFor(spot, texts.spots, { placeId: room.id, spotId: spot.id })),
     worn,
     hanging,
-    rooms: day.reachableRooms().map(({ id, steps }) => ({
-      ...named(texts.rooms, day.roomOf(id)),
-      steps,
-      hint: id === homeRoomId ? level : 'hidden',
-    })),
-    hintText: level === 'shown' ? texts.planHint({ location: describeLocation(day, home.location, texts) }) : '',
+    rooms: day.reachableRooms().map(({ id, steps }) => ({ ...named(texts.rooms, day.roomOf(id)), steps })),
   };
 }

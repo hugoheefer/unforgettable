@@ -12,7 +12,7 @@ import { dayState, find, letGo, pocket, putAway, rand, spot, tell, worldWith } f
 
 const emptySave = () => ({
   plan: defaultPlan(), progress: { streaks: {} }, world: new World(LAYOUT).snapshot(), day: null, dayCount: 0,
-  history: { finds: [], puts: [] }, lastDayFinishedOn: null, yesterdayChains: [],
+  history: { finds: [], puts: [] }, lastDayFinishedOn: null, yesterdayChains: [], oneTap: true,
 });
 
 const TODAY = '2026-11-16';
@@ -44,8 +44,9 @@ test('a new player is offered to start session 1 or to choose home spots', () =>
   assert.deepEqual(app.step(), {
     lead: [],
     command: 'Unforgettable. Always put your things in the same place.',
-    choices: [{ id: 'play', label: 'Start session 1' }, { id: 'setup', label: 'Choose my home spots' }],
+    choices: [{ id: 'play', label: 'Start session 1' }, { id: 'setup', label: 'Choose my home spots' }, { id: 'settings', label: 'Settings' }],
     selected: null,
+    showNext: false,
   });
 });
 
@@ -56,12 +57,12 @@ test('the start screen has no Menu link', () => {
 test('with a day in progress the player is offered to continue it', () => {
   const day = Day.start({ layout: LAYOUT, things: THINGS, world: new World(LAYOUT), plan: defaultPlan(), progress: { streaks: {} }, random: rand(), number: 3 });
   const { app } = newApp({ saved: { day: day.snapshot(), dayCount: 2 } });
-  assert.deepEqual(labels(app), ['Continue session 3', 'Choose my home spots', 'Start again']);
+  assert.deepEqual(labels(app), ['Continue session 3', 'Choose my home spots', 'Settings', 'Start again']);
 });
 
 test('after a finished day the player is offered the next day', () => {
   const { app } = newApp({ saved: { dayCount: 2 } });
-  assert.deepEqual(labels(app), ['Start session 3', 'Choose my home spots', 'Start again']);
+  assert.deepEqual(labels(app), ['Start session 3', 'Choose my home spots', 'Settings', 'Start again']);
 });
 
 // ---- a new game ----
@@ -80,7 +81,7 @@ test('starting session 1 shows a pause that says it is a new game, with no choic
   const { app } = newApp();
   pick(app, 'play');
   assert.deepEqual(app.step(), {
-    lead: ['A new game. Everything is in its home spot.'], command: 'Session 1.', choices: [], selected: null, canLeave: true,
+    lead: ['A new game. Everything is in its home spot.'], command: 'Session 1.', choices: [], selected: null, canLeave: true, showNext: true,
   });
 });
 
@@ -88,7 +89,7 @@ test('starting a later session shows a pause that says the game goes on and thin
   const { app } = newApp({ saved: { dayCount: 2 } });
   pick(app, 'play');
   assert.deepEqual(app.step(), {
-    lead: ['Everything is where you left it.'], command: 'Session 3.', choices: [], selected: null, canLeave: true,
+    lead: ['Everything is where you left it.'], command: 'Session 3.', choices: [], selected: null, canLeave: true, showNext: true,
   });
 });
 
@@ -111,7 +112,7 @@ test('the Menu returns from a day to the start screen, and the day continues whe
   pick(app, 'door:kitchen');
   const before = app.step().command;
   app.leave();
-  assert.deepEqual(labels(app), ['Continue session 1', 'Choose my home spots', 'Start again']);
+  assert.deepEqual(labels(app), ['Continue session 1', 'Choose my home spots', 'Settings', 'Start again']);
   pick(app, 'play');
   assert.equal(app.step().command, before);
   assert.match(before, /kitchen/);
@@ -139,7 +140,7 @@ const SINK = { placeId: 'kitchen', spotId: 'sink' };
 test('choosing home spots leads through the list and the questions and then back to the start screen, with the plan saved', () => {
   const { app, saves } = newApp();
   chooseSinkForEverything(app);
-  assert.deepEqual(ids(app), ['play', 'setup']);
+  assert.deepEqual(ids(app), ['play', 'setup', 'settings']);
   assert.deepEqual(saves.at(-1).plan.keys, SINK);
 });
 
@@ -169,7 +170,11 @@ test('home spots chosen between two events of a day apply to the next put-away',
   const { app } = newApp({ saved: { day, dayCount: 2, world: worldWith({}).snapshot() } });
   chooseSinkForEverything(app);
   pick(app, 'play');
-  assert.deepEqual(app.step().lead, ['Your plan: in the sink in the kitchen.']);
+  pick(app, 'doors');
+  pick(app, 'door:kitchen');
+  pick(app, 'spots');
+  pick(app, 'spot:sink');
+  assert.equal(app.saveState().progress.streaks.keys, 1);
 });
 
 // ---- the end of a day: the summary ----
@@ -204,6 +209,7 @@ test('a cheap day ends with the searching line, the putting-away line and the st
     command: 'Session 3 is done.',
     choices: [{ id: 'next', label: 'Start session 4' }, { id: 'start', label: 'Back to the start' }],
     selected: null,
+    showNext: false,
   });
 });
 
@@ -258,7 +264,7 @@ test('"Back to the start" shows the start screen with the next day to start', ()
   const { app } = dayThreeAtItsLastPutAway({ finds: [found(3, 'keys', 1, 1)] });
   putTheKeysOnTheHook(app);
   pick(app, 'start');
-  assert.deepEqual(labels(app), ['Start session 4', 'Choose my home spots', 'Start again']);
+  assert.deepEqual(labels(app), ['Start session 4', 'Choose my home spots', 'Settings', 'Start again']);
 });
 
 // ---- the chains of a day ----
@@ -335,7 +341,7 @@ test('the state is saved after a Next that changed something, with the whole pla
   const { app, saves } = newApp();
   pick(app, 'play');
   assert.equal(saves.length, 1);
-  assert.deepEqual(Object.keys(saves[0]).sort(), ['day', 'dayCount', 'history', 'lastDayFinishedOn', 'plan', 'progress', 'world', 'yesterdayChains']);
+  assert.deepEqual(Object.keys(saves[0]).sort(), ['day', 'dayCount', 'history', 'lastDayFinishedOn', 'oneTap', 'plan', 'progress', 'world', 'yesterdayChains']);
   assert.equal(saves[0].day.number, 1);
   assert.equal(saves[0].dayCount, 0);
   assert.deepEqual(saves[0].plan, defaultPlan());
@@ -388,7 +394,7 @@ test('an app started from a saved state in the middle of an event continues exac
   pick(first.app, 'doors');
   pick(first.app, 'door:kitchen');
   const again = newApp({ saved: first.saves.at(-1) });
-  assert.deepEqual(labels(again.app), ['Continue session 1', 'Choose my home spots', 'Start again']);
+  assert.deepEqual(labels(again.app), ['Continue session 1', 'Choose my home spots', 'Settings', 'Start again']);
   pick(again.app, 'play');
   const { canLookBack, ...theScreen } = first.app.step();
   assert.equal(canLookBack, true);
@@ -410,7 +416,7 @@ test('a saved day that cannot be continued is dropped, the world is kept and a n
   const world = worldWith({ keys: spot('living', 'sofa') }).snapshot();
   const withoutScissors = THINGS.filter((thing) => thing.id !== 'scissors');
   const { app, saves } = newApp({ things: withoutScissors, saved: { day: full.snapshot(), dayCount: 2, world } });
-  assert.deepEqual(labels(app), ['Start session 3', 'Choose my home spots', 'Start again']);
+  assert.deepEqual(labels(app), ['Start session 3', 'Choose my home spots', 'Settings', 'Start again']);
   pick(app, 'play');
   assert.deepEqual(saves.at(-1).world.things.keys, spot('living', 'sofa'));
   assert.equal(saves.at(-1).day.number, 3);
@@ -421,7 +427,7 @@ test('a saved day with a broken field is dropped too', () => {
   const day = Day.start({ layout: LAYOUT, things: THINGS, world: new World(LAYOUT), plan: defaultPlan(), progress: { streaks: {} }, random: rand(), number: 1 });
   const broken = { ...day.snapshot(), events: [{ kind: 'dance' }] };
   const { app } = newApp({ saved: { day: broken } });
-  assert.deepEqual(labels(app), ['Start session 1', 'Choose my home spots', 'Start again']);
+  assert.deepEqual(labels(app), ['Start session 1', 'Choose my home spots', 'Settings', 'Start again']);
 });
 
 // ---- the flow contract and the texts ----
@@ -629,7 +635,7 @@ test('only the home spot that was changed changes, and the player can leave the 
   pick(app, 'thing:scissors'); pick(app, 'area:kitchen'); pick(app, 'place:sink');
   pick(app, 'done');
   assert.deepEqual(saves.at(-1).plan, { ...defaultPlan(), scissors: SINK });
-  assert.deepEqual(ids(app), ['play', 'setup']);
+  assert.deepEqual(ids(app), ['play', 'setup', 'settings']);
 });
 
 test('leaving the list without changing anything saves nothing and changes nothing', () => {
@@ -637,7 +643,7 @@ test('leaving the list without changing anything saves nothing and changes nothi
   pick(app, 'setup');
   pick(app, 'done');
   assert.equal(saves.length, 0);
-  assert.deepEqual(ids(app), ['play', 'setup']);
+  assert.deepEqual(ids(app), ['play', 'setup', 'settings']);
 });
 
 // ---- starting again ----
@@ -663,7 +669,7 @@ test('once a session has been started the start screen offers to start again, af
   pick(app, 'play');
   app.leave();
   assert.deepEqual(app.step().choices.at(-1), ASK);
-  assert.deepEqual(ids(app), ['play', 'setup', 'reset']);
+  assert.deepEqual(ids(app), ['play', 'setup', 'settings', 'reset']);
 });
 
 test('a game that has been played offers to start again too', () => {
@@ -678,6 +684,7 @@ test('starting again asks first, and says what is erased and what stays', () => 
     command: 'Start again? This erases your sessions and your progress. Your home spots stay.',
     choices: [{ id: 'yes', label: 'Yes, erase my progress' }, { id: 'no', label: 'No, keep everything' }],
     selected: null,
+    showNext: false,
   });
 });
 
@@ -688,7 +695,7 @@ test('saying no changes nothing, saves nothing and returns to the start screen',
   pick(app, 'no');
   assert.equal(JSON.stringify(app.saveState()), before);
   assert.equal(saves.length, 0);
-  assert.deepEqual(ids(app), ['play', 'setup', 'reset']);
+  assert.deepEqual(ids(app), ['play', 'setup', 'settings', 'reset']);
 });
 
 test('saying yes erases the sessions, the streaks, the history, the dates and the day in progress, and keeps the home spots', () => {
@@ -735,7 +742,7 @@ test('after starting again the start screen offers session 1 and the pause says 
   const { app } = newApp({ saved: PLAYED() });
   pick(app, 'reset');
   pick(app, 'yes');
-  assert.deepEqual(labels(app), ['Start session 1', 'Choose my home spots']);
+  assert.deepEqual(labels(app), ['Start session 1', 'Choose my home spots', 'Settings']);
   pick(app, 'play');
   assert.deepEqual(app.step().lead, ['A new game. Everything is in its home spot.']);
 });
@@ -756,4 +763,179 @@ test('a whole session can be played after starting again', () => {
   pick(app, 'play');
   playDay(app, 1);
   assert.deepEqual(ids(app), ['next', 'start']);
+});
+
+// ---- one tap or two: the setting ----
+
+const tap = (app, id) => app.tap(id);
+const twoTaps = (overrides = {}) => newApp({ ...overrides, saved: { oneTap: false, ...overrides.saved } });
+const markedIds = (app) => app.step().choices.filter((entry) => entry.mark).map((entry) => entry.id);
+
+test('with one tap a tap on a choice does what Next does, and says the screen moved on', () => {
+  const { app } = newApp();
+  assert.equal(tap(app, 'play'), true);
+  assert.equal(app.step().command, 'Session 1.');
+});
+
+test('with two taps a tap on a choice only selects it, and says the screen did not move', () => {
+  const { app } = twoTaps();
+  assert.equal(tap(app, 'play'), false);
+  assert.equal(app.step().selected, 'play');
+  assert.equal(app.step().command, 'Unforgettable. Always put your things in the same place.');
+  app.next();
+  assert.equal(app.step().command, 'Session 1.');
+});
+
+test('a tap on a choice that is not on the screen is refused, with either setting', () => {
+  assert.throws(() => newApp().app.tap('nope'), /not offered/i);
+  assert.throws(() => twoTaps().app.tap('nope'), /not offered/i);
+});
+
+test('with one tap a screen with choices has no Next, and a screen without choices keeps it', () => {
+  const { app } = newApp();
+  assert.equal(app.step().showNext, false);
+  pick(app, 'play');
+  assert.deepEqual(ids(app), []);
+  assert.equal(app.step().showNext, true);
+});
+
+test('with two taps every screen has its Next', () => {
+  const { app } = twoTaps();
+  assert.equal(app.step().showNext, true);
+  pick(app, 'play');
+  assert.equal(app.step().showNext, true);
+  app.next();
+  assert.equal(app.step().showNext, true);
+});
+
+test('with one tap the screens of a day, of the home spots, of looking back and of the questions have no Next', () => {
+  const { app } = afterThePause();
+  assert.equal(app.step().showNext, false);
+  app.lookBack();
+  assert.equal(app.step().showNext, false);
+  pick(app, 'return');
+  app.leave();
+  pick(app, 'setup');
+  assert.equal(app.step().showNext, false);
+  pick(app, 'done');
+  pick(app, 'reset');
+  assert.equal(app.step().showNext, false);
+});
+
+test('one tap works through the whole day: every tap on a choice acts', () => {
+  const { app } = newApp();
+  tap(app, 'play');
+  app.next();
+  assert.equal(tap(app, 'doors'), true);
+  assert.equal(tap(app, 'door:kitchen'), true);
+  assert.match(app.step().command, /kitchen/);
+});
+
+test('with one tap a tap on Earlier screen looks back at once', () => {
+  const { app } = afterThePause();
+  tap(app, 'doors');
+  app.lookBack();
+  assert.equal(tap(app, 'earlier'), true);
+  assert.equal(app.step().command, 'Session 1.');
+});
+
+test('the start screen offers Settings after the home spots and before Start again', () => {
+  const { app } = newApp({ saved: PLAYED() });
+  assert.deepEqual(ids(app), ['play', 'setup', 'settings', 'reset']);
+});
+
+test('the settings screen asks how to choose, marks the setting that is on, and has a way back', () => {
+  const { app } = newApp();
+  pick(app, 'settings');
+  assert.deepEqual(app.step(), {
+    lead: [],
+    command: 'How do you want to choose?',
+    choices: [
+      { id: 'onetap:on', label: 'One tap: a choice happens at once', mark: '★' },
+      { id: 'onetap:off', label: 'Two taps: choose, then Next' },
+      { id: 'back', label: '↩ Choose something else' },
+    ],
+    selected: null,
+    showNext: false,
+  });
+});
+
+test('with two taps on, the mark is on the two taps', () => {
+  const { app } = twoTaps();
+  pick(app, 'settings');
+  assert.deepEqual(markedIds(app), ['onetap:off']);
+});
+
+test('choosing two taps is saved at once and returns to the start screen, where Next is back', () => {
+  const { app, saves } = newApp();
+  pick(app, 'settings');
+  tap(app, 'onetap:off');
+  assert.equal(saves.at(-1).oneTap, false);
+  assert.equal(app.saveState().oneTap, false);
+  assert.equal(app.step().command, 'Unforgettable. Always put your things in the same place.');
+  assert.equal(app.step().showNext, true);
+  assert.equal(tap(app, 'play'), false);
+});
+
+test('choosing one tap again is saved too, and taps act at once again', () => {
+  const { app, saves } = twoTaps();
+  pick(app, 'settings');
+  pick(app, 'onetap:on');
+  assert.equal(saves.at(-1).oneTap, true);
+  assert.equal(app.step().showNext, false);
+  assert.equal(tap(app, 'play'), true);
+});
+
+test('choosing the setting that is on changes nothing and saves nothing', () => {
+  const { app, saves } = newApp();
+  pick(app, 'settings');
+  pick(app, 'onetap:on');
+  assert.equal(saves.length, 0);
+  assert.deepEqual(ids(app), ['play', 'setup', 'settings']);
+});
+
+test('going back from the settings saves nothing', () => {
+  const { app, saves } = newApp();
+  pick(app, 'settings');
+  pick(app, 'back');
+  assert.equal(saves.length, 0);
+  assert.deepEqual(ids(app), ['play', 'setup', 'settings']);
+});
+
+test('the setting is part of the saved state and survives a reload', () => {
+  const first = newApp();
+  pick(first.app, 'settings');
+  pick(first.app, 'onetap:off');
+  const again = newApp({ saved: first.saves.at(-1) });
+  assert.equal(again.app.step().showNext, true);
+  assert.equal(again.app.saveState().oneTap, false);
+});
+
+test('starting again keeps the setting: it is not part of the game', () => {
+  const { app } = twoTaps({ saved: PLAYED() });
+  pick(app, 'reset');
+  pick(app, 'yes');
+  assert.equal(app.saveState().oneTap, false);
+});
+
+// ---- praise on the screen log ----
+
+test('looking back shows the praise of a screen as its first line after the note', () => {
+  const day = dayState([putAway('keys'), putAway('wallet')], { number: 1, inHand: ['keys', 'wallet'] });
+  const { app } = newApp({ saved: { day, dayCount: 0, world: worldWith({}).snapshot() } });
+  pick(app, 'play');
+  pick(app, 'pockets');
+  pick(app, 'pocket:coat/coat-right'); // the home spot of the keys
+  assert.equal(app.step().praise, '✨ Well done! You put your 🔑 keys on the home spot.');
+  pick(app, 'doors');
+  app.lookBack();
+  assert.deepEqual(app.step().lead.slice(0, 2), [TEXTS.lookBackNote, '✨ Well done! You put your 🔑 keys on the home spot.']);
+});
+
+test('a saved state without the one-tap field behaves as one tap', () => {
+  const { oneTap, ...withoutField } = emptySave();
+  const { app } = newApp({ saved: withoutField });
+  assert.equal(app.step().showNext, false);
+  assert.equal(app.tap('play'), true);
+  assert.equal(app.saveState().oneTap, true);
 });

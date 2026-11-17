@@ -1,4 +1,5 @@
-// Draws one screen: the app's command, the choices the player can make, and Next. No game logic here.
+// Draws one screen: the app's command, the choices the player can make, and Next (unless one tap makes it
+// needless). No game logic here.
 
 function el(tag, className, text) {
   const node = document.createElement(tag);
@@ -17,7 +18,7 @@ function quietLink(text, onClick) {
 
 /**
  * @param {{ lead: string[], command: string, choices: { id: string, label: string, mark?: string }[], selected: string | null,
- *           canLeave?: boolean, canLookBack?: boolean }} step
+ *           canLeave?: boolean, canLookBack?: boolean, showNext?: boolean, praise?: string }} step
  * @param {{ onChoose: (id: string) => void, onNext: () => void, onLeave: () => void, onLookBack: () => void }} handlers
  * @param {{ next: string, menu: string, lookBack: string }} texts
  */
@@ -28,6 +29,11 @@ export function renderStep(step, { onChoose, onNext, onLeave, onLookBack }, text
     links.append(quietLink(texts.menu, onLeave));
     if (step.canLookBack) links.append(quietLink(texts.lookBack, onLookBack));
     screen.append(links);
+  }
+  if (step.praise) {
+    const praise = el('p', 'praise', step.praise);
+    praise.setAttribute('role', 'status');
+    screen.append(praise);
   }
   if (step.lead.length > 0) {
     const lead = el('div', 'lead');
@@ -44,7 +50,7 @@ export function renderStep(step, { onChoose, onNext, onLeave, onLookBack }, text
     const option = el('button', 'choice');
     option.type = 'button';
     option.setAttribute('role', 'radio');
-    option.setAttribute('aria-checked', String(choice.id === step.selected));
+    option.setAttribute('aria-checked', String(showsSelection(step) && choice.id === step.selected));
     option.dataset.choice = choice.id;
     option.append(el('span', 'choice-label', choice.label));
     if (choice.mark) option.append(el('span', 'choice-mark', choice.mark));
@@ -53,13 +59,18 @@ export function renderStep(step, { onChoose, onNext, onLeave, onLookBack }, text
   }
   screen.append(choices);
 
-  const next = el('button', 'primary next', texts.next);
-  next.type = 'button';
-  next.disabled = nextIsDisabled(step);
-  next.addEventListener('click', onNext);
-  screen.append(next);
+  if (step.showNext !== false) {
+    const next = el('button', 'primary next', texts.next);
+    next.type = 'button';
+    next.disabled = nextIsDisabled(step);
+    next.addEventListener('click', onNext);
+    screen.append(next);
+  }
   return screen;
 }
+
+/** Without a Next button a tap acts at once, so a preselected choice ("Go on") would only look like a choice already made. */
+const showsSelection = (step) => step.showNext !== false;
 
 const nextIsDisabled = (step) => step.choices.length > 0 && step.selected === null;
 
@@ -73,5 +84,6 @@ export function updateSelection(screen, step) {
   for (const option of screen.querySelectorAll('[data-choice]')) {
     option.setAttribute('aria-checked', String(option.dataset.choice === step.selected));
   }
-  screen.querySelector('.next').disabled = nextIsDisabled(step);
+  const next = screen.querySelector('.next');
+  if (next) next.disabled = nextIsDisabled(step);
 }

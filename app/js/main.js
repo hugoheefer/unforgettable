@@ -41,8 +41,8 @@ let screen = null;
 function showScreen() {
   screen = renderStep(flow.step(), {
     onChoose: (id) => {
-      flow.choose(id);
-      updateSelection(screen, flow.step());
+      if (flow.tap(id)) showScreen();
+      else updateSelection(screen, flow.step());
     },
     onNext: () => {
       flow.next();

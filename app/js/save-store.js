@@ -6,6 +6,7 @@ import { validHistory } from './history.js';
 const SAVE_KEY = 'unforgettable-save';
 const VERSION = 2;
 const DEFAULT_LANGUAGE = 'en';
+const DEFAULT_ONE_TAP = true;
 
 const DATE_FORMAT = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -53,6 +54,7 @@ export function createSaveStore(getStorage, { defaults, world }) {
       return {
         version: VERSION,
         language: typeof saved?.language === 'string' ? saved.language : DEFAULT_LANGUAGE,
+        oneTap: typeof saved?.oneTap === 'boolean' ? saved.oneTap : DEFAULT_ONE_TAP,
         things: validThings(saved?.things),
         plan: mergePlan(saved?.plan),
         progress: { streaks: validStreaks(saved?.progress?.streaks) },

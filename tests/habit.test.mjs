@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { emptyProgress, hintLevel, recordPlacement, streakOf } from '../app/js/habit.js';
+import { emptyProgress, recordPlacement, streakOf } from '../app/js/habit.js';
 
 test('an item never placed has no streak', () => {
   assert.equal(streakOf({ streaks: {} }, 'keys'), 0);
@@ -28,15 +28,6 @@ test('recording a placement does not change the progress it was given', () => {
   const before = { streaks: { keys: 1 } };
   recordPlacement(before, 'keys', true);
   assert.deepEqual(before, { streaks: { keys: 1 } });
-});
-
-test('the home-spot hint fades as the streak grows', () => {
-  assert.equal(hintLevel(0), 'shown');
-  assert.equal(hintLevel(1), 'shown');
-  assert.equal(hintLevel(2), 'dimmed');
-  assert.equal(hintLevel(3), 'dimmed');
-  assert.equal(hintLevel(4), 'hidden');
-  assert.equal(hintLevel(20), 'hidden');
 });
 
 test('new progress has no streaks, and each call gives progress of its own', () => {

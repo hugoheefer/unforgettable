@@ -643,11 +643,6 @@ test('the streaks you hand in are not changed behind your back', () => {
   assert.deepEqual(streaks, { keys: 2 });
 });
 
-test('the hint for a thing follows its streak', () => {
-  assert.equal(putAwayDay('keys', { streaks: { keys: 0 } }).hintFor('keys'), 'shown');
-  assert.equal(putAwayDay('keys', { streaks: { keys: 5 } }).hintFor('keys'), 'hidden');
-});
-
 // ---- saving and continuing ----
 
 function midFind() {
@@ -724,7 +719,7 @@ test('a plan chosen between two events applies to the next put-away', () => {
   assert.equal(day.progress().streaks.keys, 1);
 });
 
-test('the hint follows the plan that was chosen last', () => {
+test('the day follows the plan that was chosen last', () => {
   const day = putAwayDay('keys');
   day.usePlan({ ...PLAN, keys: spot('kitchen', 'counter') });
   assert.deepEqual(day.plan.keys, spot('kitchen', 'counter'));

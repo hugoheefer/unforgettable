@@ -281,3 +281,18 @@ test('the list of home spots has its question, its way out and the words for a t
   assert.equal(TEXTS.thingHome({ thing, where: 'on the hook' }), '🔑 keys: on the hook');
   assert.equal(TEXTS.homeSet({ thing, where: 'on the hook' }), '✔ Home spot of your 🔑 keys: on the hook.');
 });
+
+// ---- praise and the setting for one tap ----
+
+test('the praise names the thing with its icon and the home spot, and the old grey line and the plan hint are gone', () => {
+  assert.equal(TEXTS.praise({ thing: { icon: '🔑', name: 'keys' } }), '✨ Well done! You put your 🔑 keys on the home spot.');
+  assert.equal('placedHome' in TEXTS, false);
+  assert.equal('planHint' in TEXTS, false);
+});
+
+test('the settings have their choice, their question and the two ways to choose', () => {
+  assert.equal(TEXTS.settings, 'Settings');
+  assert.equal(TEXTS.oneTapCommand, 'How do you want to choose?');
+  assert.equal(TEXTS.oneTapOn, 'One tap: a choice happens at once');
+  assert.equal(TEXTS.oneTapOff, 'Two taps: choose, then Next');
+});

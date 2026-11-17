@@ -25,7 +25,7 @@ const world = {
   hasLocation: (location) => new World(layout).hasLocation(location),
   restore: (snapshot) => World.restore(layout, snapshot),
 };
-const freshSave = () => ({ version: 2, language: 'en', things: defaults.things, plan: defaults.plan, progress: { streaks: {} }, world: emptyWorld(), day: null, dayCount: 0, history: EMPTY_HISTORY, lastDayFinishedOn: null, yesterdayChains: [] });
+const freshSave = () => ({ version: 2, language: 'en', oneTap: true, things: defaults.things, plan: defaults.plan, progress: { streaks: {} }, world: emptyWorld(), day: null, dayCount: 0, history: EMPTY_HISTORY, lastDayFinishedOn: null, yesterdayChains: [] });
 
 function memoryStorage(initial = {}) {
   const data = new Map(Object.entries(initial));
@@ -181,4 +181,16 @@ test('yesterday\'s chains that are not a list give an empty list', () => {
 
 test('a save without yesterday\'s chains gets an empty list, field by field with the rest', () => {
   assert.deepEqual(loadFrom({ version: 2, dayCount: 3 }).yesterdayChains, []);
+});
+
+test('one tap is on when nothing is saved about it', () => {
+  assert.equal(loadFrom({}).oneTap, true);
+});
+
+test('the choice for two taps is restored', () => {
+  assert.equal(loadFrom({ oneTap: false }).oneTap, false);
+});
+
+test('a saved one-tap setting that is not true or false gives the default', () => {
+  for (const damaged of ['no', 0, null, [], {}]) assert.equal(loadFrom({ oneTap: damaged }).oneTap, true, JSON.stringify(damaged));
 });

@@ -70,51 +70,21 @@ test('while finding, a pocket shows its things only after you looked in it', () 
   assert.deepEqual(seen(), ['👛', '📱']);
 });
 
-test('with a short streak the home spot is named and marked', () => {
-  const view = describe(putAwayDay('keys'));
-  assert.equal(tile(view.spots, 'hook').hint, 'shown');
-  assert.equal(view.hintText, 'Your plan: on the key hook in the hallway.');
+test('the view marks no home spot and names no plan: nothing points at where a thing belongs', () => {
+  for (const thingId of ['keys', 'wallet', 'phone']) {
+    const view = describe(putAwayDay(thingId));
+    assert.equal('hintText' in view, false, thingId);
+    assert.ok([...view.spots, ...view.rooms, ...view.worn.flatMap((garment) => garment.pockets)].every((entry) => !('hint' in entry)), thingId);
+  }
 });
 
-test('a home pocket of a garment within reach is marked, and named by itself in the hint', () => {
-  const view = describe(putAwayDay('wallet'));
-  assert.equal(tile(tile(view.worn, 'coat').pockets, 'coat-inside').hint, 'shown');
-  assert.equal(view.hintText, 'Your plan: in the inside pocket of your coat.');
-});
-
-test('the room of the home spot gets the hint in the list of rooms', () => {
-  const view = describe(putAwayDay('phone'));
-  assert.equal(tile(view.rooms, 'kitchen').hint, 'shown');
-  assert.equal(tile(view.rooms, 'living').hint, 'hidden');
-});
-
-test('the room where the coat with the home pocket hangs gets the hint, a worn coat gives no room a hint', () => {
-  const hanging = describe(putAwayDay('wallet', { world: worldWith({}, { coat: spot('kitchen', 'counter') }) }));
-  assert.equal(tile(hanging.rooms, 'kitchen').hint, 'shown');
-  assert.ok(describe(putAwayDay('wallet')).rooms.every((room) => room.hint === 'hidden'));
-});
-
-test('with a middle streak the home spot is only marked, not named', () => {
-  const view = describe(putAwayDay('keys', { streaks: { keys: 2 } }));
-  assert.equal(tile(view.spots, 'hook').hint, 'dimmed');
-  assert.equal(view.hintText, '');
-});
-
-test('with a long streak nothing is hinted: memory has to do the work', () => {
-  const view = describe(putAwayDay('phone', { streaks: { phone: 4 } }));
-  assert.equal(view.hintText, '');
-  assert.ok(view.rooms.every((room) => room.hint === 'hidden'));
-});
-
-test('nothing is hinted while finding', () => {
-  const view = describe(findDay('keys'));
-  assert.ok(view.spots.every((entry) => entry.hint === 'hidden'));
-  assert.equal(view.hintText, '');
+test('a coat that hangs in another room gives that room no hint either', () => {
+  const view = describe(putAwayDay('wallet', { world: worldWith({}, { coat: spot('kitchen', 'counter') }) }));
+  assert.ok(view.rooms.every((room) => !('hint' in room)));
 });
 
 test('a day with a pause on screen still describes the room', () => {
   const day = makeDay([{ kind: 'pause', text: 'day' }, putAway('keys')]);
-  assert.equal(describe(day).hintText, '');
   assert.equal(describe(day).room.name, 'Hallway');
 });
 
@@ -137,24 +107,4 @@ test('the coat can come off during a tell, a walk-to and a check as well, not on
     assert.equal(tile(view.worn, 'coat').canTakeOff, true, event.kind);
     assert.equal(tile(view.worn, 'trousers').canTakeOff, false, event.kind);
   }
-});
-
-test('without a thing named, a tell stars no spot: there is nothing to put away', () => {
-  const view = describe(makeDay([tell('hall'), tell('hall')]));
-  assert.ok(view.spots.every((entry) => entry.hint === 'hidden'));
-  assert.equal(view.hintText, '');
-});
-
-test('a thing put away on your own gets its home spot starred and its plan named, whatever the event is', () => {
-  const day = makeDay([tell('hall'), tell('hall')], { state: { inHand: ['keys'] } });
-  const view = describeRoom(day, TEXTS, { thingId: 'keys' });
-  assert.equal(tile(view.spots, 'hook').hint, 'shown');
-  assert.equal(view.hintText, 'Your plan: on the key hook in the hallway.');
-});
-
-test('the home spot of a thing put away on your own fades with its streak like any other', () => {
-  const day = makeDay([tell('hall'), tell('hall')], { state: { inHand: ['keys'] }, streaks: { keys: 2 } });
-  const view = describeRoom(day, TEXTS, { thingId: 'keys' });
-  assert.equal(tile(view.spots, 'hook').hint, 'dimmed');
-  assert.equal(view.hintText, '');
 });

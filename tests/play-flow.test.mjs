@@ -16,16 +16,16 @@ const ids = (step) => step.choices.map((choice) => choice.id);
 const pick = (flow, id) => { flow.choose(id); flow.next(); };
 const choice = (flow, id) => flow.step().choices.find((entry) => entry.id === id);
 
-const PLAN_KEYS = 'Your plan: on the key hook in the hallway.';
-const PLAN_SCISSORS = 'Your plan: in the desk drawer in the study.';
+const PRAISE_KEYS = '✨ Well done! You put your 🔑 keys on the home spot.';
+const PRAISE_SCISSORS = '✨ Well done! You put your ✂️ scissors on the home spot.';
 const ELSE = { id: 'else', label: 'Something else first' };
 const WALK = { id: 'doors', label: 'Walk to another room' };
 
 // ---- the put-away screen ----
 
-test('putting back: the lead names the plan, the command the room and the thing, four ways to answer', () => {
+test('putting back: no lead, the command names the room and the thing, four ways to answer', () => {
   assert.deepEqual(putFlow().step(), {
-    lead: [PLAN_KEYS],
+    lead: [],
     command: 'You are in the hallway. Put your 🔑 keys back.',
     choices: [
       { id: 'spots', label: 'Here, in the hallway' },
@@ -42,30 +42,29 @@ test('the put-away screen has no "Something else first": the player is already p
   assert.equal(ids(putFlow().step()).includes('else'), false);
 });
 
-test('the plan names a pocket by itself when the home spot is a pocket', () => {
-  assert.deepEqual(putFlow('wallet').step().lead, ['Your plan: in the inside pocket of your coat.']);
-});
-
-test('with a middle streak the plan is not named; with a long streak neither', () => {
-  assert.deepEqual(putFlow('keys', { streaks: { keys: 2 } }).step().lead, []);
-  assert.deepEqual(putFlow('keys', { streaks: { keys: 5 } }).step().lead, []);
+test('the put-away screen never names the plan, whatever the streak: the player chooses from memory', () => {
+  for (const [thingId, streak] of [['keys', 0], ['keys', 2], ['keys', 5], ['wallet', 0]]) {
+    assert.deepEqual(putFlow(thingId, { streaks: { [thingId]: streak } }).step().lead, [], `${thingId} ${streak}`);
+  }
 });
 
 // ---- spots, pockets and the coat ----
 
-test('choosing "here" shows the spots of this room, the home spot starred, and a way back', () => {
+test('choosing "here" shows the spots of this room, none starred, and a way back', () => {
   const flow = putFlow();
   pick(flow, 'spots');
   assert.equal(flow.step().command, 'Which spot in the hallway?');
-  assert.deepEqual(choice(flow, 'spot:hook'), { id: 'spot:hook', label: '🪝 Key hook', mark: '★' });
+  assert.deepEqual(choice(flow, 'spot:hook'), { id: 'spot:hook', label: '🪝 Key hook' });
   assert.deepEqual(choice(flow, 'spot:shoes'), { id: 'spot:shoes', label: '👟 Shoe rack' });
   assert.deepEqual(choice(flow, 'back'), { id: 'back', label: '↩ Choose something else' });
 });
 
-test('with a long streak the home spot is not starred', () => {
-  const flow = putFlow('keys', { streaks: { keys: 5 } });
-  pick(flow, 'spots');
-  assert.equal(choice(flow, 'spot:hook').mark, undefined);
+test('no spot or pocket is starred, also not the home spot of a thing with a short streak', () => {
+  for (const [thingId, menu] of [['keys', 'spots'], ['wallet', 'pockets']]) {
+    const flow = putFlow(thingId);
+    pick(flow, menu);
+    assert.ok(flow.step().choices.every((entry) => entry.mark === undefined), thingId);
+  }
 });
 
 test('"back" returns to the first question', () => {
@@ -83,12 +82,13 @@ test('the pockets of what you wear are offered, and choosing one puts the thing 
   assert.ok(ids(flow.step()).includes('pocket:trousers/trousers-back'));
 });
 
-test('putting a thing on its home spot is told, and the next thing is asked about', () => {
+test('putting a thing on its home spot is praised, and the next thing is asked about', () => {
   const day = makeDay([putAway('keys'), putAway('wallet')], { state: { inHand: ['keys', 'wallet'] } });
   const flow = flowFor(day);
   pick(flow, 'spots');
   pick(flow, 'spot:hook');
-  assert.equal(flow.step().lead[0], '✔ You put your 🔑 keys on the home spot.');
+  assert.equal(flow.step().praise, PRAISE_KEYS);
+  assert.deepEqual(flow.step().lead, []);
   assert.equal(flow.step().command, 'You are in the hallway. Put your 👛 wallet back.');
 });
 
@@ -98,6 +98,7 @@ test('putting a thing elsewhere is told with where it went and where its home sp
   pick(flow, 'spots');
   pick(flow, 'spot:shoes');
   assert.equal(flow.step().lead[0], 'You put your 🔑 keys on the shoe rack. Home spot: on the key hook in the hallway.');
+  assert.equal(flow.step().praise ?? null, null);
 });
 
 test('a thing put in a pocket is told with the pocket, and a pocket home is named by itself', () => {
@@ -131,7 +132,7 @@ test('the pockets of a coat that hangs in this room say so', () => {
 // ---- walking ----
 
 test('the walk list shows every other room with its distance, nearest first, then in the order of the layout', () => {
-  const flow = putFlow('keys', { streaks: { keys: 5 } });
+  const flow = putFlow('keys');
   pick(flow, 'doors');
   assert.equal(flow.step().command, 'Where do you walk to?');
   assert.deepEqual(flow.step().choices.map((entry) => entry.label), [
@@ -142,26 +143,13 @@ test('the walk list shows every other room with its distance, nearest first, the
   assert.equal(ids(flow.step())[1], 'door:kitchen');
 });
 
-test('while the hint is shown or dimmed the room of the home spot is starred in the walk list', () => {
-  for (const streak of [0, 2]) {
+test('the walk list stars no room and names no plan, also for a thing whose home spot is in another room', () => {
+  for (const streak of [0, 2, 5]) {
     const flow = putFlow('phone', { streaks: { phone: streak } });
     pick(flow, 'doors');
-    assert.equal(choice(flow, 'door:kitchen').mark, '★');
-    assert.equal(choice(flow, 'door:living').mark, undefined);
+    assert.ok(flow.step().choices.every((entry) => entry.mark === undefined), streak);
+    assert.deepEqual(flow.step().lead, [], streak);
   }
-});
-
-test('with a long streak no room is starred and the plan is not named', () => {
-  const flow = putFlow('phone', { streaks: { phone: 5 } });
-  pick(flow, 'doors');
-  assert.ok(flow.step().choices.every((entry) => entry.mark === undefined));
-  assert.deepEqual(flow.step().lead, []);
-});
-
-test('the plan is named in the walk list while the hint is shown', () => {
-  const flow = putFlow('phone');
-  pick(flow, 'doors');
-  assert.deepEqual(flow.step().lead, ['Your plan: on the worktop in the kitchen.']);
 });
 
 test('walking to a room two doors away arrives there in one action', () => {
@@ -245,16 +233,16 @@ const comingHome = () => flowFor(makeDay([pause('day'), moveTo('hall'), putAway(
 test('the sentence of a move is the first lead line of the next screen when nothing came before it', () => {
   const flow = comingHome();
   flow.next();
-  assert.deepEqual(flow.step().lead, ['You come home and stand at your front door.', PLAN_KEYS]);
+  assert.deepEqual(flow.step().lead, ['You come home and stand at your front door.']);
 });
 
 test('the sentence of a move is gone on the screen after, also when you come back to the first question', () => {
   const flow = comingHome();
   flow.next();
   pick(flow, 'spots');
-  assert.deepEqual(flow.step().lead, [PLAN_KEYS]);
+  assert.deepEqual(flow.step().lead, []);
   pick(flow, 'back');
-  assert.deepEqual(flow.step().lead, [PLAN_KEYS]);
+  assert.deepEqual(flow.step().lead, []);
 });
 
 test('a day that was saved right after a move shows the sentence of that move again', () => {
@@ -384,15 +372,8 @@ test('a thing found in a pocket is told with the pocket', () => {
   assert.equal(flow.step().lead[0], 'Found your 👛 wallet in the inside pocket of your coat. 1 step.');
 });
 
-test('a home pocket of a coat that hangs in another room gets that room starred in the walk list', () => {
+test('a home pocket of a coat that hangs in another room stars no room in the walk list', () => {
   const flow = putFlow('wallet', { world: worldWith({}, { coat: spot('kitchen', 'counter') }) });
-  pick(flow, 'doors');
-  assert.equal(choice(flow, 'door:kitchen').mark, '★');
-  assert.equal(choice(flow, 'door:living').mark, undefined);
-});
-
-test('a home pocket of the coat you wear stars no room in the walk list', () => {
-  const flow = putFlow('wallet');
   pick(flow, 'doors');
   assert.ok(flow.step().choices.every((entry) => entry.mark === undefined));
 });
@@ -546,9 +527,9 @@ const ownPut = (options = {}) => {
   return flow;
 };
 
-test('putting a thing away on your own looks like a put-away: the plan, the command, four ways', () => {
+test('putting a thing away on your own looks like a put-away: no plan, the command, four ways', () => {
   assert.deepEqual(ownPut().step(), {
-    lead: ['Your plan: in the kitchen drawer in the kitchen.'],
+    lead: [],
     command: 'You are in the kitchen. Put your ✂️ scissors back.',
     choices: [
       { id: 'spots', label: 'Here, in the kitchen' },
@@ -578,11 +559,11 @@ test('the guided put-back has no Choose something else at its first question', (
   assert.equal(ids(putFlow().step()).includes('back'), false);
 });
 
-test('putting away on your own names the plan while the hint is shown', () => {
+test('putting away on your own names no plan', () => {
   const flow = flowFor(tellDay({ ...handsWith('scissors'), plan: { ...defaultPlan(), scissors: spot('study', 'desk-drawer') } }));
   pick(flow, 'else');
   pick(flow, 'putaway:scissors');
-  assert.deepEqual(flow.step().lead, [PLAN_SCISSORS]);
+  assert.deepEqual(flow.step().lead, []);
 });
 
 test('the thing put away on your own is told, and the story is on its screen again', () => {
@@ -593,11 +574,12 @@ test('the thing put away on your own is told, and the story is on its screen aga
   assert.equal(flow.step().command, 'Take a new pack of coffee from the top right cupboard.');
 });
 
-test('on the home spot it is told as such', () => {
+test('on the home spot it is praised', () => {
   const flow = ownPut();
   pick(flow, 'spots');
   pick(flow, 'spot:drawer');
-  assert.deepEqual(flow.step().lead, ['✔ You put your ✂️ scissors on the home spot.']);
+  assert.equal(flow.step().praise, PRAISE_SCISSORS);
+  assert.deepEqual(flow.step().lead, []);
 });
 
 test('putting a thing away in another room, then the screen asks you back', () => {
@@ -606,7 +588,7 @@ test('putting a thing away in another room, then the screen asks you back', () =
   pick(flow, 'door:study');
   pick(flow, 'spots');
   pick(flow, 'spot:desk-drawer');
-  assert.deepEqual(flow.step().lead, ['✔ You put your ✂️ scissors on the home spot.']);
+  assert.equal(flow.step().praise, PRAISE_SCISSORS);
   assert.equal(flow.step().command, 'Go back to the kitchen.');
   assert.deepEqual(ids(flow.step()), ['doors']);
 });
@@ -632,6 +614,45 @@ test('a guided put-away of a thing the player put away already is skipped', () =
   pick(flow, 'spot:counter');
   pick(flow, 'go');
   assert.equal(flow.step().command, 'You pour the coffee into the tin and make a pot of filter coffee.');
+});
+
+// ---- praise ----
+
+test('a thing put in its home pocket is praised too', () => {
+  const flow = flowFor(makeDay([putAway('wallet'), putAway('keys')], { state: { inHand: ['wallet', 'keys'] } }));
+  pick(flow, 'pockets');
+  pick(flow, 'pocket:coat/coat-inside');
+  assert.equal(flow.step().praise, '✨ Well done! You put your 👛 wallet on the home spot.');
+});
+
+test('the praise is gone from the screen after the next action', () => {
+  const day = makeDay([putAway('keys'), putAway('wallet')], { state: { inHand: ['keys', 'wallet'] } });
+  const flow = flowFor(day);
+  pick(flow, 'spots');
+  pick(flow, 'spot:hook');
+  pick(flow, 'spots');
+  assert.equal(flow.step().praise ?? null, null);
+});
+
+test('a refused move is not praised', () => {
+  const flow = putFlow();
+  pick(flow, 'doors');
+  pick(flow, 'door:dining');
+  assert.equal(flow.step().praise ?? null, null);
+});
+
+test('finding a thing is not praised, not even on its home spot', () => {
+  const world = worldWith({ keys: spot('hall', 'hook') });
+  const flow = flowFor(makeDay([find('keys'), putAway('keys')], { world }));
+  pick(flow, 'spots');
+  pick(flow, 'spot:hook');
+  assert.equal(flow.step().praise ?? null, null);
+});
+
+test('answering "Yes, everything" at the check is not praised: the app does not say whether it was right', () => {
+  const flow = flowFor(checkDay());
+  pick(flow, 'yes');
+  assert.equal(flow.step().praise ?? null, null);
 });
 
 // ---- finishing, refusals, contract ----

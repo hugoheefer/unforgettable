@@ -187,6 +187,11 @@ export const en = {
   menu: 'Menu',
   welcome: 'Unforgettable. Always put your things in the same place.',
   chooseHomeSpots: 'Choose my home spots',
+  // The settings: how a choice is made.
+  settings: 'Settings',
+  oneTapCommand: 'How do you want to choose?',
+  oneTapOn: 'One tap: a choice happens at once',
+  oneTapOff: 'Two taps: choose, then Next',
   // Starting again: the choice on the start screen, its question and its two answers.
   startAgain: 'Start again',
   startAgainCommand: 'Start again? This erases your sessions and your progress. Your home spots stay.',
@@ -215,7 +220,6 @@ export const en = {
   },
   comeBackTomorrow: 'Come back tomorrow. A night in between is the real test.',
 
-  planHint: ({ location }) => `Your plan: ${location}.`,
   locationSpot: ({ spot, room }) => `${spot.at} ${room.in}`,
   locationHere: ({ spot }) => spot.at,
   locationPocket: ({ pocket }) => pocket.at,
@@ -252,7 +256,7 @@ export const en = {
 
   putOnDone: ({ garment }) => `You put ${garment.your} on.`,
   hungDone: ({ garment, spot }) => `You hung ${garment.your} ${spot.at}.`,
-  placedHome: ({ thing }) => `✔ You put your ${thing.icon} ${thing.name} on the home spot.`,
+  praise: ({ thing }) => `✨ Well done! You put your ${thing.icon} ${thing.name} on the home spot.`,
   placedAway: ({ thing, where, home }) => `You put your ${thing.icon} ${thing.name} ${where}. Home spot: ${home}.`,
   found: ({ thing, where, steps: count }) => `Found your ${thing.icon} ${thing.name} ${where}. ${steps(count)}.`,
   notHere: 'Not here.',

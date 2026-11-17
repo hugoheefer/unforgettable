@@ -13,6 +13,9 @@ import { chainIdsOf } from './day-plan.js';
 import { createScreenLog } from './screen-log.js';
 import { LookBackFlow } from './look-back-flow.js';
 
+const CURRENT = '★';
+const DEFAULT_ONE_TAP = true;
+
 /** A screen with fixed text whose choices lead somewhere. */
 class ChoiceScreen {
   constructor({ lead = [], command, choices }, onChoice) {
@@ -45,6 +48,7 @@ export class AppFlow {
   constructor({ layout, things, texts, random, clock, saved, onSave }) {
     Object.assign(this, { layout, things, texts, random, clock, onSave });
     this.plan = saved.plan;
+    this.oneTap = saved.oneTap ?? DEFAULT_ONE_TAP;
     this.progress = saved.progress;
     this.dayCount = saved.dayCount;
     this.history = saved.history;
@@ -73,6 +77,7 @@ export class AppFlow {
       history: this.history,
       lastDayFinishedOn: this.lastDayFinishedOn,
       yesterdayChains: this.yesterdayChains,
+      oneTap: this.oneTap,
     });
   }
 
@@ -89,11 +94,27 @@ export class AppFlow {
     const choices = [
       { id: 'play', label: play },
       { id: 'setup', label: texts.chooseHomeSpots },
+      { id: 'settings', label: texts.settings },
       ...(this.started ? [{ id: 'reset', label: texts.startAgain }] : []),
     ];
-    const opens = { play: () => this.startDay(), setup: () => this.startSetup(), reset: () => this.confirmReset() };
+    const opens = { play: () => this.startDay(), setup: () => this.startSetup(), settings: () => this.settingsScreen(), reset: () => this.confirmReset() };
     return new ChoiceScreen({ command: texts.welcome, choices }, (choice) => {
       this.current = opens[choice]();
+    });
+  }
+
+  /** How a choice is made; choosing one saves it at once and returns to the start screen. */
+  settingsScreen() {
+    const { texts } = this;
+    const mark = (on) => (this.oneTap === on ? { mark: CURRENT } : {});
+    const choices = [
+      { id: 'onetap:on', label: texts.oneTapOn, ...mark(true) },
+      { id: 'onetap:off', label: texts.oneTapOff, ...mark(false) },
+      { id: 'back', label: texts.back },
+    ];
+    return new ChoiceScreen({ command: texts.oneTapCommand, choices }, (choice) => {
+      if (choice !== 'back') this.oneTap = choice === 'onetap:on';
+      this.current = this.welcome();
     });
   }
 
@@ -147,14 +168,26 @@ export class AppFlow {
     return new SetupFlow({ layout: this.layout, items: this.things, plan: this.plan, texts: this.texts, onFinished: () => this.finishSetup() });
   }
 
-  /** The screen shown; a screen of a day offers to look back once a screen of the session has been left. */
+  /**
+   * The screen shown. A screen of a day offers to look back once a screen of the session has been left; Next is
+   * shown unless one tap makes it needless (a screen without choices is left with Next only).
+   */
   step() {
     const step = this.current.step();
-    return step.canLeave && !this.screens.isEmpty() ? { ...step, canLookBack: true } : step;
+    const showNext = !(this.oneTap && step.choices.length > 0);
+    return { ...step, showNext, ...(step.canLeave && !this.screens.isEmpty() ? { canLookBack: true } : {}) };
   }
 
   choose(choiceId) {
     this.current.choose(choiceId);
+  }
+
+  /** A tap on a choice: it selects it and, with one tap, also acts. @returns {boolean} whether the screen moved on */
+  tap(choiceId) {
+    const acts = this.oneTap;
+    this.choose(choiceId);
+    if (acts) this.next();
+    return acts;
   }
 
   /** Acts on the choice and hands the new state over when it changed. */
@@ -171,7 +204,7 @@ export class AppFlow {
   recordScreen(shown) {
     if (!shown.canLeave || (shown.choices.length > 0 && shown.selected === null)) return;
     const picked = shown.choices.find((entry) => entry.id === shown.selected)?.label ?? null;
-    this.screens.record({ lead: shown.lead, command: shown.command, picked });
+    this.screens.record({ lead: [...(shown.praise ? [shown.praise] : []), ...shown.lead], command: shown.command, picked });
   }
 
   /** The Look back link: read-only screens of the session; going back to the game returns to the screen left. */

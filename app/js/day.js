@@ -9,7 +9,7 @@
 // reach in its own room; a pocket when its garment is worn or hangs in this room.
 
 import { isPocket, locationKey, sameLocation } from './world.js';
-import { hintLevel, recordPlacement, streakOf } from './habit.js';
+import { recordPlacement, streakOf } from './habit.js';
 import { RefusedMove, unknownRoom, unknownThing } from './errors.js';
 import { buildDay } from './day-plan.js';
 import { CHAINS } from './chains.js';
@@ -107,10 +107,6 @@ export class Day {
       .filter((place) => place.id !== this.roomId)
       .map((place) => ({ id: place.id, steps: this.world.stepsBetween(this.roomId, place.id) }))
       .sort((a, b) => a.steps - b.steps);
-  }
-
-  hintFor(thingId) {
-    return hintLevel(streakOf(this.habits, thingId));
   }
 
   roomOf(id) {
