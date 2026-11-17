@@ -5,10 +5,12 @@ import { Day, canContinue } from './day.js';
 import { PlayFlow } from './play-flow.js';
 import { SetupFlow } from './setup-flow.js';
 import { World } from './world.js';
-import { choiceNotOffered } from './errors.js';
+import { choiceNotOffered, lookBackUnavailable } from './errors.js';
 import { recordFind, recordPut } from './history.js';
 import { summarize } from './summary.js';
 import { chainIdsOf } from './day-plan.js';
+import { createScreenLog } from './screen-log.js';
+import { LookBackFlow } from './look-back-flow.js';
 
 /** A screen with fixed text whose choices lead somewhere. */
 class ChoiceScreen {
@@ -47,6 +49,7 @@ export class AppFlow {
     this.history = saved.history;
     this.lastDayFinishedOn = saved.lastDayFinishedOn;
     this.yesterdayChains = saved.yesterdayChains;
+    this.screens = createScreenLog(); // the screens left during this session, for looking back
     this.world = World.restore(layout, saved.world);
     // until a day has been started, every thing stands on its home spot, whatever the save says
     this.started = saved.dayCount > 0 || saved.day !== null;
@@ -94,6 +97,7 @@ export class AppFlow {
 
   startDay() {
     this.started = true;
+    if (!this.day) this.screens.clear(); // looking back shows the session you are in
     this.day ??= Day.start({
       layout: this.layout, things: this.things, world: this.world, plan: this.plan, progress: this.progress, random: this.random,
       number: this.dayCount + 1, yesterday: this.yesterdayChains,
@@ -111,8 +115,10 @@ export class AppFlow {
     return new SetupFlow({ layout: this.layout, items: this.things, plan: this.plan, texts: this.texts, onFinished: () => this.finishSetup() });
   }
 
+  /** The screen shown; a screen of a day offers to look back once a screen of the session has been left. */
   step() {
-    return this.current.step();
+    const step = this.current.step();
+    return step.canLeave && !this.screens.isEmpty() ? { ...step, canLookBack: true } : step;
   }
 
   choose(choiceId) {
@@ -122,9 +128,25 @@ export class AppFlow {
   /** Acts on the choice and hands the new state over when it changed. */
   next() {
     const before = JSON.stringify(this.saveState());
+    const shown = this.current.step();
     this.current.next();
+    this.recordScreen(shown);
     const after = this.saveState();
     if (JSON.stringify(after) !== before) this.onSave(after);
+  }
+
+  /** Keeps a screen of a day that the player has left, with the choice made on it. A Next that did nothing is not a screen left. */
+  recordScreen(shown) {
+    if (!shown.canLeave || (shown.choices.length > 0 && shown.selected === null)) return;
+    const picked = shown.choices.find((entry) => entry.id === shown.selected)?.label ?? null;
+    this.screens.record({ lead: shown.lead, command: shown.command, picked });
+  }
+
+  /** The Look back link: read-only screens of the session; going back to the game returns to the screen left. */
+  lookBack() {
+    if (!this.step().canLookBack) throw lookBackUnavailable();
+    const resume = this.current;
+    this.current = new LookBackFlow({ entries: this.screens.entries(), texts: this.texts, onReturn: () => { this.current = resume; } });
   }
 
   /** The Menu link of a day: back to the start screen; the day continues where it was. */

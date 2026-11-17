@@ -27,3 +27,6 @@ export const choiceNotOffered = (choiceId) => new Error(`Choice not offered: ${c
 export const unknownLocation = (key) => new Error(`Unknown spot or pocket: ${key}`);
 export const unknownRoom = (roomId) => new Error(`Unknown room: ${roomId}`);
 export const unknownThing = (thingId) => new Error(`Unknown thing: ${thingId}`);
+
+export const noScreensToLookAt = () => new Error('There is no screen to look at');
+export const lookBackUnavailable = () => new Error('Looking back is not offered on this screen');

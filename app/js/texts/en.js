@@ -111,9 +111,14 @@ export const en = {
     'already-here': 'You are already there.',
   },
 
-  // The pause that opens a day.
+  // The pause that opens a session (the code says "day"), and the note under it: whether this is a new game,
+  // in which every thing is in its home spot, or a game that goes on.
   pauses: {
-    day: ({ number }) => `Day ${number}.`,
+    day: ({ number }) => `Session ${number}.`,
+  },
+  sessionNotes: {
+    first: 'A new game. Everything is in its home spot.',
+    later: 'Everything is where you left it.',
   },
   // The sentences of the chains, by chain and step (see chains/). A step that is a put-back of a thing has none.
   // A walk-to step's sentence is only its reason: the command ("Go to the kitchen.") is `goToCommand`.
@@ -182,9 +187,17 @@ export const en = {
   menu: 'Menu',
   welcome: 'Unforgettable. Always put your things in the same place.',
   chooseHomeSpots: 'Choose my home spots',
-  startDay: ({ number }) => `Start day ${number}`,
-  continueDay: ({ number }) => `Continue day ${number}`,
-  dayDone: ({ number }) => `Day ${number} is done.`,
+  // Looking back at the screens of the session (read only).
+  lookBack: 'Look back',
+  lookBackNote: 'You are looking back. Nothing you do here changes the game.',
+  lookBackEarlier: 'Earlier screen',
+  lookBackLater: 'Later screen',
+  lookBackReturn: 'Back to the game',
+  lookBackCommand: ({ command, picked }) => (picked === null ? command : `${command} You chose: ${picked}.`),
+
+  startDay: ({ number }) => `Start session ${number}`,
+  continueDay: ({ number }) => `Continue session ${number}`,
+  dayDone: ({ number }) => `Session ${number} is done.`,
   backToStart: 'Back to the start',
 
   // The summary of a day. It does not say what lies where: the player finds that out.

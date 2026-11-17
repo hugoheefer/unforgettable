@@ -221,9 +221,15 @@ test('the prop of a tell is not a thing: nothing about taking it appears except 
   assert.equal(JSON.stringify(flowFor(tellDay()).step()).includes('Where do you look'), false);
 });
 
-test('a pause that opens the day is a screen with no choices and an enabled Next, and no Something else first', () => {
+test('a pause that opens a later session is a screen with no choices and an enabled Next, and no Something else first', () => {
   const flow = flowFor(makeDay([pause('day'), tell('hall')], { state: { number: 2 } }));
-  assert.deepEqual(flow.step(), { lead: [], command: 'Day 2.', choices: [], selected: null, canLeave: true });
+  assert.deepEqual(flow.step(), { lead: ['Everything is where you left it.'], command: 'Session 2.', choices: [], selected: null, canLeave: true });
+});
+
+test('the pause that opens the very first session says that this is a new game and everything is in its home spot', () => {
+  const flow = flowFor(makeDay([pause('day'), tell('hall')], { state: { number: 1 } }));
+  assert.deepEqual(flow.step().lead, ['A new game. Everything is in its home spot.']);
+  assert.equal(flow.step().command, 'Session 1.');
 });
 
 test('Next on the opening pause moves the day on', () => {

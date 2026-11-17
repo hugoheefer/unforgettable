@@ -39,12 +39,12 @@ const pick = (app, id) => { app.choose(id); app.next(); };
 
 // ---- the start screen ----
 
-test('a new player is offered to start day 1 or to choose home spots', () => {
+test('a new player is offered to start session 1 or to choose home spots', () => {
   const { app } = newApp();
   assert.deepEqual(app.step(), {
     lead: [],
     command: 'Unforgettable. Always put your things in the same place.',
-    choices: [{ id: 'play', label: 'Start day 1' }, { id: 'setup', label: 'Choose my home spots' }],
+    choices: [{ id: 'play', label: 'Start session 1' }, { id: 'setup', label: 'Choose my home spots' }],
     selected: null,
   });
 });
@@ -56,12 +56,12 @@ test('the start screen has no Menu link', () => {
 test('with a day in progress the player is offered to continue it', () => {
   const day = Day.start({ layout: LAYOUT, things: THINGS, world: new World(LAYOUT), plan: defaultPlan(), progress: { streaks: {} }, random: rand(), number: 3 });
   const { app } = newApp({ saved: { day: day.snapshot(), dayCount: 2 } });
-  assert.deepEqual(labels(app), ['Continue day 3', 'Choose my home spots']);
+  assert.deepEqual(labels(app), ['Continue session 3', 'Choose my home spots']);
 });
 
 test('after a finished day the player is offered the next day', () => {
   const { app } = newApp({ saved: { dayCount: 2 } });
-  assert.deepEqual(labels(app), ['Start day 3', 'Choose my home spots']);
+  assert.deepEqual(labels(app), ['Start session 3', 'Choose my home spots']);
 });
 
 // ---- a new game ----
@@ -76,10 +76,20 @@ test('only the chosen things are put on their home spot', () => {
   assert.deepEqual(app.saveState().world.things, { keys: defaultPlan().keys });
 });
 
-test('starting day 1 shows a pause with the day number and no choices', () => {
+test('starting session 1 shows a pause that says it is a new game, with no choices', () => {
   const { app } = newApp();
   pick(app, 'play');
-  assert.deepEqual(app.step(), { lead: [], command: 'Day 1.', choices: [], selected: null, canLeave: true });
+  assert.deepEqual(app.step(), {
+    lead: ['A new game. Everything is in its home spot.'], command: 'Session 1.', choices: [], selected: null, canLeave: true,
+  });
+});
+
+test('starting a later session shows a pause that says the game goes on and things are where you left them', () => {
+  const { app } = newApp({ saved: { dayCount: 2 } });
+  pick(app, 'play');
+  assert.deepEqual(app.step(), {
+    lead: ['Everything is where you left it.'], command: 'Session 3.', choices: [], selected: null, canLeave: true,
+  });
 });
 
 test('after the pause of the first day you stand at your front door and need your keys, which are in your coat', () => {
@@ -101,7 +111,7 @@ test('the Menu returns from a day to the start screen, and the day continues whe
   pick(app, 'door:kitchen');
   const before = app.step().command;
   app.leave();
-  assert.deepEqual(labels(app), ['Continue day 1', 'Choose my home spots']);
+  assert.deepEqual(labels(app), ['Continue session 1', 'Choose my home spots']);
   pick(app, 'play');
   assert.equal(app.step().command, before);
   assert.match(before, /kitchen/);
@@ -190,8 +200,8 @@ test('a cheap day ends with the searching line, the putting-away line and the st
   putTheKeysOnTheHook(app);
   assert.deepEqual(app.step(), {
     lead: ['Searching cost 2 steps today. Going straight to each thing: 2.', 'Putting things away cost 4 steps.', STRAIGHT],
-    command: 'Day 3 is done.',
-    choices: [{ id: 'next', label: 'Start day 4' }, { id: 'start', label: 'Back to the start' }],
+    command: 'Session 3 is done.',
+    choices: [{ id: 'next', label: 'Start session 4' }, { id: 'start', label: 'Back to the start' }],
     selected: null,
   });
 });
@@ -247,7 +257,7 @@ test('"Back to the start" shows the start screen with the next day to start', ()
   const { app } = dayThreeAtItsLastPutAway({ finds: [found(3, 'keys', 1, 1)] });
   putTheKeysOnTheHook(app);
   pick(app, 'start');
-  assert.deepEqual(labels(app), ['Start day 4', 'Choose my home spots']);
+  assert.deepEqual(labels(app), ['Start session 4', 'Choose my home spots']);
 });
 
 // ---- the chains of a day ----
@@ -377,9 +387,21 @@ test('an app started from a saved state in the middle of an event continues exac
   pick(first.app, 'doors');
   pick(first.app, 'door:kitchen');
   const again = newApp({ saved: first.saves.at(-1) });
-  assert.deepEqual(labels(again.app), ['Continue day 1', 'Choose my home spots']);
+  assert.deepEqual(labels(again.app), ['Continue session 1', 'Choose my home spots']);
   pick(again.app, 'play');
-  assert.deepEqual(again.app.step(), first.app.step());
+  const { canLookBack, ...theScreen } = first.app.step();
+  assert.equal(canLookBack, true);
+  assert.deepEqual(again.app.step(), theScreen);
+});
+
+test('the screens that were left are not saved: after a reload there is nothing to look back at', () => {
+  const first = newApp();
+  pick(first.app, 'play');
+  first.app.next();
+  pick(first.app, 'doors');
+  const again = newApp({ saved: first.saves.at(-1) });
+  pick(again.app, 'play');
+  assert.notEqual(again.app.step().canLookBack, true);
 });
 
 test('a saved day that cannot be continued is dropped, the world is kept and a new day starts', () => {
@@ -387,7 +409,7 @@ test('a saved day that cannot be continued is dropped, the world is kept and a n
   const world = worldWith({ keys: spot('living', 'sofa') }).snapshot();
   const withoutScissors = THINGS.filter((thing) => thing.id !== 'scissors');
   const { app, saves } = newApp({ things: withoutScissors, saved: { day: full.snapshot(), dayCount: 2, world } });
-  assert.deepEqual(labels(app), ['Start day 3', 'Choose my home spots']);
+  assert.deepEqual(labels(app), ['Start session 3', 'Choose my home spots']);
   pick(app, 'play');
   assert.deepEqual(saves.at(-1).world.things.keys, spot('living', 'sofa'));
   assert.equal(saves.at(-1).day.number, 3);
@@ -398,7 +420,7 @@ test('a saved day with a broken field is dropped too', () => {
   const day = Day.start({ layout: LAYOUT, things: THINGS, world: new World(LAYOUT), plan: defaultPlan(), progress: { streaks: {} }, random: rand(), number: 1 });
   const broken = { ...day.snapshot(), events: [{ kind: 'dance' }] };
   const { app } = newApp({ saved: { day: broken } });
-  assert.deepEqual(labels(app), ['Start day 1', 'Choose my home spots']);
+  assert.deepEqual(labels(app), ['Start session 1', 'Choose my home spots']);
 });
 
 // ---- the flow contract and the texts ----
@@ -428,7 +450,7 @@ const comeBack = 'Come back tomorrow. A night in between is the real test.';
 test('the first day ever has no line about coming back tomorrow', () => {
   const { app } = dayThreeAtItsLastPutAway({ dayCount: 0, number: 1 });
   putTheKeysOnTheHook(app);
-  assert.equal(app.step().command, 'Day 1 is done.');
+  assert.equal(app.step().command, 'Session 1 is done.');
   assert.equal(app.step().lead.includes(comeBack), false);
 });
 
@@ -476,7 +498,7 @@ function answer(app) {
 }
 
 function playDay(app, number) {
-  for (let guard = 0; app.step().command !== `Day ${number} is done.`; guard += 1) {
+  for (let guard = 0; app.step().command !== `Session ${number} is done.`; guard += 1) {
     if (guard > 400) throw new Error(`stuck on: ${app.step().command}`);
     answer(app);
   }
@@ -498,4 +520,101 @@ test('two days in a row, with a silent chain on both, can be played, and what wa
   playDay(app, 2);
   assert.equal(saves.at(-1).dayCount, 2);
   assert.equal(saves.at(-1).history.puts.some((record) => record.left === true), true);
+});
+
+// ---- looking back ----
+
+/** A session just started and the pause left, so one screen lies behind the player. */
+function afterThePause() {
+  const made = newApp();
+  pick(made.app, 'play');
+  made.app.next();
+  return made;
+}
+
+test('a screen of a session that was just opened has nothing to look back at', () => {
+  const { app } = newApp();
+  pick(app, 'play');
+  assert.notEqual(app.step().canLookBack, true);
+});
+
+test('once the player has left a screen of the session, the screens of the session offer to look back', () => {
+  const { app } = afterThePause();
+  assert.equal(app.step().canLookBack, true);
+});
+
+test('the start screen and the home-spot screens never offer to look back', () => {
+  const { app } = afterThePause();
+  app.leave();
+  assert.notEqual(app.step().canLookBack, true);
+  pick(app, 'setup');
+  assert.notEqual(app.step().canLookBack, true);
+});
+
+test('looking back shows the screen the player just left and what they chose on it', () => {
+  const { app } = afterThePause();
+  pick(app, 'doors');
+  app.lookBack();
+  assert.match(app.step().command, /Where do you look\? You are in the garden\. You chose: Walk to another room\.$/);
+  assert.equal(app.step().lead[0], TEXTS.lookBackNote);
+});
+
+test('a screen on which the player pressed Next without having chosen is not recorded', () => {
+  const { app } = afterThePause();
+  app.next(); // a find screen with nothing selected: nothing happens
+  app.lookBack();
+  assert.match(app.step().command, /^Session 1\.$/);
+});
+
+test('the screens can be walked back through one by one, down to the first of the session', () => {
+  const { app } = afterThePause();
+  pick(app, 'doors');
+  app.lookBack();
+  app.next();
+  assert.equal(app.step().command, 'Session 1.');
+  assert.deepEqual(ids(app), ['later', 'return']);
+});
+
+test('going back to the game shows exactly the screen that was left, and the game goes on from there', () => {
+  const { app } = afterThePause();
+  pick(app, 'doors');
+  const before = app.step();
+  app.lookBack();
+  pick(app, 'return');
+  assert.deepEqual(app.step(), before);
+  pick(app, 'door:kitchen');
+  assert.match(app.step().command, /kitchen/);
+});
+
+test('looking back changes nothing and saves nothing', () => {
+  const { app, saves } = afterThePause();
+  pick(app, 'doors');
+  const savedBefore = saves.length;
+  const stateBefore = JSON.stringify(app.saveState());
+  app.lookBack();
+  app.next();
+  pick(app, 'return');
+  assert.equal(saves.length, savedBefore);
+  assert.equal(JSON.stringify(app.saveState()), stateBefore);
+});
+
+test('the screens of the session are still there after a visit to the Menu', () => {
+  const { app } = afterThePause();
+  app.leave();
+  pick(app, 'play');
+  assert.equal(app.step().canLookBack, true);
+});
+
+test('a new session starts with nothing to look back at', () => {
+  const { app } = newApp();
+  pick(app, 'play');
+  playDay(app, 1);
+  pick(app, 'next');
+  assert.equal(app.step().command, 'Session 2.');
+  assert.notEqual(app.step().canLookBack, true);
+});
+
+test('looking back where it is not offered is a mistake, not a screen', () => {
+  const { app } = newApp();
+  assert.throws(() => app.lookBack());
 });

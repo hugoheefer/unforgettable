@@ -17,6 +17,7 @@ import { RefusedMove, choiceNotOffered } from './errors.js';
 import { named } from './names.js';
 
 const HINT_MARK = '★';
+const FIRST_SESSION = 1;
 
 const markOf = (hint) => (hint === 'hidden' ? undefined : HINT_MARK);
 const withMark = (choice, hint) => (markOf(hint) ? { ...choice, mark: markOf(hint) } : choice);
@@ -43,7 +44,8 @@ function sentenceOf(texts, chain, step) {
  */
 const MODES = {
   pause: {
-    context: () => [],
+    // the first session starts a new game; every later one goes on with the world as it was left
+    context: (flow, state) => [flow.texts.sessionNotes[state.number === FIRST_SESSION ? 'first' : 'later']],
     root: (flow, state) => ({ command: flow.texts.pauses[state.event.text]({ number: state.number }), choices: [] }),
   },
   tell: {

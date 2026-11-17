@@ -64,6 +64,10 @@ Every find records its steps and the shortest way; every put-away its steps. The
 
 Chains of events replace the events of story 2: six chains (come home, go out, coffee, present, pizza, call), everything starts on its home spot, silent chains with `letGo`, the check question without an answer from the app, "Something else first", things and props, the difficulty numbers in one settings object, the summary without what lies where; the hurry is gone. Also the fix for the screen that opened too high (not reproduced in Chromium, not checked on a real iPad). 629 tests. Not checked: a real iPad, dark mode, a reload in the middle of each new event kind in the browser (unit tests only). `play-flow.js` is 375 lines, over the 300 the project aims for: split it before it grows further.
 
+## Two corrections (2026-11-17, after the chains version)
+
+1. **Look back**: read-only screens of the session behind a quiet link (see CLAUDE.md for the tension with the silent chains). 2. **Sessions**: the app says "session" and every session opens with a note: a new game (everything in its home spot) or a game that goes on. 668 tests. Not checked: a real iPad, dark mode; the look-back log is lost on a reload.
+
 ## Next
 
 The decided plan to a usable version is in `plan.md` (2026-11-16): story 0 refactor, 0b texts ready for a second language, 1 the world persists, 2 days made of events, 3 find cost and day summary, 4 progress, 5 first use and choosing things, 6 bridge to real life, 7 putting things back, 8 hand-over. Build them in that order; move each to "Done" here when it is finished.

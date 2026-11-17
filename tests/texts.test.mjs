@@ -115,7 +115,7 @@ test('the command of a walk-to and of coming back are one general sentence built
 });
 
 test('the pause that opens a day has a text', () => {
-  assert.equal(TEXTS.pauses.day({ number: 4 }), 'Day 4.');
+  assert.equal(TEXTS.pauses.day({ number: 4 }), 'Session 4.');
 });
 
 // ---- the sentences of the chains ----
@@ -251,4 +251,19 @@ test('the labels of the tell, the check and Something else first are the ones of
 test('the choices that name a thing carry its icon and name', () => {
   assert.equal(TEXTS.putMineAway({ thing: keys }), 'Put my 🔑 keys away');
   assert.equal(TEXTS.forgotOption({ thing: keys }), '🔑 keys');
+});
+
+// ---- sessions and looking back ----
+
+test('the app says "session", and the opening pause has a note for a new game and one for a game that goes on', () => {
+  assert.equal(TEXTS.startDay({ number: 2 }), 'Start session 2');
+  assert.equal(TEXTS.continueDay({ number: 2 }), 'Continue session 2');
+  assert.equal(TEXTS.dayDone({ number: 2 }), 'Session 2 is done.');
+  assert.deepEqual(Object.keys(TEXTS.sessionNotes), ['first', 'later']);
+});
+
+test('looking back has its link, its note, its three choices and the line that says what was chosen', () => {
+  for (const key of ['lookBack', 'lookBackNote', 'lookBackEarlier', 'lookBackLater', 'lookBackReturn']) assert.ok(TEXTS[key].length > 0, key);
+  assert.equal(TEXTS.lookBackCommand({ command: 'Where?', picked: 'Here' }), 'Where? You chose: Here.');
+  assert.equal(TEXTS.lookBackCommand({ command: 'Session 1.', picked: null }), 'Session 1.');
 });

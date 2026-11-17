@@ -7,18 +7,27 @@ function el(tag, className, text) {
   return node;
 }
 
+/** A small underlined link at the top of a screen, quiet so that it does not draw the eye from the command. */
+function quietLink(text, onClick) {
+  const link = el('button', 'menu-link', text);
+  link.type = 'button';
+  link.addEventListener('click', onClick);
+  return link;
+}
+
 /**
- * @param {{ lead: string[], command: string, choices: { id: string, label: string, mark?: string }[], selected: string | null, canLeave?: boolean }} step
- * @param {{ onChoose: (id: string) => void, onNext: () => void, onLeave: () => void }} handlers
- * @param {{ next: string, menu: string }} texts
+ * @param {{ lead: string[], command: string, choices: { id: string, label: string, mark?: string }[], selected: string | null,
+ *           canLeave?: boolean, canLookBack?: boolean }} step
+ * @param {{ onChoose: (id: string) => void, onNext: () => void, onLeave: () => void, onLookBack: () => void }} handlers
+ * @param {{ next: string, menu: string, lookBack: string }} texts
  */
-export function renderStep(step, { onChoose, onNext, onLeave }, texts) {
+export function renderStep(step, { onChoose, onNext, onLeave, onLookBack }, texts) {
   const screen = el('section', 'screen');
   if (step.canLeave) {
-    const menu = el('button', 'menu-link', texts.menu);
-    menu.type = 'button';
-    menu.addEventListener('click', onLeave);
-    screen.append(menu);
+    const links = el('div', 'top-links');
+    links.append(quietLink(texts.menu, onLeave));
+    if (step.canLookBack) links.append(quietLink(texts.lookBack, onLookBack));
+    screen.append(links);
   }
   if (step.lead.length > 0) {
     const lead = el('div', 'lead');

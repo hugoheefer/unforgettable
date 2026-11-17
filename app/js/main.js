@@ -51,6 +51,10 @@ function showScreen() {
       flow.leave();
       showScreen();
     },
+    onLookBack: () => {
+      flow.lookBack();
+      showScreen();
+    },
   }, texts);
   app.replaceChildren(screen);
   const command = screen.querySelector('.command');
