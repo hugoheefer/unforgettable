@@ -7,7 +7,7 @@ import { AppFlow } from './app-flow.js';
 import { createSaveStore } from './save-store.js';
 import { createRandomSource } from './random-source.js';
 import { createClock } from './clock.js';
-import { renderStep } from './screens.js';
+import { renderStep, updateSelection } from './screens.js';
 import { textsFor } from './texts.js';
 
 const app = document.getElementById('app');
@@ -33,23 +33,30 @@ const flow = new AppFlow({
   },
 });
 
-function render() {
-  app.replaceChildren(renderStep(flow.step(), {
+let screen = null;
+
+/** Draws the current screen. A new screen starts at the top and the command gets the focus (Safari, screen readers). */
+function showScreen() {
+  screen = renderStep(flow.step(), {
     onChoose: (id) => {
       flow.choose(id);
-      render();
+      updateSelection(screen, flow.step());
     },
     onNext: () => {
       flow.next();
-      render();
-      window.scrollTo(0, 0);
+      showScreen();
     },
     onLeave: () => {
       flow.leave();
-      render();
-      window.scrollTo(0, 0);
+      showScreen();
     },
-  }, texts));
+  }, texts);
+  app.replaceChildren(screen);
+  const command = screen.querySelector('.command');
+  requestAnimationFrame(() => {
+    window.scrollTo(0, 0);
+    command.focus({ preventScroll: true });
+  });
 }
 
-render();
+showScreen();
