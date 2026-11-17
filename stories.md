@@ -557,6 +557,57 @@ Story 4 (progress) and 5 (introduction, choosing things) stay. Story 6 (real-lif
 
 ---
 
+## Story 3c: a natural flow from story to story
+
+Written 2026-11-17 after the user played the sessions version: "after a few steps the steps seem less logical, less natural, not mimicking the flow of daily life any more." The planning model played three sessions by script and read every screen (`flowstudy/play.mjs` in the scratchpad). What breaks the flow:
+
+1. **Jumps between stories.** "You take off your shoes." (hallway) is followed by "(You are in the living room.) Somewhere your phone rings.": the pizza and call stories start with a `move` that puts the player in another room without a reason.
+2. **Walking back and forth without a reason.** In `present` the player fetches the scissors in the kitchen, is sent back to the dining room to wrap (natural), walks to the kitchen to put the scissors back (natural), finds the phone there for "what time does the party start?" and is then sent back to the dining room only to hear "The party starts at eight.", then to the kitchen again to put the phone back, then back again for the paper: two of the walks have no reason in life.
+3. **The same question after every story.** Three times "Is everything back in its place?" in one session is a ritual cue, and a check right after a silent story finds the gap at once, before any time has passed.
+4. **"You come home and stand at your front door."** is followed by "You are in the garden."
+
+**The user's graph idea.** The game already is a graph: every screen is a node, every choice an edge, and the state (where everything lies, the events of the session, the screens left for looking back) is stored. What made it feel unnatural were the edges *between* stories: they were jumps. Decision: no separate graph engine (it would add a second model of the same flow); three rules keep every edge natural, and each is a contract test on every chain, so a new chain cannot break them.
+
+### Rules
+
+1. **A story after the opener starts where the player is.** Only an opener (the first story of a session) may start with a `move`: it sets the scene of the session. `pizza` and `call` lose their `start` step; their first step is a `tell` that happens wherever the player is ("The doorbell rings: your pizza is here.", "Somewhere your phone rings.").
+2. **A step is tied to a room only when the story needs the place.** A `tell` gets an optional `at: <roomId>`; a prop's `take` and `putBack` (told) take `at` too. Only an event with a room asks the player back ("Go back to the dining room.") when they walked off; a tell without `at` happens wherever the player is. A `move` inside a story stays (the call that ends in the garden is the story). The `at` of each step:
+
+| Chain | Step | at |
+|---|---|---|
+| come-home | shoes | hall |
+| go-out | bag | hall |
+| go-out | done | kitchen |
+| coffee | pack, open, tin, fill, tin-back | kitchen |
+| coffee | drink | living |
+| present | paper, wrap, paper-back | dining |
+| present | call | (none: it happens where the phone is) |
+| present | ready | hall |
+| pizza | pay | hall |
+| pizza | eat | dining |
+| call | sit | living |
+
+3. **One check per session, at its end.** No chain ends with a `check` any more: `coffee.drink`, `present.ready`, `pizza.eat`, `call.sit` and `go-out.done` become `tell` steps with the same sentence. A new closing chain `evening` (`closer: true`, file `chains/evening.js`) ends every session: a `tell` "It is evening." and the `check` with the lead "Before you go to bed, you look around once more." The day plan becomes: pause, opener, other chains, closer. The check event has no room (it is a thought; it never asks the player back).
+4. **The front door.** The outside place keeps its id `garden`; its texts become "Front garden", "in the front garden", "to the front garden", so the opener reads "You come home and stand at your front door." … "You are in the front garden."
+
+### Engine
+
+- `STEP_KINDS.tell.expand` gives the event `roomId: step.at ?? null`; the told `take` and `putBack` likewise. `check` events have `roomId: null`. `EVENT_KINDS` accept `roomId: null` for `tell` and `check` (and still refuse an unknown room). `Day.returnTo()` only for an event with a room.
+- `day-plan.js`: the closer is added after the other chains; it is never silent (it has no put-backs; the contract makes sure). `DEFAULT_RULES` is unchanged (`otherChains` counts the chains between opener and closer).
+- Contract tests (`tests/chain-contract.mjs` / `chains.test.mjs`): a chain that is not an opener never starts with a `move`; `at` names a room; exactly one chain is a closer; a `check` appears only in the closer; the closer has no `take` or `putBack`.
+
+### Tests (red first; one behaviour each)
+
+- chains: the five contract rules above; `pizza` and `call` start with a tell; every step listed in the table has its `at`.
+- day-plan: a session ends with the closer's events; the closer is never silent, also with `silentChance: 1`; a session has exactly one check.
+- day / event-kinds: a tell without a room never asks the player back, also when they walked to another room; a tell with `at` asks them back; a check never asks back; a saved day standing on a tell or check with `roomId: null` can be continued; an unknown room cannot.
+- play-flow / app-flow (real chains through the screens, with a fixed random): the first screen of `pizza` after another story has no "You are in the living room." line; in `present`, after fetching the phone from the kitchen, "The party starts at eight." is shown in the kitchen and the phone is put back there without a single "Go back to" screen in between; the session ends with "It is evening." and the check; a well-played session of come-home, coffee and present shows "Go back to" at most twice (counted over all its screens).
+- texts: the front-garden forms; the evening sentences; no sentence for a removed step.
+- Mutation checks: let a tell without `at` still ask the player back (the present test fails); let the day plan forget the closer.
+- Browser: play two sessions at 390x800 and read every screen once more for jumps (the transcript script in the scratchpad may be reused); report any screen that still reads like a jump.
+
+---
+
 ## Story 4: progress in the player's own numbers (revisit)
 
 **Screen**, reached from the start screen with ( My progress ):
