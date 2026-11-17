@@ -56,6 +56,10 @@ Days made of events replace the round: `things.js` (catalogue), `scenario.js` (e
 
 Every find records its steps and the shortest way; every put-away its steps. The end of a day is a summary: what is on its home spot tonight, what is elsewhere and where, steps spent searching against going straight, steps spent putting away, one line of advice, and "come back tomorrow" when a second day is finished on the same date. 453 tests. Not reached in the browser: the costly and the no-search summaries (unit tests only). **Now the user plays a few days before story 4.**
 
+## Findings of the user after stories 0 to 3 (2026-11-17, iPad)
+
+1. A screen sometimes opens with its top above the edge of the screen. 2. The game is not natural: it starts by putting away things that should be in their place, and it always tells you to put a thing away. Decided: story 3b in `stories.md` (chains of events, sometimes silent about one thing, a check question the app never answers).
+
 ## Next
 
 The decided plan to a usable version is in `plan.md` (2026-11-16): story 0 refactor, 0b texts ready for a second language, 1 the world persists, 2 days made of events, 3 find cost and day summary, 4 progress, 5 first use and choosing things, 6 bridge to real life, 7 putting things back, 8 hand-over. Build them in that order; move each to "Done" here when it is finished.

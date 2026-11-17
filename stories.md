@@ -1,6 +1,6 @@
 # User stories in detail
 
-Written 2026-11-16. `plan.md` says why and in which order; this file says exactly what each story contains. Stories 0 to 3 (the new core) are complete: build them as written. Stories 4 to 8 are detailed to screens and rules and are marked **revisit**: the user plays the core first and their findings may change them.
+Written 2026-11-16. `plan.md` says why and in which order; this file says exactly what each story contains. Stories 0 to 3 are built. **Story 3b (chains of events) is next and replaces the events of story 2**: where 3b and an earlier story differ, 3b wins. Stories 4 to 8 are detailed to screens and rules and are marked **revisit**: the user plays the core first and their findings may change them.
 
 Screen notation: `lead` lines are the small grey lines, **command** is the big line, `( )` are choices, `[Next]` is always there. `{…}` is filled in.
 
@@ -304,6 +304,256 @@ Below the choices, as the last lead line when the day was started on the same da
 **Mutation checks.** Let `shortest` forget the +1 for looking. Let the summary add up all days.
 
 **After this story: mirror to the preview and stop. The user plays several days before story 4 is started.**
+
+---
+
+## Story 3b: chains of events (replaces the events of story 2)
+
+Written 2026-11-17 after the user played days 1 and 2 on an iPad. Build this before story 4.
+
+**The user's findings.**
+1. From some moment on a screen opens with its top above the edge of the iPad's screen; you have to pull it down to read the top.
+2. The game does not feel natural. It starts by making you put away things that should already be in their place, and it always *tells* you to put a thing away. In real life nobody tells you, and that is when things get lost.
+
+**The user's design, decided.**
+- **Everything starts in its place.** A new game begins with every thing on its home spot; nothing has to be put away before something has happened.
+- **A day is two or three chains of events**: small stories in which you do ordinary things with several objects, one after the other ("take the coffee from the cupboard", "open the pack with the scissors", ...).
+- **Sometimes the app stays silent about one thing.** In a *guided* chain the app says "put your scissors back". In a *silent* chain it says nothing about one of the things; if the player does not think of it, the thing stays where it was used. About half of the chains are silent.
+- **Later the app asks: "Is everything back in its place?"** The player answers "Yes" or "No, I forgot something". **The app never says whether the answer was right** (user decision): the player finds out the next time the thing is needed and is not in its place.
+- **Objects that are not trained are only told** (the coffee, the tin). The code must make it easy to turn such an object into a tracked thing later.
+- **Chains are easy to add and change.** Decision: one small JavaScript data module per chain, not YAML (a static page without dependencies has no YAML reader, and a module can be checked by a test) and not free code (a chain is data; the behaviour of each kind of step lives in one table). Adding a chain is one file, its texts, and one row in the list of chains.
+
+### 0. The screen that opens too high (fix first, own commit)
+
+`main.js` rebuilds the whole screen on every tap of a choice and calls `window.scrollTo(0, 0)` only after Next. Suspected cause: after a long list (the walk list has 13 choices) the page is scrolled and the next, shorter screen is drawn while Safari keeps its offset. Not yet reproduced.
+- Reproduce in Chromium at 820x1180 and 390x800: open the walk list, scroll to the last room, choose it, Next; measure `window.scrollY` and the top of `.command`.
+- Decided fix, whether or not it reproduces: choosing a choice no longer rebuilds the screen (only `aria-checked` of the choices and the disabled state of Next change, so the scroll position cannot jump while choosing); after Next and after Menu the new screen is drawn and then scrolled to the top in the next animation frame, and the command gets focus (`tabindex="-1"`, no outline) so a screen reader and Safari both land on it.
+- Pure part, test first: `screens.js` gets `updateSelection(screenElement, step)`; a test with a tiny fake element tree is not worth it here, so this part is verified in the browser: after the walk list, `scrollY` is 0 and the command is inside the viewport, at both sizes. Say in the report that a real iPad was not available.
+
+### 1. Words
+
+- **Thing**: an object the player trains with; it is in the catalogue, chosen, and has a place in the world.
+- **Prop**: any other object of a story. A chain names every object by id; an id that is not a chosen thing is a prop. Making a prop a thing is adding it to the catalogue (and choosing it): the chain does not change.
+- **Chain**: a list of steps. **Step kinds** (one table, `STEP_KINDS`; a new kind is a new row):
+
+| Kind | In the chain file | For a thing | For a prop |
+|---|---|---|---|
+| `tell` | `{ id, kind: 'tell' }` | a screen with one sentence and Next | same |
+| `move` | `{ id, kind: 'move', roomId }` | the story puts you in a room (no screen; its sentence is the first lead line of the next screen) | same |
+| `goTo` | `{ id, kind: 'goTo', roomId }` | "Go to the kitchen": the player walks there | same |
+| `take` | `{ id, kind: 'take', object, leftAt }` | "You need your scissors. Where are they?": the player finds the thing; it is then in hand. Already in hand: nothing to do | a `tell` screen with the step's sentence |
+| `putBack` | `{ id, kind: 'putBack', object }` | "Put your scissors back.": the player puts it away, anywhere. Left out of a silent run | a `tell` screen with the step's sentence |
+| `check` | `{ id, kind: 'check' }` | "Is everything back in its place?" | same |
+
+`leftAt` is the spot where a thing stays when nobody puts it back (the worktop for the scissors of the coffee chain). It is required for a `take` of an object that is in the catalogue.
+
+### 2. Rules
+
+**Start.** A new game: the world holds every chosen thing on its home spot, the coat is worn. While no day has been started, changing a home spot moves the thing with it; after that a thing stays where it is. A chosen thing that is nowhere (a thing added later, a damaged save) is put on its home spot at the start of the next day, silently. The "come home with everything in hand" start of story 2 is gone.
+
+**Building a day** (`day-plan.js`, pure; replaces `scenario.js`). A day is `pause 'day'`, one opener, then two other chains.
+- Openers have `opener: true` and may name things that must be on the person (`needsOnPerson`: in hand or in a pocket of a worn garment). Only chosen things count. The opener is picked at random from those whose need is met; `go-out` needs nothing, so there is always one.
+- The two other chains are picked at random from the rest, different from each other, preferring chains not played the day before (the save remembers the ids of yesterday's chains).
+- A chain that has at least one `putBack` of a chosen thing is silent with a chance of 1 in 2: one of those things is picked and its `putBack` step is left out. The opener of the very first day is never silent.
+- The steps are expanded into the flat list of events of the day by the `expand` function of each kind in `STEP_KINDS`. Every event carries `chain` and `step` (for its text), and a `tell`, `goTo` and `check` carry `roomId`: the room where the story stands at that point.
+- **Letting go.** Before every `move` and `goTo` of a chain that comes after a `take`, and at the end of every chain, a `letGo` event is added. It has no screen: every thing still in hand is laid on its `leftAt` spot, without a word. Its streak goes to 0 and a record is kept (see history).
+
+**Event kinds** (`EVENT_KINDS` in `day.js`; the kinds of story 2 that remain are `pause`, `moveTo`, `find`, `putAway`):
+- `find` (a `take` of a thing): done at once when the thing is in hand. It keeps `leftAt` for the thing in the day's state.
+- `goTo`: done when the player stands in `roomId`.
+- `check`: `answerCheck(true)` ends it. `answerCheck(false)` asks which thing; `forgot(thingId)` inserts a `find` and a `putAway` for that thing right after the check and ends the check. Nothing is said about whether the thing really was away.
+- `letGo`: as above, done at once.
+- A `pause`, `goTo` or `check` whose `roomId` is not the room where the player stands (they walked off to put something away) first asks the player to come back: `state().returnTo` names the room and only walking is possible.
+
+**Doing something else first.** On every screen of a day except a find, a put-away and "come back", there is one extra choice, always the same and always there: "Something else first". It leads to: "Put something away" (the things in hand; "You hold nothing." when there are none), "Take off my coat" / "Put my coat on", and "Go on". Putting a thing away on your own works exactly like a guided put-away (here, a pocket, or walk somewhere first). What is in hand is **not** shown anywhere else: a line "In your hand: scissors" on every screen would be the reminder the silent chain is meant to leave out.
+`Day` therefore allows `walkTo`, `putDown(spotId, thingId)`, `putInPocket(garmentId, pocketId, thingId)`, `takeOff` and `putOn` during a `pause`, `goTo` and `check` as well; in a `putAway` event the thing defaults to the event's.
+
+**Hurry is removed** (the rule, the reasons, the texts, the streak excuse, `hurry` in records): the special moment of a day is now the silent chain. It can come back later as a property of a chain.
+
+**Streak.** Put on its home spot: +1. Put anywhere else, or let go: 0.
+
+**History and summary.**
+- Find record as it is. Put record becomes `{ day, thingId, steps, atHome, left }`; `left` is true for a thing that was let go (steps 0).
+- The summary must not give away what lies where (the player has to discover it): the lines "On the home spot tonight" and "Somewhere else", and the advice rows `allHome` and `someAway`, are removed. It keeps: the searching line (or "Nothing to search for today."), the putting-away line, one advice line, and the come-back-tomorrow line. Advice rows, first match wins: `noSearch`; `costly` (searched more than twice the straight way) "Most of today's steps went into searching. A fixed place costs a few steps once."; `straight` (everything else) "You went straight to your things. That is what a fixed place gives you."
+
+**Default home spots** change to the user's own examples: keys in the right pocket of the coat, scissors in the kitchen drawer. Wallet (inside pocket of the coat) and phone (kitchen worktop) stay. The spot `counter` is called "Worktop" ("on the worktop").
+
+### 3. Screens
+
+Lead lines stay chronological: feedback of the last action, then the sentence of a `move`, then the step's own lead.
+
+`tell` (and a prop's `take` or `putBack`):
+
+```
+Menu
+**Take a pack of coffee from the top right cupboard.**
+( Go on )
+( Something else first )
+[Next]
+```
+
+`goTo`:
+
+```
+Menu
+**Go to the kitchen.**                     the chain's own sentence for the step, e.g. "You feel like coffee. Go to the kitchen."
+( Walk to another room )
+( Something else first )
+[Next]
+```
+"Walk to another room" gives the walk list of story 2. Arriving in another room than asked repeats the command. Come back: "**Go back to the kitchen.**" with only ( Walk to another room ).
+
+`take` of a thing (the find screens of story 2, new command):
+
+```
+Menu
+Open the pack with the scissors.                         the step's sentence
+**You need your ✂️ scissors. Where are they? You are in the kitchen.**
+( Look here, in the kitchen )
+( Look in a pocket )
+( Walk to another room )
+[Next]
+```
+Found: "Found your ✂️ scissors in the kitchen drawer. 1 step." as before.
+
+`putBack` of a thing (the put-away screens of story 2, new command):
+
+```
+Menu
+**You are in the kitchen. Put your ✂️ scissors back.**
+( Here, in the kitchen )
+( In a pocket )
+( Walk to another room )
+( Take off my coat )
+[Next]
+```
+The plan line and the star follow the hint level as before.
+
+`check`:
+
+```
+Menu
+You drink your coffee in the living room.               the step's sentence
+**Is everything back in its place?**
+( Yes, everything )
+( No, I forgot something )
+( Something else first )
+[Next]
+```
+"No" gives "**What did you forget?**" with every chosen thing (icon and name) and ( Choose something else ). Then the find and the put-away of that thing follow, with their normal screens. After "Yes" the story goes on with no comment.
+
+"Something else first":
+
+```
+**What do you want to do first?**
+( Put my ✂️ scissors away )               one per thing in hand; with nothing in hand the lead says "You hold nothing."
+( Take off my coat )
+( Go on )
+[Next]
+```
+
+### 4. The first chains
+
+Files `app/js/chains/<id>.js`, list in `app/js/chains.js`. Sentences go in `en.js` under `chains.<chain>.<step>`. Rooms: the garden is "outside, at the front door" for the openers.
+
+**`come-home`** (opener, `needsOnPerson: ['keys']`)
+
+| Step | Kind | Data | Sentence |
+|---|---|---|---|
+| `door` | move | garden | "You come home and stand at your front door." |
+| `keys` | take | keys, leftAt hall `console` | "You need your keys to get in." |
+| `inside` | move | hall | "You open the door. You are inside." |
+| `keys-back` | putBack | keys | (none: the put-back command is enough) |
+| `shoes` | tell | | "You take off your shoes." |
+
+**`go-out`** (opener, needs nothing)
+
+| Step | Kind | Data | Sentence |
+|---|---|---|---|
+| `plan` | tell | (room hall, by a `move` first: `start`, hall, "You are in the hallway.") | "You are going out for some shopping." |
+| `keys` | take | keys, leftAt hall `console` | "You cannot leave without your keys." |
+| `away` | tell | | "You lock the door. An hour later you are back with a full bag." |
+| `inside` | move | hall | "You open the door. You are inside." |
+| `bag` | tell | | "You put the shopping bag down." |
+| `keys-back` | putBack | keys | |
+| `unpack` | goTo | kitchen | "Bring the shopping to the kitchen." |
+| `done` | check | | "Everything is unpacked." |
+
+**`coffee`**
+
+| Step | Kind | Data | Sentence |
+|---|---|---|---|
+| `go` | goTo | kitchen | "You feel like coffee. Go to the kitchen." |
+| `pack` | take | `coffee-pack` (prop) | "Take a new pack of coffee from the top right cupboard." |
+| `scissors` | take | scissors, leftAt kitchen `counter` | "The pack has to be cut open." |
+| `open` | tell | | "You cut the pack open." |
+| `scissors-back` | putBack | scissors | |
+| `tin` | take | `coffee-tin` (prop) | "Take the tin with the flowers from the worktop." |
+| `fill` | tell | | "You pour the coffee into the tin and make a pot of filter coffee." |
+| `tin-back` | putBack | `coffee-tin` (prop) | "You put the lid on the tin and put the tin back in the cupboard." |
+| `sit` | goTo | living | "Take your coffee to the living room." |
+| `drink` | check | | "You sit down and drink your coffee." |
+
+**`present`**
+
+| Step | Kind | Data | Sentence |
+|---|---|---|---|
+| `go` | goTo | dining | "A birthday present has to be wrapped. Go to the dining room." |
+| `paper` | take | `wrapping-paper` (prop) | "Take the wrapping paper from the sideboard." |
+| `scissors` | take | scissors, leftAt dining `dining-table` | "The paper has to be cut." |
+| `wrap` | tell | | "You cut the paper and wrap the present." |
+| `scissors-back` | putBack | scissors | |
+| `phone` | take | phone, leftAt dining `dining-table` | "You want to ask what time the party starts." |
+| `call` | tell | | "The party starts at eight." |
+| `phone-back` | putBack | phone | |
+| `paper-back` | putBack | `wrapping-paper` (prop) | "You put the rest of the paper back in the sideboard." |
+| `hall` | goTo | hall | "Put the present ready in the hallway." |
+| `ready` | check | | "The present stands ready by the door." |
+
+**`pizza`**
+
+| Step | Kind | Data | Sentence |
+|---|---|---|---|
+| `bell` | tell | (after `move` `start`, living, "You are in the living room.") | "The doorbell rings: your pizza is here." |
+| `go` | goTo | hall | "Go to the front door." |
+| `wallet` | take | wallet, leftAt hall `console` | "The pizza has to be paid." |
+| `pay` | tell | | "You pay and take the pizza." |
+| `wallet-back` | putBack | wallet | |
+| `table` | goTo | dining | "Bring the pizza to the dining room." |
+| `eat` | check | | "The pizza is on the table." |
+
+**`call`**
+
+| Step | Kind | Data | Sentence |
+|---|---|---|---|
+| `ring` | tell | (after `move` `start`, living, "You are in the living room.") | "Somewhere your phone rings." |
+| `phone` | take | phone, leftAt garden `garden-table` | "You want to answer it." |
+| `walk` | move | garden | "You talk and walk around. The call ends in the garden." |
+| `phone-back` | putBack | phone | |
+| `in` | goTo | living | "It gets chilly. Go back to the living room." |
+| `sit` | check | | "You sit down on the sofa." |
+
+Note for `call`: the thing is still in hand after the `move` to the garden (the `letGo` before that move must not take a thing that the same chain puts back later in the new room). Rule: a `letGo` lays down only the things whose `take` has no `putBack` left in the rest of the chain's events, that is, the silent thing and the things of a chain that has ended.
+
+### 5. Tests (red first; one behaviour each)
+
+`chains.test.mjs` (a contract for every chain in the list, so a new chain is checked on arrival): ids unique; every step has a known kind and the fields of that kind; every room and spot exists; every `take` of a catalogue object has a `leftAt`; every `putBack` has an earlier `take` of the same object; every step that needs a sentence has one in every language and no sentence is without a step; a chain ends with nothing a later chain would need in hand; at most one opener needs nothing... (at least one opener needs nothing).
+
+`day-plan.test.mjs`: a day is a pause, an opener and two other chains; the opener's need is respected (keys in the worn coat: `come-home` can be picked; keys on the hook: only `go-out`); a need for a thing that is not chosen does not block; two different chains, not yesterday's when there are enough; a silent chain misses exactly one `putBack`, of a chosen thing; chance 0 gives no silent chain and chance 1 makes every chain with a chosen put-back silent, except the first day's opener; a prop's `take` and `putBack` become `tell` events and the same step for a chosen thing becomes a find or a put-away (one catalogue, with and without the coffee tin as a thing: the proof that a prop becomes a thing without touching the chain); a `letGo` stands before each move or walk after a take and at the end of the chain; the events survive JSON.
+
+`day.test.mjs` (additions and changes): a new game has every thing on its home spot; a thing that is nowhere is on its home spot when the next day starts; a find for a thing in hand is done at once; `goTo` ends on arrival and not before; in a silent chain the thing lies on its `leftAt` spot after the chain and its streak is 0; in a guided chain nothing is let go; the thing of the `call` chain is still in hand in the garden; putting a thing away on your own during a `tell`, a `goTo` and a `check` works and counts for the streak; after walking off, the story asks you back and refuses everything but walking; `answerCheck(true)` goes on and changes nothing; `forgot(thing)` adds a find and a put-away for it, also when it lies on its home spot; a day in the middle of each new kind survives save and restore; `canContinue` refuses a broken event of each new kind; all hurry tests are removed with the rule.
+
+`play-flow.test.mjs`: each screen of section 3 word for word; "Something else first" is on `tell`, `goTo` and `check` screens and not on find, put-away and come-back screens; nothing on a normal screen names what is in hand; the things in hand are listed under "Put something away"; the check says nothing after "Yes", also when a thing lies on the worktop; the flow contract.
+
+`history`, `summary`, `app-flow`, `save`, `texts`: `left` replaces `hurry`; the summary has no home or away line; the new advice table; yesterday's chain ids are saved and validated; a new game's world is filled from the plan; changing a home spot before the first day moves the thing and after it does not.
+
+Mutation checks (two): let `letGo` do nothing (the silent-chain test must fail); let the check say something after a wrong "Yes" (the test "the check says nothing" must fail).
+
+**Look at it.** Playwright at 390x800 and 820x1180: play day 1 and day 2 with a fixed random that makes `coffee` silent on day 1; do not put the scissors back, answer "Yes", and on day 2 play `present`: the scissors are searched for and found on the worktop. Screenshots of a tell screen, the check, "Something else first" and the day-2 summary, looked at.
+
+### 6. What this does to the later stories
+
+Story 4 (progress) and 5 (introduction, choosing things) stay. Story 6 (real-life question) stays. Story 7 (tidy up, say it out loud) is covered by the check and by "Something else first" and is dropped; "say it out loud" may return as a sentence. The uses table of the catalogue is replaced by chains: each of the sixteen things needs at least one chain before story 5 offers it.
 
 ---
 

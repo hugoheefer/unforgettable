@@ -45,6 +45,7 @@ Written out in `stories.md` (screens, rules, texts, tests, the catalogue of sixt
 | 1 | The world can be saved and restored; save format version 2 |
 | 2 | Days made of events: things are used, put away, needed again; steps; hurry |
 | 3 | What a find cost, and the day summary. **Then the user plays.** |
+| 3b | Chains of events: everything starts in its place, small stories with several objects, sometimes silent about one thing, "Is everything back in its place?" with no answer from the app. Replaces the events of story 2 (user findings 2026-11-17) |
 | 4 | My progress |
 | 5 | Introduction, choosing things, suggested home spots, start again |
 | 6 | If-then cards and the daily real-life question |
