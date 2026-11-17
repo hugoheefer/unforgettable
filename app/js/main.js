@@ -8,13 +8,14 @@ import { AppFlow } from './app-flow.js';
 import { createSaveStore } from './save-store.js';
 import { createRandomSource } from './random-source.js';
 import { createClock } from './clock.js';
+import { emptyProgress } from './habit.js';
 import { renderStep, updateSelection } from './screens.js';
 import { textsFor } from './texts.js';
 
 const app = document.getElementById('app');
 const world = new World(LAYOUT);
 const store = createSaveStore(() => window.localStorage, {
-  defaults: { plan: defaultPlan(), progress: { streaks: {} }, things: THINGS.map((thing) => thing.id), chainIds: CHAINS.map((chain) => chain.id) },
+  defaults: { plan: defaultPlan(), progress: emptyProgress(), things: THINGS.map((thing) => thing.id), chainIds: CHAINS.map((chain) => chain.id) },
   world: { hasLocation: (location) => world.hasLocation(location), restore: (snapshot) => World.restore(LAYOUT, snapshot) },
 });
 

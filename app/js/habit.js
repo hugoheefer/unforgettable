@@ -3,6 +3,9 @@
 const DIMMED_FROM_STREAK = 2;
 const HIDDEN_FROM_STREAK = 4;
 
+/** Progress of a new game: no streaks. */
+export const emptyProgress = () => ({ streaks: {} });
+
 export const streakOf = (progress, itemId) => progress.streaks[itemId] ?? 0;
 
 /** Returns new progress: the streak grows when the item went to its home spot and restarts otherwise. */

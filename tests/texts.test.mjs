@@ -267,3 +267,17 @@ test('looking back has its link, its note, its three choices and the line that s
   assert.equal(TEXTS.lookBackCommand({ command: 'Where?', picked: 'Here' }), 'Where? You chose: Here.');
   assert.equal(TEXTS.lookBackCommand({ command: 'Session 1.', picked: null }), 'Session 1.');
 });
+
+// ---- starting again and the list of home spots ----
+
+test('starting again has its choice, its question and its two answers', () => {
+  for (const key of ['startAgain', 'startAgainCommand', 'yesErase', 'noKeep']) assert.ok(TEXTS[key].length > 0, key);
+});
+
+test('the list of home spots has its question, its way out and the words for a thing and for a change', () => {
+  assert.ok(TEXTS.whichThing.length > 0);
+  assert.ok(TEXTS.setupDone.length > 0);
+  const thing = { icon: '🔑', name: 'keys' };
+  assert.equal(TEXTS.thingHome({ thing, where: 'on the hook' }), '🔑 keys: on the hook');
+  assert.equal(TEXTS.homeSet({ thing, where: 'on the hook' }), '✔ Home spot of your 🔑 keys: on the hook.');
+});

@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { findsOfDay, putsOfDay, recordFind, recordPut, validHistory } from '../app/js/history.js';
+import { emptyHistory, findsOfDay, putsOfDay, recordFind, recordPut, validHistory } from '../app/js/history.js';
 
 const EMPTY = { finds: [], puts: [] };
 const found = (day, thingId = 'keys', steps = 1, shortest = 1, wasHome = true) => ({ day, thingId, steps, shortest, wasHome });
@@ -137,4 +137,9 @@ test('a loaded history keeps only the last 300 records of each kind', () => {
   const loaded = validHistory({ finds, puts: [] });
   assert.equal(loaded.finds.length, 300);
   assert.equal(loaded.finds[0].day, 51);
+});
+
+test('a new history is empty, and each call gives a history of its own', () => {
+  assert.deepEqual(emptyHistory(), { finds: [], puts: [] });
+  assert.notEqual(emptyHistory(), emptyHistory());
 });

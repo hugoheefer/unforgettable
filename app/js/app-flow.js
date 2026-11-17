@@ -6,7 +6,8 @@ import { PlayFlow } from './play-flow.js';
 import { SetupFlow } from './setup-flow.js';
 import { World } from './world.js';
 import { choiceNotOffered, lookBackUnavailable } from './errors.js';
-import { recordFind, recordPut } from './history.js';
+import { emptyHistory, recordFind, recordPut } from './history.js';
+import { emptyProgress } from './habit.js';
 import { summarize } from './summary.js';
 import { chainIdsOf } from './day-plan.js';
 import { createScreenLog } from './screen-log.js';
@@ -84,15 +85,46 @@ export class AppFlow {
   welcome() {
     const { texts } = this;
     const play = this.day ? texts.continueDay({ number: this.day.state().number }) : texts.startDay({ number: this.dayCount + 1 });
+    // a new game has nothing to erase, so it offers no way to start again
+    const choices = [
+      { id: 'play', label: play },
+      { id: 'setup', label: texts.chooseHomeSpots },
+      ...(this.started ? [{ id: 'reset', label: texts.startAgain }] : []),
+    ];
+    const opens = { play: () => this.startDay(), setup: () => this.startSetup(), reset: () => this.confirmReset() };
+    return new ChoiceScreen({ command: texts.welcome, choices }, (choice) => {
+      this.current = opens[choice]();
+    });
+  }
+
+  /** Starting again erases a lot: it is asked first, and says what stays. */
+  confirmReset() {
+    const { texts } = this;
+    const answers = { yes: () => this.resetGame(), no: () => this.welcome() };
     return new ChoiceScreen(
       {
-        command: texts.welcome,
-        choices: [{ id: 'play', label: play }, { id: 'setup', label: texts.chooseHomeSpots }],
+        command: texts.startAgainCommand,
+        choices: [{ id: 'yes', label: texts.yesErase }, { id: 'no', label: texts.noKeep }],
       },
       (choice) => {
-        this.current = choice === 'play' ? this.startDay() : this.startSetup();
+        this.current = answers[choice]();
       },
     );
+  }
+
+  /** A new game: sessions, streaks, history and the world are erased; the home spots stay, so every thing is on its home spot. */
+  resetGame() {
+    this.day = null;
+    this.dayCount = 0;
+    this.progress = emptyProgress();
+    this.history = emptyHistory();
+    this.lastDayFinishedOn = null;
+    this.yesterdayChains = [];
+    this.world = new World(this.layout);
+    this.started = false;
+    this.placeThingsOnPlan();
+    this.screens.clear();
+    return this.welcome();
   }
 
   startDay() {

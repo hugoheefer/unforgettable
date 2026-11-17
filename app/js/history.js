@@ -16,6 +16,9 @@ const isPut = (r) => isWholeNumber(r.day) && typeof r.thingId === 'string' && is
 const append = (list, record) => [...list, record].slice(-KEEP);
 const loaded = (list, isValid) => (Array.isArray(list) ? list.filter((r) => isObject(r) && isValid(r)).slice(-KEEP) : []);
 
+/** A history without a single record: the start of a new game. */
+export const emptyHistory = () => ({ finds: [], puts: [] });
+
 /** @param {{ finds: object[], puts: object[] }} history */
 export const recordFind = (history, record) => ({ ...history, finds: append(history.finds, record) });
 
@@ -28,5 +31,5 @@ export const putsOfDay = (history, day) => history.puts.filter((record) => recor
 
 /** A history from a save that may be damaged: whatever is not a well-formed record is dropped. */
 export function validHistory(value) {
-  return isObject(value) ? { finds: loaded(value.finds, isFind), puts: loaded(value.puts, isPut) } : { finds: [], puts: [] };
+  return isObject(value) ? { finds: loaded(value.finds, isFind), puts: loaded(value.puts, isPut) } : emptyHistory();
 }

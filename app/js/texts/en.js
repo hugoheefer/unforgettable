@@ -187,6 +187,11 @@ export const en = {
   menu: 'Menu',
   welcome: 'Unforgettable. Always put your things in the same place.',
   chooseHomeSpots: 'Choose my home spots',
+  // Starting again: the choice on the start screen, its question and its two answers.
+  startAgain: 'Start again',
+  startAgainCommand: 'Start again? This erases your sessions and your progress. Your home spots stay.',
+  yesErase: 'Yes, erase my progress',
+  noKeep: 'No, keep everything',
   // Looking back at the screens of the session (read only).
   lookBack: 'Look back',
   lookBackNote: 'You are looking back. Nothing you do here changes the game.',
@@ -253,6 +258,11 @@ export const en = {
   notHere: 'Not here.',
   notHereSee: ({ seen }) => `Not here. You see ${seen.join(' ')}.`,
 
+  // The list of home spots: one line per thing with where it lives now, and the way out.
+  whichThing: 'Which home spot do you want to change?',
+  setupDone: 'I am done',
+  thingHome: ({ thing, where }) => `${thing.icon} ${thing.name}: ${where}`,
+  homeSet: ({ thing, where }) => `✔ Home spot of your ${thing.icon} ${thing.name}: ${where}.`,
   whereToKeep: ({ thing }) => `Where do you want to always keep your ${thing.icon} ${thing.name}?`,
   whichPlace: ({ room }) => `Which place ${room.in}?`,
   whichPocket: ({ garment }) => `Which pocket of ${garment.your}?`,
