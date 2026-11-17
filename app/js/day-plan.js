@@ -88,7 +88,9 @@ function eventsOfChain(chain, { chosen, silentAllowed, random, rules }) {
 export function buildDay({ dayNumber, chains = CHAINS, things, onPerson = [], yesterday = [], random, rules = DEFAULT_RULES }) {
   const chosen = new Set(things.map((thing) => thing.id));
   const openers = chains.filter((chain) => canOpen(chain, chosen, onPerson));
-  const opener = openers.length > 0 ? random.pick(openers) : null;
+  // the very first day begins the way the game is introduced (at the front door), not with a random opener
+  const starter = dayNumber === FIRST_DAY ? openers.find((chain) => chain.startsTheGame === true) : undefined;
+  const opener = starter ?? (openers.length > 0 ? random.pick(openers) : null);
   const rest = chains.filter((chain) => chain.opener !== true);
   const fresh = rest.filter((chain) => !yesterday.includes(chain.id));
   const stale = rest.filter((chain) => yesterday.includes(chain.id));

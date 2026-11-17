@@ -310,3 +310,26 @@ test('two silent put-backs leave out only one in a chain that has one chosen thi
 test('one silent put-back leaves out one of two', () => {
   assert.equal(putAwaysOf(presentDay(chosen('scissors', 'phone'), DEFAULT_RULES), 'present').length, 1);
 });
+
+// ---- the very first day ----
+const lastPick = () => rand({ pick: (list) => list[list.length - 1] });
+const START = { ...NEEDS_KEYS, id: 'start', startsTheGame: true };
+
+test('the first day ever opens with the chain that starts the game, whatever the luck', () => {
+  const events = buildDay({ dayNumber: 1, chains: [START, OPEN, PLAIN], things: THINGS, onPerson: ['keys'], yesterday: [], random: lastPick() });
+  assert.equal(chainIdsOf(events)[0], 'start');
+});
+
+test('on a later day the opener is picked by luck again', () => {
+  const events = buildDay({ dayNumber: 2, chains: [START, OPEN, PLAIN], things: THINGS, onPerson: ['keys'], yesterday: [], random: lastPick() });
+  assert.equal(chainIdsOf(events)[0], 'open');
+});
+
+test('when the chain that starts the game cannot open, the first day opens with another opener', () => {
+  const events = buildDay({ dayNumber: 1, chains: [START, OPEN, PLAIN], things: THINGS, onPerson: [], yesterday: [], random: lastPick() });
+  assert.equal(chainIdsOf(events)[0], 'open');
+});
+
+test('the real game starts at the front door: come-home starts the game', () => {
+  assert.deepEqual(CHAINS.filter((chain) => chain.startsTheGame).map((chain) => chain.id), ['come-home']);
+});
