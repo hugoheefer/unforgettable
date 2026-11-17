@@ -54,7 +54,8 @@ Written out in `stories.md` (screens, rules, texts, tests, the catalogue of sixt
 
 ## Later, not part of "usable"
 
-Away from home (friend, library, the carry-along rule), a flat floor plan, a 3D view, sound. They stay in `todo.md`.
+- **Levels** (user idea, 2026-11-17): a new player starts in level 1, the easy one: short chains with one thing silently left out. Higher levels get longer chains and more silent gaps. To prepare without building it: the numbers that decide how hard a day is (how many chains, the chance that a chain is silent, how many things a chain is silent about) are one settings object given to the builder of a day, not constants spread through the code; a level is then one row in a table of such settings.
+- Away from home (friend, library, the carry-along rule), a flat floor plan, a 3D view, sound.
 
 ## Answered by the user (2026-11-16)
 
