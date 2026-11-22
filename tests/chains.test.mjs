@@ -13,13 +13,14 @@ const catalogueIds = new Set(THINGS.map((thing) => thing.id));
 const hasLocation = (location) => world.hasLocation(location);
 const counter = { placeId: 'kitchen', spotId: 'counter' };
 
-/** The facts of the seven chains, as the story writes them: id:kind:data@room of every step (`at` is the room a step is tied to). */
+/** The facts of the eight chains, as the story writes them: id:kind:data@room of every step (`at` is the room a step is tied to). */
 const STORY = {
   'come-home': ['door:move:garden', 'keys:take:keys', 'inside:move:hall', 'keys-back:putBack:keys', 'shoes:tell@hall'],
-  'go-out': ['start:move:hall', 'plan:tell', 'keys:take:keys', 'away:tell', 'inside:move:hall', 'bag:tell@hall', 'keys-back:putBack:keys', 'unpack:goTo:kitchen', 'done:tell@kitchen'],
+  'go-out': ['start:move:hall', 'plan:tell', 'keys:take:keys', 'wallet:take:wallet', 'away:tell', 'pay:tell', 'back:tell', 'inside:move:hall', 'bag:tell@hall', 'keys-back:putBack:keys', 'wallet-back:putBack:wallet', 'unpack:goTo:kitchen', 'done:tell@kitchen'],
+  morning: ['wake:move:bedroom', 'phone:take:phone', 'read:tell@bedroom', 'phone-back:putBack:phone', 'dress:tell@bedroom', 'breakfast:goTo:kitchen', 'eat:tell@kitchen'],
   coffee: ['go:goTo:kitchen', 'pack:take:coffee-pack@kitchen', 'scissors:take:scissors', 'open:tell@kitchen', 'scissors-back:putBack:scissors', 'tin:take:coffee-tin@kitchen', 'fill:tell@kitchen', 'tin-back:putBack:coffee-tin@kitchen', 'sit:goTo:living', 'drink:tell@living'],
   present: ['go:goTo:dining', 'paper:take:wrapping-paper@dining', 'scissors:take:scissors', 'wrap:tell@dining', 'scissors-back:putBack:scissors', 'phone:take:phone', 'call:tell', 'phone-back:putBack:phone', 'paper-back:putBack:wrapping-paper@dining', 'hall:goTo:hall', 'ready:tell@hall'],
-  pizza: ['bell:tell', 'go:goTo:hall', 'wallet:take:wallet', 'pay:tell@hall', 'wallet-back:putBack:wallet', 'table:goTo:dining', 'eat:tell@dining'],
+  pizza: ['hungry:goTo:living', 'phone:take:phone', 'ordered:tell@living', 'phone-back:putBack:phone', 'bell:tell', 'go:goTo:hall', 'wallet:take:wallet', 'pay:tell@hall', 'wallet-back:putBack:wallet', 'table:goTo:dining', 'eat:tell@dining'],
   call: ['ring:tell', 'phone:take:phone', 'walk:move:garden', 'phone-back:putBack:phone', 'in:goTo:living', 'sit:tell@living'],
   evening: ['dusk:tell', 'look:check'],
 };
@@ -30,7 +31,7 @@ const contextFor = (sentences) => ({ rooms, catalogueIds, hasLocation, kinds: ST
 
 // ---- the list of chains ----
 
-test('the list holds the seven chains of the story, in that order', () => {
+test('the list holds the eight chains of the story, in that order', () => {
   assert.deepEqual(CHAINS.map((chain) => chain.id), Object.keys(STORY));
 });
 
@@ -38,9 +39,24 @@ test('every chain id is different', () => {
   assert.equal(new Set(CHAINS.map((chain) => chain.id)).size, CHAINS.length);
 });
 
-test('two chains open a day: come-home needs the keys on the person, go-out needs nothing', () => {
+test('three chains open a day: come-home needs the keys on the person, go-out and morning need nothing', () => {
   const openers = CHAINS.filter((chain) => chain.opener === true);
-  assert.deepEqual(openers.map((chain) => [chain.id, chain.needsOnPerson ?? []]), [['come-home', ['keys']], ['go-out', []]]);
+  assert.deepEqual(openers.map((chain) => [chain.id, chain.needsOnPerson ?? []]), [['come-home', ['keys']], ['go-out', []], ['morning', []]]);
+});
+
+test('morning starts a session at home: it opens with a move to the bedroom', () => {
+  assert.equal(chainNamed('morning')?.steps[0].kind, 'move');
+  assert.equal(chainNamed('morning')?.steps[0].roomId, 'bedroom');
+});
+
+test('going out takes the keys and then the wallet: nobody goes shopping without one', () => {
+  const taken = chainNamed('go-out')?.steps.filter((step) => step.kind === 'take').map((step) => step.object);
+  assert.deepEqual(taken, ['keys', 'wallet']);
+});
+
+test('the pizza is ordered with the phone before the wallet is needed at the door', () => {
+  const taken = chainNamed('pizza')?.steps.filter((step) => step.kind === 'take').map((step) => step.object);
+  assert.deepEqual(taken, ['phone', 'wallet']);
 });
 
 test('exactly one chain closes a session: evening', () => {
@@ -52,9 +68,9 @@ test('the check is asked once, in the closing chain, and nowhere else', () => {
   assert.deepEqual(checks, ['evening']);
 });
 
-test('no chain after the opener starts with a move: pizza and call start with a tell', () => {
+test('no chain after the opener starts with a move: pizza starts with a walk-to and call with a tell', () => {
   assert.deepEqual(CHAINS.filter((chain) => chain.opener !== true && chain.steps[0].kind === 'move'), []);
-  assert.equal(chainNamed('pizza')?.steps[0].kind, 'tell');
+  assert.equal(chainNamed('pizza')?.steps[0].kind, 'goTo');
   assert.equal(chainNamed('call')?.steps[0].kind, 'tell');
 });
 
@@ -105,8 +121,8 @@ test('every step kind can say whether its fields are right, whether it needs a s
   }
 });
 
-test('only a move and a walk-to put the story in a room', () => {
-  assert.deepEqual(Object.entries(STEP_KINDS).filter(([, row]) => row.leavesRoom === true).map(([kind]) => kind).sort(), ['goTo', 'move']);
+test('only a walk-to is a moment where the player walks out of a room: a move takes them along with what they hold', () => {
+  assert.deepEqual(Object.entries(STEP_KINDS).filter(([, row]) => row.walksAway === true).map(([kind]) => kind), ['goTo']);
 });
 
 const context = { rooms, catalogueIds, hasLocation };

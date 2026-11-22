@@ -122,6 +122,20 @@ test('a need for a thing that is not chosen does not block the opener', () => {
   assert.equal(chainIdsOf(events)[0], 'needs-keys');
 });
 
+// ---- openers take turns ----
+
+const ALT = { id: 'alt', opener: true, steps: [move('in', 'kitchen'), tell('t')] };
+
+test('the opener of yesterday is not picked again when another opener can open', () => {
+  const events = buildDay({ dayNumber: 2, chains: [OPEN, ALT, PLAIN], things: THINGS, onPerson: [], yesterday: ['open'], random: rand() });
+  assert.equal(chainIdsOf(events)[0], 'alt');
+});
+
+test('the opener of yesterday is picked when it is the only one that can open', () => {
+  const events = buildDay({ dayNumber: 2, chains: [OPEN, PLAIN], things: THINGS, onPerson: [], yesterday: ['open'], random: rand() });
+  assert.equal(chainIdsOf(events)[0], 'open');
+});
+
 test('the opener is picked at random from those whose need is met', () => {
   const chains = [NEEDS_KEYS, OPEN, PLAIN, OTHER];
   const events = buildDay({ dayNumber: 2, chains, things: THINGS, onPerson: ['keys'], yesterday: [], random: rand({ pick: lastOf }) });
@@ -264,20 +278,50 @@ test('in a silent chain the let-go at the end names the silent thing, and the gu
   assert.deepEqual(sequence(events, 'two'), ['moveTo', 'find', 'find', 'tell', 'putAway', 'check', 'letGo:keys']);
 });
 
-test('a silent thing is laid down at the next move or walk, and not named again afterwards', () => {
+test('a silent thing is laid down after the walk out of the room, and not named again afterwards', () => {
   const events = plan({ chains: [OPEN, WALKING, PLAIN], random: luck() });
-  assert.deepEqual(sequence(events, 'walking'), ['moveTo', 'find', 'letGo:keys', 'goTo', 'goTo', 'tell', 'check']);
+  assert.deepEqual(sequence(events, 'walking'), ['moveTo', 'find', 'goTo', 'letGo:keys', 'goTo', 'tell', 'check']);
 });
 
-test('a let-go before a move leaves a thing in hand when the same chain puts it back later: the call chain keeps the phone in the garden', () => {
+const HOME = { id: 'home', steps: [tell('t0'), take('k', 'keys', hall), move('m', 'hall'), putBack('kb', 'keys'), tell('t')] };
+
+test('a story move takes the player along with what they hold: the let-go comes after the tell, not before the move', () => {
+  const events = plan({ chains: [OPEN, HOME, PLAIN], random: luck() });
+  assert.deepEqual(sequence(events, 'home'), ['tell', 'find', 'moveTo', 'tell', 'letGo:keys']);
+});
+
+test('a guided chain keeps the phone in hand over the move: the call chain keeps the phone in the garden', () => {
   const events = plan({ chains: [OPEN, CALL, PLAIN] });
   assert.deepEqual(sequence(events, 'call'), ['moveTo', 'tell', 'find', 'moveTo', 'putAway', 'goTo', 'check']);
 });
 
-test('the same call chain with a silent phone lays the phone down before the move to the garden', () => {
+test('the same call chain with a silent phone keeps it in hand in the garden and lays it down after the walk inside', () => {
   const events = plan({ chains: [OPEN, CALL, PLAIN], random: luck() });
-  assert.deepEqual(sequence(events, 'call'), ['moveTo', 'tell', 'find', 'letGo:phone', 'moveTo', 'goTo', 'check']);
+  assert.deepEqual(sequence(events, 'call'), ['moveTo', 'tell', 'find', 'moveTo', 'goTo', 'letGo:phone', 'check']);
 });
+
+// every chain of the game, alone in a day, with the default rules: every put-back is silent
+const SCREENS = ['tell', 'goTo', 'check'];
+function eventsOfRealChain(chain) {
+  const chains = chain.opener === true ? [chain] : [OPEN, chain];
+  return ofChain(buildDay({ dayNumber: 2, chains, things: THINGS, onPerson: ['keys'], yesterday: [], random: rand() }), chain.id);
+}
+
+for (const chain of CHAINS.filter((candidate) => candidate.closer !== true)) {
+  test(`in ${chain.id} the player gets a screen holding each thing, where the story stands, before it is let go`, () => {
+    const events = eventsOfRealChain(chain);
+    events.forEach((event, at) => {
+      if (event.kind !== 'letGo') return;
+      for (const thingId of event.thingIds) {
+        const found = events.findLastIndex((other, index) => index < at && other.kind === 'find' && other.thingId === thingId);
+        const moved = events.findLastIndex((other, index) => index < at && other.kind === 'moveTo');
+        const since = Math.max(found, moved);
+        const screens = events.slice(since + 1, at).filter((other) => SCREENS.includes(other.kind));
+        assert.ok(found >= 0 && screens.length > 0, `${chain.id}: ${thingId} is let go without a screen in the room where the story stands`);
+      }
+    });
+  });
+}
 
 test('a let-go knows the chain it belongs to and never has an empty list', () => {
   const letGos = letGosOf(plan({ random: luck() }));

@@ -137,18 +137,29 @@ const CHAIN_SENTENCES = {
     start: 'You are in the hallway.',
     plan: 'You are going out for some shopping.',
     keys: 'You cannot leave without your keys.',
-    away: 'You lock the door. An hour later you are back with a full bag.',
+    wallet: 'You will have to pay in the shop.',
+    away: 'You lock the door and walk to the shop.',
+    pay: 'You pay at the till.',
+    back: 'An hour later you are back with a full bag.',
     inside: 'You open the door. You are inside.',
     bag: 'You put the shopping bag down.',
     unpack: 'The shopping belongs in the kitchen.',
     done: 'Everything is unpacked.',
+  },
+  morning: {
+    wake: 'You wake up in your bedroom.',
+    phone: 'You want to know the time and read your messages.',
+    read: 'You read your messages in bed.',
+    dress: 'You get dressed.',
+    breakfast: 'Breakfast is waiting.',
+    eat: 'You have breakfast.',
   },
   coffee: {
     go: 'You feel like coffee.',
     pack: 'Take a new pack of coffee from the top right cupboard.',
     scissors: 'The pack has to be cut open.',
     open: 'You cut the pack open.',
-    tin: 'Take the tin with the flowers from the worktop.',
+    tin: 'Take the tin with the flowers from the cupboard.',
     fill: 'You pour the coffee into the tin and make a pot of filter coffee.',
     'tin-back': 'You put the lid on the tin and put the tin back in the cupboard.',
     sit: 'You want to drink your coffee in the living room.',
@@ -166,6 +177,9 @@ const CHAIN_SENTENCES = {
     ready: 'The present stands ready by the door.',
   },
   pizza: {
+    hungry: 'You are hungry and want to order a pizza from the sofa.',
+    phone: 'You order it with your phone.',
+    ordered: 'The pizza is ordered. It will be here in half an hour.',
     bell: 'The doorbell rings: your pizza is here.',
     go: 'Someone has to open the front door.',
     wallet: 'The pizza has to be paid.',
@@ -174,8 +188,8 @@ const CHAIN_SENTENCES = {
     eat: 'The pizza is on the table.',
   },
   call: {
-    ring: 'Somewhere your phone rings.',
-    phone: 'You want to answer the call.',
+    ring: 'You want to call your sister.',
+    phone: 'You need your phone for that.',
     walk: 'You talk and walk around. The call ends in the front garden.',
     in: 'It gets chilly outside.',
     sit: 'You sit down on the sofa.',
@@ -196,8 +210,12 @@ for (const [chain, steps] of Object.entries(CHAIN_SENTENCES)) {
   });
 }
 
-test('the chains in the texts are the seven chains of the list', () => {
-  assert.deepEqual(Object.keys(TEXTS.chains ?? {}).sort(), ['call', 'coffee', 'come-home', 'evening', 'go-out', 'pizza', 'present']);
+test('call.ring no longer mentions ringing: nothing rings, the player wants to call', () => {
+  assert.doesNotMatch(sentenceOf('call', 'ring'), /ring/i);
+});
+
+test('the chains in the texts are the eight chains of the list', () => {
+  assert.deepEqual(Object.keys(TEXTS.chains ?? {}).sort(), ['call', 'coffee', 'come-home', 'evening', 'go-out', 'morning', 'pizza', 'present']);
   assert.deepEqual(Object.keys(TEXTS.chains ?? {}).sort(), CHAINS.map((chain) => chain.id).sort());
 });
 

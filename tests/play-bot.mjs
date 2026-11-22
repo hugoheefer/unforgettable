@@ -5,7 +5,7 @@ import { isPocket } from '../app/js/world.js';
 
 /**
  * Plays one session from the start screen to its summary and returns every screen it showed:
- * { lead, command, room, answer } (`answer` is the choice id tapped, or 'next' on a pause).
+ * { lead, command, room, inHand, answer } (`answer` is the choice id tapped, or 'next' on a pause).
  * @param {import('../app/js/app-flow.js').AppFlow} app standing on a start screen that offers 'play' or 'next'
  */
 export function playSession(app) {
@@ -13,7 +13,7 @@ export function playSession(app) {
   const ids = () => app.step().choices.map((entry) => entry.id);
   const tap = (answer) => {
     const { lead, command } = app.step();
-    screens.push({ lead, command, room: app.day?.state().roomId, answer });
+    screens.push({ lead, command, room: app.day?.state().roomId, inHand: app.day?.state().inHand, answer });
     app.choose(answer);
     app.next();
   };
@@ -30,7 +30,7 @@ export function playSession(app) {
     if (guard > 300) throw new Error('the bot is stuck');
     const state = app.day.state();
     const offered = ids();
-    if (offered.length === 0) { screens.push({ lead: app.step().lead, command: app.step().command, room: state.roomId, answer: 'next' }); app.next(); }
+    if (offered.length === 0) { screens.push({ lead: app.step().lead, command: app.step().command, room: state.roomId, inHand: state.inHand, answer: 'next' }); app.next(); }
     else if (offered.includes('go')) tap('go');
     else if (offered.includes('yes')) tap('yes');
     else if (state.returnTo) walkTo(state.returnTo);

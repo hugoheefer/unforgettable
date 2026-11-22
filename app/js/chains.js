@@ -7,13 +7,14 @@
 
 import { comeHome } from './chains/come-home.js';
 import { goOut } from './chains/go-out.js';
+import { morning } from './chains/morning.js';
 import { coffee } from './chains/coffee.js';
 import { present } from './chains/present.js';
 import { pizza } from './chains/pizza.js';
 import { call } from './chains/call.js';
 import { evening } from './chains/evening.js';
 
-export const CHAINS = Object.freeze([comeHome, goOut, coffee, present, pizza, call, evening]);
+export const CHAINS = Object.freeze([comeHome, goOut, morning, coffee, present, pizza, call, evening]);
 
 const eventOf = (kind, step, { chainId }, extra) => ({ kind, chain: chainId, step: step.id, ...extra });
 // a step is tied to a room only when `at` says so; otherwise it happens wherever the player is
@@ -25,7 +26,7 @@ const inCatalogue = (step, { catalogueIds }) => catalogueIds.has(step.object);
 
 /**
  * What each kind of step must hold (`isValid`), whether it needs a sentence of its own (`needsSentence`), and
- * the events it becomes (`expand`). `leavesRoom` marks the kinds that put the story in another room.
+ * the events it becomes (`expand`). `walksAway` marks the kinds where the player walks out of a room (a move takes them along with what they hold).
  */
 export const STEP_KINDS = Object.freeze({
   tell: {
@@ -34,13 +35,12 @@ export const STEP_KINDS = Object.freeze({
     expand: (step, context) => [told(step, context)],
   },
   move: {
-    leavesRoom: true,
     isValid: hasRoom,
     needsSentence: () => true,
     expand: (step, context) => [eventOf('moveTo', step, context, { roomId: step.roomId })],
   },
   goTo: {
-    leavesRoom: true,
+    walksAway: true,
     isValid: hasRoom,
     needsSentence: () => true,
     expand: (step, context) => [eventOf('goTo', step, context, { roomId: step.roomId })],

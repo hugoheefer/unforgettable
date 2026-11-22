@@ -43,14 +43,14 @@ const expandSteps = (chain, chosen) =>
   chain.steps.map((step) => ({ step, events: STEP_KINDS[step.kind].expand(step, { chainId: chain.id, chosen }) }));
 
 /**
- * Lays the groups out as events and adds a `letGo` where things that nobody puts back are laid down: before
- * every move or walk after a take, and at the end of the chain. A `letGo` is left out when it has nothing to lay
- * down, and never names a thing that the rest of the chain still puts back.
+ * Lays the groups out as events and adds a `letGo` where things that nobody puts back are laid down: after
+ * every walk out of a room, and at the end of the chain. A story move takes the player along with what they
+ * hold, so the player always gets a screen with the thing in hand where it was used. A `letGo` is left out when
+ * it has nothing to lay down, and never names a thing that the rest of the chain still puts back.
  */
 function withLetGos(groups, chainId) {
   const events = [];
   const held = new Set();
-  let tookSomething = false;
   const letGo = (restOfChain) => {
     const putBackLater = new Set(restOfChain.flatMap((group) => group.events).filter((event) => event.kind === 'putAway').map((event) => event.thingId));
     const thingIds = [...held].filter((id) => !putBackLater.has(id));
@@ -58,12 +58,12 @@ function withLetGos(groups, chainId) {
     if (thingIds.length > 0) events.push({ kind: 'letGo', chain: chainId, thingIds });
   };
   groups.forEach((group, index) => {
-    if (tookSomething && STEP_KINDS[group.step.kind].leavesRoom) letGo(groups.slice(index));
     for (const event of group.events) {
-      if (event.kind === 'find') { held.add(event.thingId); tookSomething = true; }
+      if (event.kind === 'find') held.add(event.thingId);
       if (event.kind === 'putAway') held.delete(event.thingId);
       events.push(event);
     }
+    if (STEP_KINDS[group.step.kind].walksAway) letGo(groups.slice(index + 1));
   });
   letGo([]);
   return events;
@@ -90,7 +90,10 @@ export function buildDay({ dayNumber, chains = CHAINS, things, onPerson = [], ye
   const openers = chains.filter((chain) => canOpen(chain, chosen, onPerson));
   // the very first day begins the way the game is introduced (at the front door), not with a random opener
   const starter = dayNumber === FIRST_DAY ? openers.find((chain) => chain.startsTheGame === true) : undefined;
-  const opener = starter ?? (openers.length > 0 ? random.pick(openers) : null);
+  // openers take turns: yesterday's is only played again when no other can open
+  const freshOpeners = openers.filter((chain) => !yesterday.includes(chain.id));
+  const choices = freshOpeners.length > 0 ? freshOpeners : openers;
+  const opener = starter ?? (choices.length > 0 ? random.pick(choices) : null);
   const closer = chains.find((chain) => chain.closer === true);
   const rest = chains.filter((chain) => chain.opener !== true && chain.closer !== true);
   const fresh = rest.filter((chain) => !yesterday.includes(chain.id));

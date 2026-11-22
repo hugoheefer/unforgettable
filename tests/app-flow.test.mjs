@@ -957,12 +957,38 @@ test('a story after another one starts where the player is: nothing says "You ar
   assert.equal(textOf(session(PIZZA_DAY)).includes('You are in the living room.'), false);
 });
 
-test('the pizza story opens with the doorbell, straight after the last screen of the story before it and with no lead of its own', () => {
+test('the pizza story opens with its own reason, straight after the last screen of the story before it', () => {
   const screens = session(PIZZA_DAY);
-  const bell = screens.findIndex((screen) => screen.command === 'The doorbell rings: your pizza is here.');
-  assert.ok(bell > 0, 'the doorbell rings');
-  assert.equal(screens[bell - 1].command, 'You take off your shoes.');
-  assert.deepEqual(screens[bell].lead, []);
+  const shoes = screens.findIndex((screen) => screen.command === 'You take off your shoes.');
+  assert.ok(shoes >= 0, 'the story before ends with the shoes');
+  assert.deepEqual(screens[shoes + 1].lead, ['You are hungry and want to order a pizza from the sofa.']);
+  assert.equal(screens[shoes + 1].command, 'Go to the living room.');
+});
+
+test('coming home, the player is shown taking off their shoes while the keys are still in hand, inside the hallway', () => {
+  const screen = session().find((candidate) => candidate.command === 'You take off your shoes.');
+  assert.ok(screen, 'the shoes are shown');
+  assert.equal(screen.room, 'hall');
+  assert.ok(screen.inHand.includes('keys'));
+});
+
+test('in the call story the player is shown a screen in the garden with the phone still in hand', () => {
+  const screen = session(PIZZA_DAY).find((candidate) => candidate.lead.includes('It gets chilly outside.'));
+  assert.ok(screen, 'the screen about the chill is shown');
+  assert.equal(screen.room, 'garden');
+  assert.ok(screen.inHand.includes('phone'));
+});
+
+// relies on the fixed random picking the first fresh opener: go-out, then (go-out being yesterday) morning
+test('two sessions in a row do not open with the same story', () => {
+  const { app } = newApp();
+  const openers = [];
+  for (let count = 0; count < 3; count += 1) {
+    playSession(app);
+    openers.push(app.saveState().yesterdayChains[0]);
+  }
+  assert.equal(openers[0], 'come-home');
+  assert.notEqual(openers[1], openers[2]);
 });
 
 test('in the present story, the call is told in the kitchen where the phone was fetched, with no walk back first', () => {

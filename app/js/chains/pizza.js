@@ -1,7 +1,11 @@
-// The pizza is at the door and has to be paid with the wallet.
+// A pizza ordered from the sofa with the phone, paid at the door with the wallet.
 export const pizza = {
   id: 'pizza',
   steps: [
+    { id: 'hungry', kind: 'goTo', roomId: 'living' },
+    { id: 'phone', kind: 'take', object: 'phone', leftAt: { placeId: 'living', spotId: 'coffee-table' } },
+    { id: 'ordered', kind: 'tell', at: 'living' },
+    { id: 'phone-back', kind: 'putBack', object: 'phone' },
     { id: 'bell', kind: 'tell' },
     { id: 'go', kind: 'goTo', roomId: 'hall' },
     { id: 'wallet', kind: 'take', object: 'wallet', leftAt: { placeId: 'hall', spotId: 'console' } },
