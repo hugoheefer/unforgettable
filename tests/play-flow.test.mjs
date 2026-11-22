@@ -167,7 +167,7 @@ const tellDay = (options = {}) => makeDay([tell('kitchen', 'coffee', 'pack'), te
 test('a tell is its sentence as the command, with Go on and Something else first', () => {
   assert.deepEqual(flowFor(tellDay()).step(), {
     lead: [],
-    command: 'Take a new pack of coffee from the top right cupboard.',
+    command: 'You take a new pack of coffee from the top right cupboard.',
     choices: [{ id: 'go', label: 'Go on' }, ELSE],
     selected: 'go',
     canLeave: true,
@@ -308,7 +308,7 @@ test('the check is shown wherever the player stands, without asking them back', 
 test('walking back is one choice, and the screen of the story is shown again', () => {
   const flow = flowFor(tellDay({ state: { roomId: 'study', startedIn: 'study' } }));
   pick(flow, 'door:kitchen');
-  assert.equal(flow.step().command, 'Take a new pack of coffee from the top right cupboard.');
+  assert.equal(flow.step().command, 'You take a new pack of coffee from the top right cupboard.');
 });
 
 // ---- finding ----
@@ -320,7 +320,7 @@ const scissorsFind = (options = {}) => makeDay([find('scissors'), tell('kitchen'
 test('finding a thing: the sentence of the step is the lead, the command asks for the thing, three ways to answer', () => {
   assert.deepEqual(flowFor(scissorsFind()).step(), {
     lead: ['The pack has to be cut open.'],
-    command: 'You need your ✂️ scissors. Where do you look? You are in the kitchen.',
+    command: 'Where do you look for your ✂️ scissors? You are in the kitchen.',
     choices: [
       { id: 'spots', label: 'Look here, in the kitchen' },
       { id: 'pockets', label: 'Look in a pocket' },
@@ -429,7 +429,7 @@ test('naming the forgotten thing leads to its find, with the normal screen and n
   pick(flow, 'no');
   pick(flow, 'forgot:scissors');
   assert.deepEqual(flow.step().lead, []);
-  assert.equal(flow.step().command, 'You need your ✂️ scissors. Where do you look? You are in the living room.');
+  assert.equal(flow.step().command, 'Where do you look for your ✂️ scissors? You are in the living room.');
 });
 
 test('after the find of the forgotten thing comes its put-away, and then the story goes on', () => {
@@ -483,7 +483,7 @@ test('putting away a thing that is not in hand says so and changes nothing', () 
   pick(flow, 'else');
   pick(flow, 'putaway:keys');
   assert.deepEqual(flow.step().lead, ['You are not holding your 🔑 keys.']);
-  assert.equal(flow.step().command, 'Take a new pack of coffee from the top right cupboard.');
+  assert.equal(flow.step().command, 'You take a new pack of coffee from the top right cupboard.');
   assert.equal(flow.day.state().inHand.length, 0);
 });
 
@@ -498,7 +498,7 @@ test('Go on returns to the screen of the story', () => {
   const flow = flowFor(tellDay());
   pick(flow, 'else');
   pick(flow, 'back');
-  assert.equal(flow.step().command, 'Take a new pack of coffee from the top right cupboard.');
+  assert.equal(flow.step().command, 'You take a new pack of coffee from the top right cupboard.');
 });
 
 test('Something else first is on a tell, a walk-to and a check, and not on a find, a put-away or the way back', () => {
@@ -524,7 +524,7 @@ test('taking the coat off from Something else first asks where to hang it and th
   assert.equal(flow.step().command, 'Where do you hang your coat?');
   pick(flow, 'spot:counter');
   assert.deepEqual(flow.step().lead, ['You hung your coat on the worktop.']);
-  assert.equal(flow.step().command, 'Take a new pack of coffee from the top right cupboard.');
+  assert.equal(flow.step().command, 'You take a new pack of coffee from the top right cupboard.');
   pick(flow, 'else');
   assert.deepEqual(ids(flow.step()), [...EVERY_THING, 'puton:coat', 'back']);
 });
@@ -582,7 +582,7 @@ test('the thing put away on your own is told, and the story is on its screen aga
   pick(flow, 'spots');
   pick(flow, 'spot:counter');
   assert.deepEqual(flow.step().lead, ['You put your ✂️ scissors on the worktop. Home spot: in the kitchen drawer in the kitchen.']);
-  assert.equal(flow.step().command, 'Take a new pack of coffee from the top right cupboard.');
+  assert.equal(flow.step().command, 'You take a new pack of coffee from the top right cupboard.');
 });
 
 test('on the home spot it is praised', () => {

@@ -5,7 +5,7 @@ import { RefusedMove } from '../app/js/errors.js';
 import { LAYOUT } from '../app/js/layout.js';
 import { THINGS, defaultPlan } from '../app/js/things.js';
 import { World } from '../app/js/world.js';
-import { PLAN, check, dayState, find, findDay, goTo, letGo, makeDay, moveTo, pause, playOut, pocket, putAway, putAwayDay, rand, refusalOf, spot, tell, worldWith } from './day-helper.mjs';
+import { LEFT_AT, PLAN, check, dayState, find, findDay, goTo, letGo, makeDay, moveTo, pause, playOut, pocket, putAway, putAwayDay, rand, refusalOf, spot, tell, worldWith } from './day-helper.mjs';
 
 const coatHooks = spot('hall', 'coat-hooks');
 const start = (world, options = {}) => Day.start({ layout: LAYOUT, things: THINGS, world, plan: defaultPlan(), progress: { streaks: {} }, random: rand(), number: 2, ...options });
@@ -965,4 +965,83 @@ test('a saved day with a note left over from a find that is over cannot be conti
   const state = goodState();
   state.findStart = { shortest: 1, wasHome: true };
   assert.equal(canContinue(state, context), false);
+});
+
+
+// ---- a step that uses a thing needs it in hand (story 3e, U1) ----
+
+const SCISSORS_LEFT = { placeId: 'dining', spotId: 'dining-table' };
+// the wrap of the present uses the scissors; the call after it is only a next step to prove that the story goes on
+const wrapping = (state, { world = worldWith({ scissors: spot('study', 'desk-drawer') }), earlier = [find('scissors', SCISSORS_LEFT, 'present', 'scissors')] } = {}) =>
+  makeDay([...earlier, tell('dining', 'present', 'wrap', 'scissors'), tell('dining', 'present', 'call')],
+    { world, state: { index: earlier.length, roomId: 'dining', startedIn: 'dining', leftAt: { scissors: SCISSORS_LEFT }, ...state } });
+
+test('a step that uses a thing in hand goes on at a tap', () => {
+  const day = wrapping({ inHand: ['scissors'] });
+  day.continue();
+  assert.equal(day.state().event.step, 'call');
+});
+
+test('a step that uses a thing that is not in hand first asks for it: a find of that thing, with the reason the story first gave for needing it', () => {
+  const day = wrapping({});
+  day.continue();
+  assert.deepEqual(day.state().event, { kind: 'find', chain: 'present', step: 'scissors', thingId: 'scissors', leftAt: SCISSORS_LEFT });
+});
+
+test('the latest earlier find of that thing in the same chain gives the reason, not an earlier one or one of another chain', () => {
+  const earlier = [find('scissors', SCISSORS_LEFT, 'coffee', 'scissors'), find('scissors', SCISSORS_LEFT, 'present', 'phone'), find('scissors', SCISSORS_LEFT, 'present', 'scissors'), find('keys', LEFT_AT.keys, 'present', 'paper')];
+  const day = wrapping({}, { earlier });
+  day.continue();
+  assert.equal(day.state().event.step, 'scissors');
+});
+
+test('without an earlier find of that thing in the chain the sentence of the step itself is the reason', () => {
+  const day = wrapping({ leftAt: { scissors: SCISSORS_LEFT } }, { earlier: [] });
+  day.continue();
+  assert.deepEqual(day.state().event, { kind: 'find', chain: 'present', step: 'wrap', thingId: 'scissors', leftAt: SCISSORS_LEFT });
+});
+
+test('the inserted find is a real find: it counts what the search costs from where the player stands', () => {
+  const day = wrapping({});
+  day.continue();
+  const shortest = day.world.stepsBetween('dining', 'study') + 1;
+  day.walkTo('study');
+  assert.deepEqual(costOf(day.look('desk-drawer')), { found: true, steps: shortest, shortest, wasHome: true });
+});
+
+test('after the thing is found the same step is shown again, and now it goes on', () => {
+  const day = wrapping({});
+  day.continue();
+  day.walkTo('study');
+  day.look('desk-drawer');
+  assert.deepEqual([day.state().event.kind, day.state().event.step, day.state().inHand], ['tell', 'wrap', ['scissors']]);
+  day.walkTo('dining');
+  day.continue();
+  assert.equal(day.state().event.step, 'call');
+});
+
+test('a step that uses something that is not a chosen thing changes nothing: a prop is only told', () => {
+  const day = makeDay([tell('dining', 'present', 'wrap', 'wrapping-paper'), tell('dining', 'present', 'call')], { state: { roomId: 'dining', startedIn: 'dining' } });
+  day.continue();
+  assert.equal(day.state().event.step, 'call');
+});
+
+test('the story waits in its room first: a thing is asked for only when the player is back where the step is told', () => {
+  const day = wrapping({ roomId: 'study', startedIn: 'study' });
+  assert.equal(refusalOf(() => day.continue()), 'come-back');
+  assert.equal(day.state().event.kind, 'tell');
+});
+
+test('a day saved in the middle of the inserted find survives saving and goes on exactly like the original', () => {
+  const day = wrapping({});
+  day.continue();
+  const saved = JSON.parse(JSON.stringify(day.snapshot()));
+  assert.equal(canContinue(saved, context), true);
+  const again = resumed(day);
+  assert.deepEqual(again.state(), day.state());
+  again.walkTo('study');
+  again.look('desk-drawer');
+  again.walkTo('dining');
+  again.continue();
+  assert.equal(again.state().event.step, 'call');
 });

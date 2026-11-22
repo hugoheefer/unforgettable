@@ -23,7 +23,7 @@ const isStepOrNone = (event, context) => (event.chain === null && event.step ===
 /**
  * What each kind of event does when it begins (`enter`), when it is over (`isDone`), and what a saved event of
  * its kind must hold (`isValid`, checked before a saved day is continued). Also what the player may do meanwhile:
- * `canWalk`, `canHandle` (put things away, coat on and off), `waitsForNext`, and `room`, the room the story
+ * `canWalk`, `canHandle`, `needs` (the things that must be in hand before the player may go on) (put things away, coat on and off), `waitsForNext`, and `room`, the room the story
  * stands in, which the player is asked to come back to. `day.js` never switches on the kind.
  * A move is done at once: it sets the room and leaves its text for the next screen.
  */
@@ -39,6 +39,8 @@ export const EVENT_KINDS = {
     canHandle: true,
     waitsForNext: true,
     room: (event) => event.roomId,
+    // a step that uses a thing needs it in hand; a prop or a thing that is not chosen is only told
+    needs: (day, event) => (day.things.some((thing) => thing.id === event.uses) && !day.inHand.includes(event.uses) ? [event.uses] : []),
     enter() {},
     isDone: (day) => day.acknowledged,
     isValid: (event, context) => isRoomOrNone(event, context) && isStep(event, context),

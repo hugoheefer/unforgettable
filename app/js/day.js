@@ -163,8 +163,23 @@ export class Day {
   continue() {
     this.begin('waitsForNext');
     this.assertPresent();
+    const missing = EVENT_KINDS[this.event().kind].needs?.(this, this.event()) ?? [];
+    if (missing.length > 0) return this.askAgainFor(missing[0]);
     this.acknowledged = true;
     this.settle();
+  }
+
+  /**
+   * The player put a thing away that the step needs: it is searched for again before the step, with the reason the
+   * story first gave for needing it (the latest earlier find of it in this chain), and the step is shown after it.
+   */
+  askAgainFor(thingId) {
+    const current = this.event();
+    const earlier = this.events.slice(0, this.index).findLast((event) => event.kind === 'find' && event.chain === current.chain && event.thingId === thingId);
+    const leftAt = earlier?.leftAt ?? this.leftAt[thingId] ?? this.plan[thingId];
+    this.events.splice(this.index, 0, { kind: 'find', chain: current.chain, step: earlier?.step ?? current.step, thingId, leftAt });
+    this.index -= 1;
+    this.advance();
   }
 
   // ---- the check ----

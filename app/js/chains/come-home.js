@@ -1,6 +1,7 @@
 // Opener: you come home and need your keys to get in. It also starts the game: the first day ever opens here.
 export const comeHome = {
   id: 'come-home',
+  time: 'day',
   opener: true,
   startsTheGame: true,
   needsOnPerson: ['keys'],

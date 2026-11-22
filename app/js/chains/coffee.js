@@ -2,11 +2,12 @@
 // it stays, so making it a thing needs no change here.
 export const coffee = {
   id: 'coffee',
+  time: 'day',
   steps: [
     { id: 'go', kind: 'goTo', roomId: 'kitchen' },
     { id: 'pack', kind: 'take', object: 'coffee-pack', at: 'kitchen' },
     { id: 'scissors', kind: 'take', object: 'scissors', leftAt: { placeId: 'kitchen', spotId: 'counter' } },
-    { id: 'open', kind: 'tell', at: 'kitchen' },
+    { id: 'open', kind: 'tell', at: 'kitchen', uses: 'scissors' },
     { id: 'scissors-back', kind: 'putBack', object: 'scissors' },
     { id: 'tin', kind: 'take', object: 'coffee-tin', leftAt: { placeId: 'kitchen', spotId: 'counter' }, at: 'kitchen' },
     { id: 'fill', kind: 'tell', at: 'kitchen' },

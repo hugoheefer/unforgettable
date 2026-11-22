@@ -30,7 +30,7 @@ export const LEFT_AT = {
 // of these can also be checked with canContinue.
 export const pause = (text = 'day') => ({ kind: 'pause', text });
 export const moveTo = (roomId, chain = 'come-home', step = 'door') => ({ kind: 'moveTo', chain, step, roomId });
-export const tell = (roomId, chain = 'coffee', step = 'open') => ({ kind: 'tell', chain, step, roomId });
+export const tell = (roomId, chain = 'coffee', step = 'open', uses = undefined) => ({ kind: 'tell', chain, step, roomId, ...(uses === undefined ? {} : { uses }) });
 export const goTo = (roomId, chain = 'coffee', step = 'go') => ({ kind: 'goTo', chain, step, roomId });
 export const check = (roomId, chain = 'coffee', step = 'drink') => ({ kind: 'check', chain, step, roomId });
 export const letGo = (thingIds = [], chain = 'coffee') => ({ kind: 'letGo', chain, thingIds });

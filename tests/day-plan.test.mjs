@@ -172,6 +172,49 @@ test('with only one other chain in the list the day has only that one', () => {
   assert.deepEqual(chainIdsOf(buildDay({ dayNumber: 2, chains: [OPEN, PLAIN], things: THINGS, onPerson: [], yesterday: [], random: rand() })), ['open', 'plain']);
 });
 
+// ---- the time of day (story 3e, U2) ----
+
+const timed = (chain, time) => ({ ...chain, time });
+const M_OPEN = timed({ ...OPEN, id: 'm-open' }, 'morning');
+const D_OPEN = timed({ ...OPEN, id: 'd-open' }, 'day');
+const E_OPEN = timed({ ...OPEN, id: 'e-open' }, 'evening');
+const DAY_A = timed({ ...PLAIN, id: 'day-a' }, 'day');
+const EVENING_A = timed({ ...PLAIN, id: 'evening-a' }, 'evening');
+const MORNING_A = timed({ ...PLAIN, id: 'morning-a' }, 'morning');
+const byTime = (chains) => plan({ chains, rules: DEFAULT_RULES });
+
+test('a morning opener can be followed by a day chain and an evening chain, played in that order although the evening chain was picked first', () => {
+  assert.deepEqual(chainIdsOf(byTime([M_OPEN, EVENING_A, DAY_A])), ['m-open', 'day-a', 'evening-a']);
+});
+
+test('after a day opener the day chain comes before the evening chain, however they were picked', () => {
+  assert.deepEqual(chainIdsOf(byTime([D_OPEN, EVENING_A, DAY_A])), ['d-open', 'day-a', 'evening-a']);
+});
+
+test('a day opener is never followed by a morning chain', () => {
+  assert.deepEqual(chainIdsOf(byTime([D_OPEN, MORNING_A, DAY_A, EVENING_A])), ['d-open', 'day-a', 'evening-a']);
+});
+
+test('with too few chains of a later time the session has fewer stories rather than going back in time', () => {
+  assert.deepEqual(chainIdsOf(byTime([E_OPEN, DAY_A, MORNING_A, EVENING_A])), ['e-open', 'evening-a']);
+  assert.deepEqual(chainIdsOf(byTime([E_OPEN, DAY_A, MORNING_A])), ['e-open']);
+});
+
+test('the closing chain stays last, also when it is an evening chain like the others', () => {
+  assert.deepEqual(chainIdsOf(byTime([D_OPEN, EVENING_A, DAY_A, timed(CLOSE, 'evening')])), ['d-open', 'day-a', 'evening-a', 'close']);
+});
+
+test('the real chains in a real session follow the time of day, with pizza (evening) last of the stories even when luck puts it first', () => {
+  const pizzaFirst = rand({ shuffle: (list) => [...list].sort((a, b) => Number(b.id === 'pizza') - Number(a.id === 'pizza')) });
+  const ids = chainIdsOf(buildDay({ dayNumber: 2, chains: CHAINS, things: THINGS, onPerson: ['keys'], yesterday: [], random: pizzaFirst }));
+  assert.deepEqual(ids, ['come-home', 'coffee', 'pizza', 'evening']);
+});
+
+test('the first session still opens with come-home, whatever the luck', () => {
+  const ids = chainIdsOf(buildDay({ dayNumber: 1, chains: CHAINS, things: THINGS, onPerson: ['keys'], yesterday: [], random: lastPick() }));
+  assert.equal(ids[0], 'come-home');
+});
+
 // ---- silent chains ----
 
 const putAwaysOf = (events, id) => ofChain(events, id).filter((event) => event.kind === 'putAway').map((event) => event.thingId);

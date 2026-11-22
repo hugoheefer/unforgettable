@@ -9,6 +9,11 @@ import { CHAINS, STEP_KINDS } from './chains.js';
 
 const FIRST_DAY = 1;
 
+// The parts of a day in the order they are played. A chain without a time (not allowed in the game: the chain
+// contract checks it) ranks before all of them.
+const TIMES_OF_DAY = ['morning', 'day', 'evening'];
+const timeRank = (chain) => TIMES_OF_DAY.indexOf(chain.time);
+
 /**
  * The numbers that decide how hard a day is, in one place: a level is later one row of such settings.
  * `otherChains`: chains after the opener. `silentChance`: the chance that a chain with a put-back of a chosen
@@ -95,10 +100,11 @@ export function buildDay({ dayNumber, chains = CHAINS, things, onPerson = [], ye
   const choices = freshOpeners.length > 0 ? freshOpeners : openers;
   const opener = starter ?? (choices.length > 0 ? random.pick(choices) : null);
   const closer = chains.find((chain) => chain.closer === true);
-  const rest = chains.filter((chain) => chain.opener !== true && chain.closer !== true);
+  // a session never goes back in time: only chains not earlier than the opener are played, and in time order
+  const rest = chains.filter((chain) => chain.opener !== true && chain.closer !== true && (!opener || timeRank(chain) >= timeRank(opener)));
   const fresh = rest.filter((chain) => !yesterday.includes(chain.id));
   const stale = rest.filter((chain) => yesterday.includes(chain.id));
-  const others = [...random.shuffle(fresh), ...random.shuffle(stale)].slice(0, rules.otherChains);
+  const others = [...random.shuffle(fresh), ...random.shuffle(stale)].slice(0, rules.otherChains).sort((a, b) => timeRank(a) - timeRank(b));
 
   const events = [{ kind: 'pause', text: 'day' }];
   // the closer ends every session; it has no put-back, so it can never be silent

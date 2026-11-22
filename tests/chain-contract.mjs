@@ -15,6 +15,9 @@ export function problemsOf(chain, { rooms, catalogueIds, hasLocation, kinds, sen
   if (typeof chain.id !== 'string' || chain.id.length === 0) problems.push('the chain has no id');
   if (!Array.isArray(chain.steps) || chain.steps.length === 0) return [...problems, 'the chain has no steps'];
 
+  if (!['morning', 'day', 'evening'].includes(chain.time)) problems.push('the chain has no time of day');
+  if (chain.closer === true && chain.time !== 'evening') problems.push('the closing chain is played in the evening');
+
   const ids = chain.steps.map((step) => step.id);
   if (ids.some((id) => typeof id !== 'string' || id.length === 0)) problems.push('a step has no id');
   if (new Set(ids).size !== ids.length) problems.push('two steps have the same id');
@@ -30,6 +33,7 @@ export function problemsOf(chain, { rooms, catalogueIds, hasLocation, kinds, sen
     if (!kind.isValid(step, context)) problems.push(`${step.id}: the fields of a ${step.kind} are wrong`);
     if (step.kind === 'check' && chain.closer !== true) problems.push(`${step.id}: a check belongs to the closing chain only`);
     if (chain.closer === true && (step.kind === 'take' || step.kind === 'putBack')) problems.push(`${step.id}: the closing chain takes and puts back nothing`);
+    if (step.uses !== undefined && !taken.has(step.uses)) problems.push(`${step.id}: uses ${step.uses}, which the chain does not take earlier`);
     if (step.kind === 'take') taken.add(step.object);
     if (step.kind === 'putBack' && !taken.has(step.object)) problems.push(`${step.id}: ${step.object} is put back before it is taken`);
     if (kind.needsSentence(step, context) && !isText(sentences?.[chain.id]?.[step.id])) problems.push(`${step.id}: no sentence`);

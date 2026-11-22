@@ -130,8 +130,7 @@ export const en = {
       shoes: 'You take off your shoes.',
     },
     'go-out': {
-      start: 'You are in the hallway.',
-      plan: 'You are going out for some shopping.',
+      start: 'You are in the hallway, about to go shopping.',
       keys: 'You cannot leave without your keys.',
       wallet: 'You will have to pay in the shop.',
       away: 'You lock the door and walk to the shop.',
@@ -152,10 +151,10 @@ export const en = {
     },
     coffee: {
       go: 'You feel like coffee.',
-      pack: 'Take a new pack of coffee from the top right cupboard.',
+      pack: 'You take a new pack of coffee from the top right cupboard.',
       scissors: 'The pack has to be cut open.',
       open: 'You cut the pack open.',
-      tin: 'Take the tin with the flowers from the cupboard.',
+      tin: 'You take the tin with the flowers from the cupboard.',
       fill: 'You pour the coffee into the tin and make a pot of filter coffee.',
       'tin-back': 'You put the lid on the tin and put the tin back in the cupboard.',
       sit: 'You want to drink your coffee in the living room.',
@@ -163,7 +162,7 @@ export const en = {
     },
     present: {
       go: 'A birthday present has to be wrapped at the dining table.',
-      paper: 'Take the wrapping paper from the sideboard.',
+      paper: 'You take the wrapping paper from the sideboard.',
       scissors: 'The paper has to be cut.',
       wrap: 'You cut the paper and wrap the present.',
       phone: 'You want to ask what time the party starts.',
@@ -174,7 +173,7 @@ export const en = {
     },
     pizza: {
       hungry: 'You are hungry and want to order a pizza from the sofa.',
-      phone: 'You order it with your phone.',
+      phone: 'You want to order it with your phone.',
       ordered: 'The pizza is ordered. It will be here in half an hour.',
       bell: 'The doorbell rings: your pizza is here.',
       go: 'Someone has to open the front door.',
@@ -184,10 +183,9 @@ export const en = {
       eat: 'The pizza is on the table.',
     },
     call: {
-      ring: 'You want to call your sister.',
-      phone: 'You need your phone for that.',
+      phone: 'You want to call your sister.',
       walk: 'You talk and walk around. The call ends in the front garden.',
-      in: 'It gets chilly outside.',
+      in: 'The call is over. You want to sit down on the sofa again.',
       sit: 'You sit down on the sofa.',
     },
     evening: {
@@ -246,7 +244,7 @@ export const en = {
   walkBackOption: ({ room, steps: count }) => `Walk back ${room.to} · ${steps(count)}`,
 
   putCommand: ({ room, thing }) => `You are ${room.in}. Put your ${thing.icon} ${thing.name} back.`,
-  findCommand: ({ room, thing }) => `You need your ${thing.icon} ${thing.name}. Where do you look? You are ${room.in}.`,
+  findCommand: ({ room, thing }) => `Where do you look for your ${thing.icon} ${thing.name}? You are ${room.in}.`,
   goOn: 'Go on',
   somethingElse: 'Something else first',
   elseCommand: 'What do you want to do first?',

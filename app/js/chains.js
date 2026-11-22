@@ -32,7 +32,8 @@ export const STEP_KINDS = Object.freeze({
   tell: {
     isValid: atExists,
     needsSentence: () => true,
-    expand: (step, context) => [told(step, context)],
+    // `uses`: the thing the step needs in hand; a tell that carries it asks for the thing again when it is not there
+    expand: (step, context) => [{ ...told(step, context), ...(step.uses === undefined ? {} : { uses: step.uses }) }],
   },
   move: {
     isValid: hasRoom,

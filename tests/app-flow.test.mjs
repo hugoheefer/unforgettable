@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { AppFlow } from '../app/js/app-flow.js';
 import { Day, EVENT_KINDS } from '../app/js/day.js';
 import { chainIdsOf } from '../app/js/day-plan.js';
+import { CHAINS } from '../app/js/chains.js';
 import { LAYOUT } from '../app/js/layout.js';
 import { THINGS, defaultPlan } from '../app/js/things.js';
 import { World, isPocket } from '../app/js/world.js';
@@ -99,7 +100,7 @@ test('after the pause of the first day you stand at your front door and need you
   pick(app, 'play');
   app.next();
   assert.deepEqual(app.step().lead, ['You come home and stand at your front door.', 'You need your keys to get in.']);
-  assert.equal(app.step().command, 'You need your 🔑 keys. Where do you look? You are in the front garden.');
+  assert.equal(app.step().command, 'Where do you look for your 🔑 keys? You are in the front garden.');
   assert.deepEqual(labels(app), ['Look here, in the front garden', 'Look in a pocket', 'Walk to another room']);
 });
 
@@ -282,7 +283,7 @@ test('a new day is built from what was played yesterday: those chains are left f
   assert.deepEqual(chainIdsOf(fresh.saves.at(-1).day.events), ['come-home', 'coffee', 'present', 'evening']);
   const next = newApp({ saved: { yesterdayChains: ['coffee', 'present'] } });
   pick(next.app, 'play');
-  assert.deepEqual(chainIdsOf(next.saves.at(-1).day.events), ['come-home', 'pizza', 'call', 'evening']);
+  assert.deepEqual(chainIdsOf(next.saves.at(-1).day.events), ['come-home', 'call', 'pizza', 'evening']);
 });
 
 test('with the keys not on the person the day opens with going out', () => {
@@ -569,7 +570,7 @@ test('looking back shows the screen the player just left and what they chose on 
   const { app } = afterThePause();
   pick(app, 'doors');
   app.lookBack();
-  assert.match(app.step().command, /Where do you look\? You are in the front garden\. You chose: Walk to another room\.$/);
+  assert.match(app.step().command, /Where do you look for your 🔑 keys\? You are in the front garden\. You chose: Walk to another room\.$/);
   assert.equal(app.step().lead[0], TEXTS.lookBackNote);
 });
 
@@ -951,19 +952,19 @@ test('a saved state without the one-tap field behaves as one tap', () => {
 const session = (saved = {}) => playSession(newApp({ saved }).app);
 const commandsOf = (screens) => screens.map((screen) => screen.command);
 const textOf = (screens) => screens.flatMap((screen) => [...screen.lead, screen.command]);
-// the day of the story: come-home, pizza, call (coffee and present were yesterday)
+// the day of the story: come-home, call, pizza (coffee and present were yesterday; the pizza is for the evening)
 const PIZZA_DAY = { yesterdayChains: ['coffee', 'present'] };
 
 test('a story after another one starts where the player is: nothing says "You are in the living room."', () => {
   assert.equal(textOf(session(PIZZA_DAY)).includes('You are in the living room.'), false);
 });
 
-test('the pizza story opens with its own reason, straight after the last screen of the story before it', () => {
+test('the call story opens with its own reason, straight after the last screen of the story before it: the reason is the lead of the search for the phone', () => {
   const screens = session(PIZZA_DAY);
   const shoes = screens.findIndex((screen) => screen.command === 'You take off your shoes.');
   assert.ok(shoes >= 0, 'the story before ends with the shoes');
-  assert.deepEqual(screens[shoes + 1].lead, []);
-  assert.equal(screens[shoes + 1].command, 'You are hungry and want to order a pizza from the sofa.');
+  assert.deepEqual(screens[shoes + 1].lead, ['You want to call your sister.']);
+  assert.equal(screens[shoes + 1].command, 'Where do you look for your 📱 phone? You are in the hallway.');
 });
 
 test('coming home, the player is shown taking off their shoes while the keys are still in hand, inside the hallway', () => {
@@ -974,8 +975,8 @@ test('coming home, the player is shown taking off their shoes while the keys are
 });
 
 test('in the call story the player is shown a screen in the garden with the phone still in hand', () => {
-  const screen = session(PIZZA_DAY).find((candidate) => candidate.command === 'It gets chilly outside.');
-  assert.ok(screen, 'the screen about the chill is shown');
+  const screen = session(PIZZA_DAY).find((candidate) => candidate.command === 'The call is over. You want to sit down on the sofa again.');
+  assert.ok(screen, 'the screen that ends the call is shown');
   assert.equal(screen.room, 'garden');
   assert.ok(screen.inHand.includes('phone'));
 });
@@ -1020,4 +1021,29 @@ test('a whole session through the real chains never tells the player to put a th
     const said = [...screen.lead, screen.command].join(' ');
     assert.doesNotMatch(said, /Put your .* back/, said);
   }
+});
+
+// ---- a step that uses a thing (story 3e, U1): the player who puts a thing away on their own before it is used ----
+
+const USING_STEPS = CHAINS.flatMap((chain) => chain.steps.filter((step) => step.uses !== undefined).map((step) => ({ chain: chain.id, step: step.id, thing: step.uses })));
+const sentenceOfStep = ({ chain, step }) => TEXTS.chains[chain][step];
+
+test('a player who puts the scissors away before they are used is asked for them again before the paper is wrapped', () => {
+  const screens = playSession(newApp().app, { putsAwayBeforeUse: true });
+  const wrap = 'You cut the paper and wrap the present.';
+  const searchFor = screens.findIndex((screen) => screen.lead.includes('The paper has to be cut.') && screen.command.startsWith('Where do you look for your ✂️ scissors'));
+  const wrapped = screens.findIndex((screen) => screen.command === wrap && screen.answer === 'go');
+  assert.ok(searchFor >= 0, 'the scissors are asked for, with the reason the story first gave');
+  assert.ok(searchFor < wrapped, 'and that comes before the paper is wrapped');
+});
+
+test('whatever the player puts away on their own, a step that uses a thing never goes on without it: the next screen is the search', () => {
+  const screens = playSession(newApp().app, { putsAwayBeforeUse: true });
+  const tapped = screens.flatMap((screen, at) => (screen.answer === 'go' && USING_STEPS.some((use) => sentenceOfStep(use) === screen.command) ? [at] : []));
+  assert.ok(tapped.length > 0);
+  for (const at of tapped) {
+    const use = USING_STEPS.find((candidate) => sentenceOfStep(candidate) === screens[at].command);
+    if (!screens[at].inHand.includes(use.thing)) assert.match(screens[at + 1].command, /^Where do you look for your/, `${screens[at].command} went on without ${use.thing}`);
+  }
+  assert.ok(screens.some((screen) => screen.answer === 'else'), 'the player did put something away on their own');
 });

@@ -16,12 +16,12 @@ const counter = { placeId: 'kitchen', spotId: 'counter' };
 /** The facts of the eight chains, as the story writes them: id:kind:data@room of every step (`at` is the room a step is tied to). */
 const STORY = {
   'come-home': ['door:move:garden', 'keys:take:keys', 'inside:move:hall', 'keys-back:putBack:keys', 'shoes:tell@hall'],
-  'go-out': ['start:move:hall', 'plan:tell', 'keys:take:keys', 'wallet:take:wallet', 'away:tell', 'pay:tell', 'back:tell', 'inside:move:hall', 'bag:tell@hall', 'keys-back:putBack:keys', 'wallet-back:putBack:wallet', 'unpack:goTo:kitchen', 'done:tell@kitchen'],
+  'go-out': ['start:move:hall', 'keys:take:keys', 'wallet:take:wallet', 'away:tell', 'pay:tell', 'back:tell', 'inside:move:hall', 'bag:tell@hall', 'keys-back:putBack:keys', 'wallet-back:putBack:wallet', 'unpack:goTo:kitchen', 'done:tell@kitchen'],
   morning: ['wake:move:bedroom', 'phone:take:phone', 'read:tell@bedroom', 'phone-back:putBack:phone', 'dress:tell@bedroom', 'breakfast:goTo:kitchen', 'eat:tell@kitchen'],
   coffee: ['go:goTo:kitchen', 'pack:take:coffee-pack@kitchen', 'scissors:take:scissors', 'open:tell@kitchen', 'scissors-back:putBack:scissors', 'tin:take:coffee-tin@kitchen', 'fill:tell@kitchen', 'tin-back:putBack:coffee-tin@kitchen', 'sit:goTo:living', 'drink:tell@living'],
   present: ['go:goTo:dining', 'paper:take:wrapping-paper@dining', 'scissors:take:scissors', 'wrap:tell@dining', 'scissors-back:putBack:scissors', 'phone:take:phone', 'call:tell', 'phone-back:putBack:phone', 'paper-back:putBack:wrapping-paper@dining', 'hall:goTo:hall', 'ready:tell@hall'],
   pizza: ['hungry:goTo:living', 'phone:take:phone', 'ordered:tell@living', 'phone-back:putBack:phone', 'bell:tell', 'go:goTo:hall', 'wallet:take:wallet', 'pay:tell@hall', 'wallet-back:putBack:wallet', 'table:goTo:dining', 'eat:tell@dining'],
-  call: ['ring:tell', 'phone:take:phone', 'walk:move:garden', 'phone-back:putBack:phone', 'in:goTo:living', 'sit:tell@living'],
+  call: ['phone:take:phone', 'walk:move:garden', 'phone-back:putBack:phone', 'in:goTo:living', 'sit:tell@living'],
   evening: ['dusk:tell', 'look:check'],
 };
 
@@ -68,10 +68,51 @@ test('the check is asked once, in the closing chain, and nowhere else', () => {
   assert.deepEqual(checks, ['evening']);
 });
 
-test('no chain after the opener starts with a move: pizza starts with a walk-to and call with a tell', () => {
+test('no chain after the opener starts with a move: pizza starts with a walk-to and call with the search for the phone', () => {
   assert.deepEqual(CHAINS.filter((chain) => chain.opener !== true && chain.steps[0].kind === 'move'), []);
   assert.equal(chainNamed('pizza')?.steps[0].kind, 'goTo');
-  assert.equal(chainNamed('call')?.steps[0].kind, 'tell');
+  assert.equal(chainNamed('call')?.steps[0].kind, 'take');
+});
+
+// ---- one screen for one intention (story 3e, U6) ----
+
+test('the steps that only announced the next step are gone: call.ring and go-out.plan', () => {
+  assert.equal(chainNamed('call')?.steps.some((step) => step.id === 'ring'), false);
+  assert.equal(chainNamed('go-out')?.steps.some((step) => step.id === 'plan'), false);
+});
+
+// ---- a step that uses a thing (story 3e, U1) ----
+
+/** chain:step -> the thing the step uses, as the story's table has it. */
+const USES = {
+  'go-out:away': 'keys', 'go-out:pay': 'wallet', 'coffee:open': 'scissors', 'present:wrap': 'scissors',
+  'present:call': 'phone', 'pizza:ordered': 'phone', 'pizza:pay': 'wallet', 'morning:read': 'phone',
+};
+
+test('exactly the steps of the story say which thing they use', () => {
+  const found = Object.fromEntries(CHAINS.flatMap((chain) => chain.steps.filter((step) => step.uses !== undefined).map((step) => [`${chain.id}:${step.id}`, step.uses])));
+  assert.deepEqual(found, USES);
+});
+
+test('only a tell uses a thing', () => {
+  assert.deepEqual(CHAINS.flatMap((chain) => chain.steps.filter((step) => step.uses !== undefined && step.kind !== 'tell')), []);
+});
+
+test('a tell that uses a thing becomes a tell event that carries it; a tell without carries nothing', () => {
+  assert.deepEqual(expand({ id: 'a', kind: 'tell', at: 'kitchen', uses: 'scissors' }), [{ kind: 'tell', chain: 'x', step: 'a', roomId: 'kitchen', uses: 'scissors' }]);
+  assert.equal('uses' in expand({ id: 'a', kind: 'tell' })[0], false);
+});
+
+// ---- the time of day (story 3e, U2) ----
+
+const TIMES = { morning: 'morning', 'go-out': 'day', 'come-home': 'day', coffee: 'day', present: 'day', call: 'day', pizza: 'evening', evening: 'evening' };
+
+test('every chain has the time of day of the story', () => {
+  assert.deepEqual(Object.fromEntries(CHAINS.map((chain) => [chain.id, chain.time])), TIMES);
+});
+
+test('the closing chain is played in the evening', () => {
+  assert.equal(chainNamed(CHAINS.find((chain) => chain.closer === true)?.id)?.time, 'evening');
 });
 
 test('at least one opener needs nothing, so a day can always begin', () => {
@@ -225,7 +266,7 @@ test('a tell, a take and a put-back may name a room with `at`, and it must exist
 // ---- the contract notices what is wrong ----
 
 const TEXTS_OF = { good: { a: 'Go.', b: 'Cut.', c: 'Done?' } };
-const GOOD = { id: 'good', steps: [{ id: 'a', kind: 'goTo', roomId: 'kitchen' }, { id: 'b', kind: 'take', object: 'scissors', leftAt: counter }, { id: 'c', kind: 'tell' }] };
+const GOOD = { id: 'good', time: 'day', steps: [{ id: 'a', kind: 'goTo', roomId: 'kitchen' }, { id: 'b', kind: 'take', object: 'scissors', leftAt: counter }, { id: 'c', kind: 'tell' }] };
 const problems = (chain, sentences = TEXTS_OF) => problemsOf(chain, contextFor(sentences));
 const withSteps = (steps) => ({ ...GOOD, steps });
 
@@ -280,13 +321,34 @@ test('a check outside the closing chain is a problem', () => {
 });
 
 test('a closing chain may hold a check', () => {
-  const chain = { id: 'good', closer: true, steps: [{ id: 'a', kind: 'tell' }, { id: 'c', kind: 'check' }] };
+  const chain = { id: 'good', closer: true, time: 'evening', steps: [{ id: 'a', kind: 'tell' }, { id: 'c', kind: 'check' }] };
   assert.deepEqual(problems(chain, { good: { a: 'Dusk.', c: 'Done?' } }), []);
 });
 
 test('a closing chain that takes or puts back something is a problem', () => {
-  const chain = { id: 'good', closer: true, steps: [{ id: 'a', kind: 'tell' }, { id: 'b', kind: 'take', object: 'scissors', leftAt: counter }, { id: 'c', kind: 'putBack', object: 'scissors' }] };
+  const chain = { id: 'good', closer: true, time: 'evening', steps: [{ id: 'a', kind: 'tell' }, { id: 'b', kind: 'take', object: 'scissors', leftAt: counter }, { id: 'c', kind: 'putBack', object: 'scissors' }] };
   assert.deepEqual(problems(chain, { good: { a: 'x', b: 'y' } }), ['b: the closing chain takes and puts back nothing', 'c: the closing chain takes and puts back nothing']);
+});
+
+test('a chain without a time of day, or with one that does not exist, is a problem', () => {
+  assert.deepEqual(problems({ ...GOOD, time: undefined }), ['the chain has no time of day']);
+  assert.deepEqual(problems({ ...GOOD, time: 'noon' }), ['the chain has no time of day']);
+});
+
+test('a closing chain that is not played in the evening is a problem', () => {
+  const chain = { id: 'good', closer: true, time: 'day', steps: [{ id: 'a', kind: 'tell' }, { id: 'c', kind: 'check' }] };
+  assert.deepEqual(problems(chain, { good: { a: 'Dusk.', c: 'Done?' } }), ['the closing chain is played in the evening']);
+});
+
+test('a step that uses a thing the chain takes earlier is fine; one that uses something else is a problem', () => {
+  const using = (uses) => withSteps([GOOD.steps[0], GOOD.steps[1], { id: 'c', kind: 'tell', uses }]);
+  assert.deepEqual(problems(using('scissors')), []);
+  assert.deepEqual(problems(using('keys')), ['c: uses keys, which the chain does not take earlier']);
+});
+
+test('a step that uses a thing before the chain takes it is a problem', () => {
+  const chain = withSteps([GOOD.steps[0], { id: 'c', kind: 'tell', uses: 'scissors' }, { id: 'b', kind: 'take', object: 'scissors', leftAt: counter }]);
+  assert.deepEqual(problems(chain, { good: { a: 'Go.', b: 'Cut.', c: 'Done?' } }), ['c: uses scissors, which the chain does not take earlier']);
 });
 
 test('an opener that needs a thing that does not exist is a problem', () => {

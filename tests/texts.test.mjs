@@ -136,8 +136,7 @@ const CHAIN_SENTENCES = {
     shoes: 'You take off your shoes.',
   },
   'go-out': {
-    start: 'You are in the hallway.',
-    plan: 'You are going out for some shopping.',
+    start: 'You are in the hallway, about to go shopping.',
     keys: 'You cannot leave without your keys.',
     wallet: 'You will have to pay in the shop.',
     away: 'You lock the door and walk to the shop.',
@@ -158,10 +157,10 @@ const CHAIN_SENTENCES = {
   },
   coffee: {
     go: 'You feel like coffee.',
-    pack: 'Take a new pack of coffee from the top right cupboard.',
+    pack: 'You take a new pack of coffee from the top right cupboard.',
     scissors: 'The pack has to be cut open.',
     open: 'You cut the pack open.',
-    tin: 'Take the tin with the flowers from the cupboard.',
+    tin: 'You take the tin with the flowers from the cupboard.',
     fill: 'You pour the coffee into the tin and make a pot of filter coffee.',
     'tin-back': 'You put the lid on the tin and put the tin back in the cupboard.',
     sit: 'You want to drink your coffee in the living room.',
@@ -169,7 +168,7 @@ const CHAIN_SENTENCES = {
   },
   present: {
     go: 'A birthday present has to be wrapped at the dining table.',
-    paper: 'Take the wrapping paper from the sideboard.',
+    paper: 'You take the wrapping paper from the sideboard.',
     scissors: 'The paper has to be cut.',
     wrap: 'You cut the paper and wrap the present.',
     phone: 'You want to ask what time the party starts.',
@@ -180,7 +179,7 @@ const CHAIN_SENTENCES = {
   },
   pizza: {
     hungry: 'You are hungry and want to order a pizza from the sofa.',
-    phone: 'You order it with your phone.',
+    phone: 'You want to order it with your phone.',
     ordered: 'The pizza is ordered. It will be here in half an hour.',
     bell: 'The doorbell rings: your pizza is here.',
     go: 'Someone has to open the front door.',
@@ -190,10 +189,9 @@ const CHAIN_SENTENCES = {
     eat: 'The pizza is on the table.',
   },
   call: {
-    ring: 'You want to call your sister.',
-    phone: 'You need your phone for that.',
+    phone: 'You want to call your sister.',
     walk: 'You talk and walk around. The call ends in the front garden.',
-    in: 'It gets chilly outside.',
+    in: 'The call is over. You want to sit down on the sofa again.',
     sit: 'You sit down on the sofa.',
   },
   evening: {
@@ -212,8 +210,19 @@ for (const [chain, steps] of Object.entries(CHAIN_SENTENCES)) {
   });
 }
 
-test('call.ring no longer mentions ringing: nothing rings, the player wants to call', () => {
-  assert.doesNotMatch(sentenceOf('call', 'ring'), /ring/i);
+test('every sentence of a chain is a narration, never an order: none starts with a bare verb', () => {
+  const bare = /^(Take|Put|Go|Walk) /;
+  const orders = Object.entries(TEXTS.chains).flatMap(([chain, steps]) => Object.keys(steps).filter((step) => bare.test(sentenceOf(chain, step))).map((step) => `${chain}.${step}`));
+  assert.deepEqual(orders, []);
+});
+
+test('the sentence that brings the player back inside is true wherever they stand: it names no place they are in', () => {
+  assert.doesNotMatch(sentenceOf('call', 'in'), /chilly|outside|garden/i);
+});
+
+test('the story of the call and of going out have no step that only announces the next one', () => {
+  assert.equal('ring' in TEXTS.chains.call, false);
+  assert.equal('plan' in TEXTS.chains['go-out'], false);
 });
 
 test('the chains in the texts are the eight chains of the list', () => {
@@ -260,7 +269,7 @@ const keys = { ...TEXTS.things.keys, icon: '🔑' };
 const hall = TEXTS.rooms.hall;
 
 test('the command to find a thing names it with its icon and asks where to look, without a pronoun that depends on the thing', () => {
-  assert.equal(TEXTS.findCommand({ room: hall, thing: keys }), 'You need your 🔑 keys. Where do you look? You are in the hallway.');
+  assert.equal(TEXTS.findCommand({ room: hall, thing: keys }), 'Where do you look for your 🔑 keys? You are in the hallway.');
 });
 
 test('the command to put a thing back names the room and the thing', () => {
