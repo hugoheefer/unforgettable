@@ -697,6 +697,59 @@ The player wears the coat all day, also in bed. Coming home should take the coat
 
 ---
 
+## Story 3e: no step that a human would find strange
+
+Written 2026-11-22 by the planning model after the user showed "You feel like coffee. Go to the kitchen." with the choice "Walk to another room" (fixed already: a walk-to offers its room). The user: "look for other not logical sequences". Three sessions were then played like a careful human who puts things away on their own (`flowstudy/human.mjs` in the scratchpad prints every screen with all its choices).
+
+### What is still strange
+
+1. **A step that uses a thing happens without it.** The player puts the scissors back in the drawer ("Something else first") and the story goes on with "You cut the paper and wrap the present." Same for the call ("The party starts at eight."), reading messages, paying.
+2. **No time of day.** "You have breakfast." is followed by "You are hungry and want to order a pizza from the sofa."
+3. **A reason that is only true in one place.** "It gets chilly outside." (call) is shown after the player walked to the kitchen to put the phone away.
+4. **Two voices.** "Take a new pack of coffee from the top right cupboard." (an order the player cannot refuse) next to "You cut the pack open." (a narration).
+5. **"Need" twice.** "(You need your phone for that.)" above "You need your 📱 phone. Where do you look?"
+6. **Two taps for one intention.** "You want to call your sister." [Go on] and only then the search for the phone; "You are going out for some shopping." [Go on] and only then the search for the keys.
+
+### Rules
+
+**U1 A step that uses a thing needs it in hand.** A `tell` may carry `uses: <object>`. When the player taps Go on and does not hold that thing (they put it away first), the story asks for it again: a `find` of that thing is inserted before the step (the same mechanism as "No, I forgot something"), with the step's own sentence as the reason. A prop in `uses` is ignored. Contract: `uses` names an object that the chain takes earlier. The steps that use a thing:
+
+| Chain | Step | uses |
+|---|---|---|
+| go-out | away (you lock the door) | keys |
+| go-out | pay | wallet |
+| coffee | open | scissors |
+| present | wrap | scissors |
+| present | call | phone |
+| pizza | ordered | phone |
+| pizza | pay | wallet |
+| morning | read | phone |
+
+**U2 Stories follow the time of day.** Every chain gets `time: 'morning' | 'day' | 'evening'`. The opener's time is the earliest of the session; the two other chains are picked among those not earlier than the opener and are played in time order (morning, day, evening); the closer is last. Times: `morning` morning; `go-out`, `come-home`, `coffee`, `present`, `call` day; `pizza` evening. Contract: every chain has a time; the closer is evening.
+
+**U3 A walk reason is true wherever the player stands.** The player may have walked off to put a thing away. Rule for authors (in `CLAUDE.md`): a `goTo` sentence is a wish or a purpose, never a description of the place the player is in. `call.in` becomes "The call is over. You want to sit down on the sofa again."
+
+**U4 One voice: the story narrates.** Every `tell` and every told prop step is a narration in the present tense ("You …", "The …"), never an order. Changes: `coffee.pack` "You take a new pack of coffee from the top right cupboard."; `coffee.tin` "You take the tin with the flowers from the cupboard."; `present.paper` "You take the wrapping paper from the sideboard.". Contract test over the English texts: no chain sentence starts with a bare verb ("Take ", "Put ", "Go ", "Walk ").
+
+**U5 The find command does not repeat "need".** `findCommand` becomes "Where do you look for your 🔑 keys? You are in the front garden." The take sentences stay as the reason ("You need your keys to get in.").
+
+**U6 One screen for one intention.** A `tell` directly before the `take` of a thing and saying why it is needed merges into the take's reason:
+- `call`: the `ring` step goes; `phone` becomes "You want to call your sister." (the call story then starts with the search for the phone, wherever the player is).
+- `go-out`: the `plan` step goes; the `start` move becomes "You are in the hallway, about to go shopping."
+- `pizza.phone` becomes "You want to order it with your phone." (an intention, not something already happening).
+
+### Tests (red first; one behaviour each)
+
+- day: U1 (a tell with `uses` and the thing in hand goes on; without it a find of that thing comes first, with the step's sentence as its reason; after finding it the tell is shown again; a prop in `uses` changes nothing; a saved day in the middle of the inserted find survives save and restore).
+- chains: the `uses` table; the contract for `uses`; every chain has a `time`; the closer is evening; U4 over all sentences; the removed steps (`call.ring`, `go-out.plan`).
+- day-plan: U2 (a morning opener can be followed by day and evening chains in time order; a day opener is never followed by a morning chain; the others are played in time order; with too few chains of a later time the session has fewer stories rather than going back in time; the first session still opens with `come-home`).
+- texts: the changed sentences; `findCommand`.
+- app-flow with the human-like player (copy the idea of `flowstudy/human.mjs` into `tests/play-bot.mjs` as an option): putting the scissors away before "You cut the paper and wrap the present." leads to a search for the scissors before the present is wrapped.
+- Mutation checks: ignore `uses` (the U1 tests fail); play the others in random order instead of time order (U2 fails).
+- At the end: play three sessions with `flowstudy/human.mjs` (seeds 7, 23, 11) and with `flowstudy/play.mjs`, read every screen with its choices, and report each screen that a human would still find strange, quoting it. Do not stop at the first one.
+
+---
+
 ## Story 4: progress in the player's own numbers (revisit)
 
 **Screen**, reached from the start screen with ( My progress ):
