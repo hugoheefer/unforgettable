@@ -179,7 +179,7 @@ const CHAIN_SENTENCES = {
   },
   pizza: {
     hungry: 'You are hungry and want to order a pizza from the sofa.',
-    phone: 'You want to order it with your phone.',
+    phone: 'The pizza place takes orders by phone.',
     ordered: 'The pizza is ordered. It will be here in half an hour.',
     bell: 'The doorbell rings: your pizza is here.',
     go: 'Someone has to open the front door.',
@@ -191,11 +191,11 @@ const CHAIN_SENTENCES = {
   call: {
     phone: 'You want to call your sister.',
     walk: 'You talk and walk around. The call ends in the front garden.',
-    in: 'The call is over. You want to sit down on the sofa again.',
+    in: 'The call is over. You want to sit down on the sofa.',
     sit: 'You sit down on the sofa.',
   },
   evening: {
-    dusk: 'It is evening.',
+    dusk: 'It is getting late.',
     look: 'Before you go to bed, you look around once more.',
   },
 };

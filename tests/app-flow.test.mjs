@@ -975,7 +975,7 @@ test('coming home, the player is shown taking off their shoes while the keys are
 });
 
 test('in the call story the player is shown a screen in the garden with the phone still in hand', () => {
-  const screen = session(PIZZA_DAY).find((candidate) => candidate.command === 'The call is over. You want to sit down on the sofa again.');
+  const screen = session(PIZZA_DAY).find((candidate) => candidate.command === 'The call is over. You want to sit down on the sofa.');
   assert.ok(screen, 'the screen that ends the call is shown');
   assert.equal(screen.room, 'garden');
   assert.ok(screen.inHand.includes('phone'));
@@ -1004,7 +1004,7 @@ test('in the present story, the call is told in the kitchen where the phone was 
 test('a session ends with the evening and the check, and asks "Is everything back in its place?" only once', () => {
   const screens = session();
   const commands = commandsOf(screens);
-  assert.deepEqual(commands.slice(-2), ['It is evening.', 'Is everything back in its place?']);
+  assert.deepEqual(commands.slice(-2), ['It is getting late.', 'Is everything back in its place?']);
   assert.equal(commands.filter((command) => command === 'Is everything back in its place?').length, 1);
 });
 
