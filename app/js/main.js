@@ -29,6 +29,8 @@ const flow = new AppFlow({
   random: createRandomSource(),
   clock: createClock(),
   saved: save,
+  // the test view, for testing the game only: open the page with ?test in the address
+  testMode: new URLSearchParams(window.location.search).has('test'),
   onSave: (state) => {
     save = { ...save, ...state };
     store.save(save);
@@ -54,6 +56,10 @@ function showScreen() {
     },
     onLookBack: () => {
       flow.lookBack();
+      showScreen();
+    },
+    onSeeWhere: () => {
+      flow.seeWhere();
       showScreen();
     },
   }, texts);

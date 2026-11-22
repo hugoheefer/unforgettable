@@ -18,16 +18,17 @@ function quietLink(text, onClick) {
 
 /**
  * @param {{ lead: string[], command: string, choices: { id: string, label: string, mark?: string }[], selected: string | null,
- *           canLeave?: boolean, canLookBack?: boolean, showNext?: boolean, praise?: string }} step
- * @param {{ onChoose: (id: string) => void, onNext: () => void, onLeave: () => void, onLookBack: () => void }} handlers
- * @param {{ next: string, menu: string, lookBack: string }} texts
+ *           canLeave?: boolean, canLookBack?: boolean, canSeeWhere?: boolean, showNext?: boolean, praise?: string }} step
+ * @param {{ onChoose: (id: string) => void, onNext: () => void, onLeave: () => void, onLookBack: () => void, onSeeWhere: () => void }} handlers
+ * @param {{ next: string, menu: string, lookBack: string, testLink: string }} texts
  */
-export function renderStep(step, { onChoose, onNext, onLeave, onLookBack }, texts) {
+export function renderStep(step, { onChoose, onNext, onLeave, onLookBack, onSeeWhere }, texts) {
   const screen = el('section', 'screen');
-  if (step.canLeave) {
+  if (step.canLeave || step.canSeeWhere) {
     const links = el('div', 'top-links');
-    links.append(quietLink(texts.menu, onLeave));
+    if (step.canLeave) links.append(quietLink(texts.menu, onLeave));
     if (step.canLookBack) links.append(quietLink(texts.lookBack, onLookBack));
+    if (step.canSeeWhere) links.append(quietLink(texts.testLink, onSeeWhere));
     screen.append(links);
   }
   if (step.praise) {

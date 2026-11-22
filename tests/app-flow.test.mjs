@@ -634,6 +634,52 @@ test('looking back where it is not offered is a mistake, not a screen', () => {
   assert.throws(() => app.lookBack());
 });
 
+// ---- the test view: where everything is (only with ?test in the address) ----
+
+test('without test mode no screen offers to see where everything is', () => {
+  const { app } = afterThePause();
+  assert.notEqual(app.step().canSeeWhere, true);
+  app.leave();
+  assert.notEqual(app.step().canSeeWhere, true);
+});
+
+test('in test mode the start screen, a session screen and a look-back screen offer to see where everything is', () => {
+  const { app } = newApp({ testMode: true });
+  assert.equal(app.step().canSeeWhere, true);
+  pick(app, 'play');
+  app.next();
+  assert.equal(app.step().canSeeWhere, true);
+  app.lookBack();
+  assert.equal(app.step().canSeeWhere, true);
+});
+
+test('the test view lists where the player stands and where every thing lies, and offers only the way back', () => {
+  const { app } = newApp({ testMode: true });
+  pick(app, 'play');
+  app.next();
+  app.seeWhere();
+  assert.equal(app.step().command, TEXTS.testCommand);
+  assert.equal(app.step().lead[0], TEXTS.testNote);
+  assert.equal(app.step().lead[1], 'You are in the front garden.');
+  assert.ok(app.step().lead.includes('🔑 your keys: in the right pocket of your coat ✓ home spot'));
+  assert.deepEqual(ids(app), ['back']);
+  assert.notEqual(app.step().canSeeWhere, true);
+});
+
+test('leaving the test view returns to the very screen it was opened from, and nothing was saved or recorded', () => {
+  const { app, saves } = newApp({ testMode: true });
+  pick(app, 'play');
+  app.next();
+  const before = app.step();
+  const saved = saves.length;
+  app.seeWhere();
+  pick(app, 'back');
+  assert.deepEqual(app.step(), before);
+  assert.equal(saves.length, saved);
+  app.lookBack();
+  assert.equal(app.step().command, 'Session 1.');
+});
+
 // ---- changing only some home spots ----
 
 test('only the home spot that was changed changes, and the player can leave the list at once', () => {

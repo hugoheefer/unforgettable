@@ -12,6 +12,7 @@ import { summarize } from './summary.js';
 import { chainIdsOf } from './day-plan.js';
 import { createScreenLog } from './screen-log.js';
 import { LookBackFlow } from './look-back-flow.js';
+import { whereEverythingIs } from './where-view.js';
 
 const CURRENT = '★';
 const DEFAULT_ONE_TAP = true;
@@ -43,10 +44,12 @@ export class AppFlow {
    * @param {{ layout: object, things: object[], texts: object, random: object,
    *           saved: { plan: object, progress: object, world: object, day: object | null, dayCount: number },
    *           onSave: (state: { plan: object, progress: object, world: object, day: object | null, dayCount: number }) => void }} options
-   *   `things` are the chosen catalogue entries; `saved` is what `onSave` handed over last time (or the defaults)
+   *   `things` are the chosen catalogue entries; `saved` is what `onSave` handed over last time (or the defaults);
+   *   `testMode` offers the test view on every screen
    */
-  constructor({ layout, things, texts, random, clock, saved, onSave }) {
-    Object.assign(this, { layout, things, texts, random, clock, onSave });
+  constructor({ layout, things, texts, random, clock, saved, onSave, testMode = false }) {
+    Object.assign(this, { layout, things, texts, random, clock, onSave, testMode });
+    this.testView = null; // the test view while it is open
     this.plan = saved.plan;
     this.oneTap = saved.oneTap ?? DEFAULT_ONE_TAP;
     this.progress = saved.progress;
@@ -175,7 +178,12 @@ export class AppFlow {
   step() {
     const step = this.current.step();
     const showNext = !(this.oneTap && step.choices.length > 0);
-    return { ...step, showNext, ...(step.canLeave && !this.screens.isEmpty() ? { canLookBack: true } : {}) };
+    return {
+      ...step,
+      showNext,
+      ...(step.canLeave && !this.screens.isEmpty() ? { canLookBack: true } : {}),
+      ...(this.testMode && this.current !== this.testView ? { canSeeWhere: true } : {}),
+    };
   }
 
   choose(choiceId) {
@@ -212,6 +220,19 @@ export class AppFlow {
     if (!this.step().canLookBack) throw lookBackUnavailable();
     const resume = this.current;
     this.current = new LookBackFlow({ entries: this.screens.entries(), texts: this.texts, onReturn: () => { this.current = resume; } });
+  }
+
+  /** The test view: where everything is now, read only; going back returns to the screen it was opened from. */
+  seeWhere() {
+    const resume = this.current;
+    const hand = this.day?.state().inHand ?? [];
+    const roomId = this.day?.state().roomId ?? null;
+    const lines = whereEverythingIs({ layout: this.layout, things: this.things, world: this.world, plan: this.plan, hand, roomId, texts: this.texts });
+    this.testView = new ChoiceScreen(
+      { lead: [this.texts.testNote, ...lines], command: this.texts.testCommand, choices: [{ id: 'back', label: this.texts.testBack }] },
+      () => { this.current = resume; },
+    );
+    this.current = this.testView;
   }
 
   /** The Menu link of a day: back to the start screen; the day continues where it was. */

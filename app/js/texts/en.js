@@ -217,6 +217,16 @@ export const en = {
   lookBackLater: 'Later screen',
   lookBackReturn: 'Back to the game',
   lookBackCommand: ({ command, picked }) => (picked === null ? command : `${command} You chose: ${picked}.`),
+  // the test view (only with ?test in the address)
+  testLink: 'Where is everything',
+  testCommand: 'Where everything is now (test view)',
+  testNote: 'Only for testing. Nothing here changes the game.',
+  testBack: 'Back to the game',
+  testYouAreIn: ({ room }) => `You are ${room.in}.`,
+  testThingLine: ({ thing, where, home }) => `${thing.icon} ${thing.your}: ${where}${home ? ' ✓ home spot' : ''}`,
+  testInHand: 'in your hand',
+  testWorn: 'you wear it',
+  testNowhere: 'nowhere',
 
   startDay: ({ number }) => `Start session ${number}`,
   continueDay: ({ number }) => `Continue session ${number}`,

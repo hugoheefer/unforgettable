@@ -6,7 +6,7 @@
 import { isPocket, sameLocation } from './world.js';
 import { choiceNotOffered } from './errors.js';
 import { named } from './names.js';
-import { describeLocation } from './room-view.js';
+import { describeLocation, layoutLookup } from './room-view.js';
 
 const CURRENT = '★';
 
@@ -23,11 +23,7 @@ export class SetupFlow {
     this.lead = [];
     this.finished = false;
     this.selected = null;
-    // describeLocation needs to look up rooms and garments; there is no day yet
-    this.lookup = {
-      roomOf: (id) => layout.places.find((place) => place.id === id),
-      garmentOf: (id) => layout.garments.find((garment) => garment.id === id),
-    };
+    this.lookup = layoutLookup(layout); // there is no day yet
   }
 
   isFinished() {

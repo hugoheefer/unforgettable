@@ -20,3 +20,5 @@ npm test       # unit tests (Node's built-in runner, no dependencies)
 ```
 
 `app/` is plain static files (ES modules, no build step); it is meant to be copied into `docs/unforgettable/` of the `my-wiki` repo. See `CLAUDE.md`.
+
+For testing, open the page with `?test` in the address (`http://localhost:8080/?test`): every screen then has a "Where is everything" link that shows where you stand and where every thing and the coat are. Players never see it.

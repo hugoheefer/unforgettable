@@ -4,6 +4,14 @@
 import { isPocket } from './world.js';
 import { named } from './names.js';
 
+/** What `describeLocation` needs to look up rooms and garments, taken from the layout (also when there is no day). */
+export function layoutLookup(layout) {
+  return {
+    roomOf: (id) => layout.places.find((place) => place.id === id),
+    garmentOf: (id) => layout.garments.find((garment) => garment.id === id),
+  };
+}
+
 /**
  * A location in words: a spot with its room ("on the key hook in the hallway"), or by itself when the room is
  * obvious; a pocket always by itself, because its sentence already names the garment.

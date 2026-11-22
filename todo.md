@@ -84,6 +84,10 @@ The app never tells the player to put a thing back, also not in the first sessio
 
 A thing is let go when the player walks away, not before; openers take turns; a morning opener; going out needs keys and wallet; the pizza is ordered by phone first; you call your sister instead of a ringing phone; the tin comes from the cupboard. 761 tests. Later: the coat (worn all day, even in bed) needs its own story.
 
+## Test view (2026-11-22)
+
+Open the game with `?test` in the address: every screen gets a "Where is everything" link (where you stand, where each thing and the coat are). For testing only; players do not see it. 804 tests.
+
 ## Next
 
 The decided plan to a usable version is in `plan.md` (2026-11-16): story 0 refactor, 0b texts ready for a second language, 1 the world persists, 2 days made of events, 3 find cost and day summary, 4 progress, 5 first use and choosing things, 6 bridge to real life, 7 putting things back, 8 hand-over. Build them in that order; move each to "Done" here when it is finished.
