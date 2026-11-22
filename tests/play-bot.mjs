@@ -17,7 +17,8 @@ export function playSession(app) {
     app.choose(answer);
     app.next();
   };
-  const walkTo = (roomId) => { tap('doors'); tap(`door:${roomId}`); };
+  // a walk-to offers its room as one choice; elsewhere the list of rooms is opened first
+  const walkTo = (roomId) => { if (!ids().includes(`door:${roomId}`)) tap('doors'); tap(`door:${roomId}`); };
   const goToThing = (location, state) => {
     if (isPocket(location)) { tap('pockets'); return tap(`pocket:${location.garmentId}/${location.pocketId}`); }
     if (location.placeId !== state.roomId) return walkTo(location.placeId);

@@ -490,7 +490,8 @@ test('the date on which a day was finished is saved when it ends, not when it st
 
 // ---- whole days through the screens ----
 
-const walkTo = (app, roomId) => { pick(app, 'doors'); pick(app, `door:${roomId}`); };
+// a walk-to offers its room as one choice; elsewhere the list of rooms is opened first
+const walkTo = (app, roomId) => { if (!ids(app).includes(`door:${roomId}`)) pick(app, 'doors'); pick(app, `door:${roomId}`); };
 
 /** Answers whatever screen is up, the way a player who knows the house would. */
 function answer(app) {
@@ -961,8 +962,8 @@ test('the pizza story opens with its own reason, straight after the last screen 
   const screens = session(PIZZA_DAY);
   const shoes = screens.findIndex((screen) => screen.command === 'You take off your shoes.');
   assert.ok(shoes >= 0, 'the story before ends with the shoes');
-  assert.deepEqual(screens[shoes + 1].lead, ['You are hungry and want to order a pizza from the sofa.']);
-  assert.equal(screens[shoes + 1].command, 'Go to the living room.');
+  assert.deepEqual(screens[shoes + 1].lead, []);
+  assert.equal(screens[shoes + 1].command, 'You are hungry and want to order a pizza from the sofa.');
 });
 
 test('coming home, the player is shown taking off their shoes while the keys are still in hand, inside the hallway', () => {
@@ -973,7 +974,7 @@ test('coming home, the player is shown taking off their shoes while the keys are
 });
 
 test('in the call story the player is shown a screen in the garden with the phone still in hand', () => {
-  const screen = session(PIZZA_DAY).find((candidate) => candidate.lead.includes('It gets chilly outside.'));
+  const screen = session(PIZZA_DAY).find((candidate) => candidate.command === 'It gets chilly outside.');
   assert.ok(screen, 'the screen about the chill is shown');
   assert.equal(screen.room, 'garden');
   assert.ok(screen.inHand.includes('phone'));

@@ -108,10 +108,12 @@ test('the spot where the scissors stay in the coffee chain is called the worktop
   assert.deepEqual(TEXTS.spots.counter, { name: 'Worktop', at: 'on the worktop' });
 });
 
-test('the command of a walk-to and of coming back are one general sentence built from the room', () => {
+test('walking to the room of the story is one choice that names the room and its steps; coming back is asked with the room', () => {
   const room = TEXTS.rooms.kitchen;
-  assert.equal(TEXTS.goToCommand({ room }), 'Go to the kitchen.');
+  assert.equal(TEXTS.walkToOption({ room, steps: 2 }), 'Walk to the kitchen · 2 steps');
+  assert.equal(TEXTS.walkBackOption({ room, steps: 1 }), 'Walk back to the kitchen · 1 step');
   assert.equal(TEXTS.goBackCommand({ room }), 'Go back to the kitchen.');
+  assert.equal('goToCommand' in TEXTS, false);
 });
 
 test('the pause that opens a day has a text', () => {

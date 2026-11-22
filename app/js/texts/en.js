@@ -121,7 +121,7 @@ export const en = {
     later: 'Everything is where you left it.',
   },
   // The sentences of the chains, by chain and step (see chains/). A step that is a put-back of a thing has none.
-  // A walk-to step's sentence is only its reason: the command ("Go to the kitchen.") is `goToCommand`.
+  // A walk-to step's sentence is its reason; the room is the choice (`walkToOption`).
   chains: {
     'come-home': {
       door: 'You come home and stand at your front door.',
@@ -195,7 +195,6 @@ export const en = {
       look: 'Before you go to bed, you look around once more.',
     },
   },
-  goToCommand: ({ room }) => `Go ${room.to}.`,
   goBackCommand: ({ room }) => `Go back ${room.to}.`,
 
   next: 'Next',
@@ -243,6 +242,8 @@ export const en = {
   pocketLabel: ({ pocket, garment, hangs, seen }) =>
     `${pocket.icon} ${pocket.name} (${garment.name}${hangs ? ', hangs here' : ''})${seenText(seen)}`,
   walkOption: ({ room, steps: count }) => `${room.name} · ${steps(count)}`,
+  walkToOption: ({ room, steps: count }) => `Walk ${room.to} · ${steps(count)}`,
+  walkBackOption: ({ room, steps: count }) => `Walk back ${room.to} · ${steps(count)}`,
 
   putCommand: ({ room, thing }) => `You are ${room.in}. Put your ${thing.icon} ${thing.name} back.`,
   findCommand: ({ room, thing }) => `You need your ${thing.icon} ${thing.name}. Where do you look? You are ${room.in}.`,

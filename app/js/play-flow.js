@@ -55,11 +55,12 @@ const MODES = {
       preselect: 'go',
     }),
   },
+  // the reason is the command and the room is the choice: the story says where to go, so no list of rooms
   goTo: {
-    context: (flow, state) => [sentenceOf(flow.texts, state.event.chain, state.event.step)],
+    context: () => [],
     root: (flow, state) => ({
-      command: flow.texts.goToCommand({ room: flow.roomNamed(state.event.roomId) }),
-      choices: [flow.walkChoice(), flow.elseChoice()],
+      command: sentenceOf(flow.texts, state.event.chain, state.event.step),
+      choices: [flow.walkStraightTo(state.event.roomId, flow.texts.walkToOption), flow.elseChoice()],
     }),
   },
   check: {
@@ -94,7 +95,7 @@ const MODES = {
     context: () => [],
     root: (flow, state) => ({
       command: flow.texts.goBackCommand({ room: flow.roomNamed(state.returnTo) }),
-      choices: [flow.walkChoice()],
+      choices: [flow.walkStraightTo(state.returnTo, flow.texts.walkBackOption)],
     }),
   },
 };
@@ -182,6 +183,13 @@ export class PlayFlow {
 
   roomNamed(roomId) {
     return named(this.texts.rooms, this.day.roomOf(roomId));
+  }
+
+  /** One choice that walks to the room the story is waiting in, with what the walk costs. */
+  walkStraightTo(roomId, sentence) {
+    const { day } = this;
+    const steps = day.world.stepsBetween(day.state().roomId, roomId);
+    return { id: `door:${roomId}`, label: sentence({ room: this.roomNamed(roomId), steps }) };
   }
 
   walkChoice() {

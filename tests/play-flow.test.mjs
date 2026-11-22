@@ -255,30 +255,25 @@ test('a day that was saved right after a move shows the sentence of that move ag
 
 const goToDay = (options = {}) => makeDay([goTo('kitchen', 'coffee', 'go'), tell('kitchen', 'coffee', 'open')], { ...options, state: { roomId: 'hall', startedIn: 'hall', ...options.state } });
 
-test('a walk-to has its reason as the lead, the general sentence as the command, and two ways to answer', () => {
+test('a walk-to tells its reason, and walking there is one choice that names the room and its steps', () => {
   assert.deepEqual(flowFor(goToDay()).step(), {
-    lead: ['You feel like coffee.'],
-    command: 'Go to the kitchen.',
-    choices: [WALK, ELSE],
+    lead: [],
+    command: 'You feel like coffee.',
+    choices: [{ id: 'door:kitchen', label: 'Walk to the kitchen · 1 step' }, ELSE],
     selected: null,
     canLeave: true,
   });
 });
 
-test('walking to the room of a walk-to ends it and shows the next screen', () => {
+test('walking to the room of a walk-to is one choice, and the next screen of the story follows', () => {
   const flow = flowFor(goToDay());
-  pick(flow, 'doors');
   pick(flow, 'door:kitchen');
   assert.deepEqual(flow.step().lead, []);
   assert.equal(flow.step().command, 'You cut the pack open.');
 });
 
-test('arriving in another room than asked repeats the command and the reason', () => {
-  const flow = flowFor(goToDay());
-  pick(flow, 'doors');
-  pick(flow, 'door:dining');
-  assert.deepEqual(flow.step().lead, ['You feel like coffee.']);
-  assert.equal(flow.step().command, 'Go to the kitchen.');
+test('a walk-to offers no list of other rooms: the story says where to go', () => {
+  assert.equal(ids(flowFor(goToDay()).step()).includes('doors'), false);
 });
 
 test('a walk-to for the room you already stand in is skipped and its reason leads the next screen', () => {
@@ -293,7 +288,9 @@ test('a walk-to for the room you already stand in is skipped and its reason lead
 
 test('when you walked off from a tell, the screen asks you back and offers only walking', () => {
   const flow = flowFor(tellDay({ state: { roomId: 'study', startedIn: 'study' } }));
-  assert.deepEqual(flow.step(), { lead: [], command: 'Go back to the kitchen.', choices: [WALK], selected: null, canLeave: true });
+  assert.deepEqual(flow.step(), {
+    lead: [], command: 'Go back to the kitchen.', choices: [{ id: 'door:kitchen', label: 'Walk back to the kitchen · 3 steps' }], selected: null, canLeave: true,
+  });
 });
 
 test('a tell without a room is shown wherever the player stands, without asking them back', () => {
@@ -308,13 +305,8 @@ test('the check is shown wherever the player stands, without asking them back', 
   assert.deepEqual(flowFor(day).step().lead, ['Before you go to bed, you look around once more.']);
 });
 
-test('walking back shows the screen of the story again', () => {
+test('walking back is one choice, and the screen of the story is shown again', () => {
   const flow = flowFor(tellDay({ state: { roomId: 'study', startedIn: 'study' } }));
-  pick(flow, 'doors');
-  pick(flow, 'door:landing');
-  pick(flow, 'doors');
-  pick(flow, 'door:hall');
-  pick(flow, 'doors');
   pick(flow, 'door:kitchen');
   assert.equal(flow.step().command, 'Take a new pack of coffee from the top right cupboard.');
 });
@@ -609,7 +601,7 @@ test('putting a thing away in another room, then the screen asks you back', () =
   pick(flow, 'spot:desk-drawer');
   assert.equal(flow.step().praise, PRAISE_SCISSORS);
   assert.equal(flow.step().command, 'Go back to the kitchen.');
-  assert.deepEqual(ids(flow.step()), ['doors']);
+  assert.deepEqual(ids(flow.step()), ['door:kitchen']);
 });
 
 test('a thing put away on your own is reported like any put-away, with the steps of the walk', () => {
@@ -732,8 +724,9 @@ test('the sentences on the screen come from the injected texts, not from the cod
 });
 
 test('the screens of the story come from the injected texts too', () => {
-  const texts = { ...TEXTS, goToCommand: () => 'GA', checkCommand: 'KLOPT HET?', goOn: 'DOOR', chains: { ...TEXTS.chains, coffee: { ...TEXTS.chains.coffee, go: 'REDEN' } } };
-  assert.deepEqual([new PlayFlow(goToDay(), { texts }).step().command, new PlayFlow(goToDay(), { texts }).step().lead], ['GA', ['REDEN']]);
+  const texts = { ...TEXTS, walkToOption: () => 'LOOP', checkCommand: 'KLOPT HET?', goOn: 'DOOR', chains: { ...TEXTS.chains, coffee: { ...TEXTS.chains.coffee, go: 'REDEN' } } };
+  const walking = new PlayFlow(goToDay(), { texts }).step();
+  assert.deepEqual([walking.command, walking.choices[0].label], ['REDEN', 'LOOP']);
   assert.equal(new PlayFlow(checkDay(), { texts }).step().command, 'KLOPT HET?');
   assert.equal(new PlayFlow(tellDay(), { texts }).step().choices[0].label, 'DOOR');
 });
