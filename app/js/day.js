@@ -125,6 +125,7 @@ export class Day {
 
   settle() {
     for (let event = this.event(); event && EVENT_KINDS[event.kind].isDone(this, event); event = this.event()) this.advance();
+    this.askForMissing();
   }
 
   advance() {
@@ -163,18 +164,19 @@ export class Day {
   continue() {
     this.begin('waitsForNext');
     this.assertPresent();
-    const missing = EVENT_KINDS[this.event().kind].needs?.(this, this.event()) ?? [];
-    if (missing.length > 0) return this.askAgainFor(missing[0]);
     this.acknowledged = true;
     this.settle();
   }
 
   /**
-   * The player put a thing away that the step needs: it is searched for again before the step, with the reason the
-   * story first gave for needing it (the latest earlier find of it in this chain), and the step is shown after it.
+   * A step that uses a thing is never shown while the thing is not in hand. As soon as the story stands on such a
+   * step in its own room (a put-away or a walk back ends here), the thing is searched for before the step, with the
+   * reason the story first gave for needing it (the latest earlier find of it in this chain); the step is shown after.
    */
-  askAgainFor(thingId) {
+  askForMissing() {
     const current = this.event();
+    const [thingId] = current && this.returnTo() === null ? EVENT_KINDS[current.kind].needs?.(this, current) ?? [] : [];
+    if (thingId === undefined) return;
     const earlier = this.events.slice(0, this.index).findLast((event) => event.kind === 'find' && event.chain === current.chain && event.thingId === thingId);
     const leftAt = earlier?.leftAt ?? this.leftAt[thingId] ?? this.plan[thingId];
     this.events.splice(this.index, 0, { kind: 'find', chain: current.chain, step: earlier?.step ?? current.step, thingId, leftAt });

@@ -1031,19 +1031,27 @@ const sentenceOfStep = ({ chain, step }) => TEXTS.chains[chain][step];
 test('a player who puts the scissors away before they are used is asked for them again before the paper is wrapped', () => {
   const screens = playSession(newApp().app, { putsAwayBeforeUse: true });
   const wrap = 'You cut the paper and wrap the present.';
-  const searchFor = screens.findIndex((screen) => screen.lead.includes('The paper has to be cut.') && screen.command.startsWith('Where do you look for your ✂️ scissors'));
+  const putAway = screens.findIndex((screen) => screen.command === wrap && screen.answer === 'else');
+  const searchFor = screens.findIndex((screen, at) => at > putAway && screen.lead.includes('The paper has to be cut.') && screen.command.startsWith('Where do you look for your ✂️ scissors'));
   const wrapped = screens.findIndex((screen) => screen.command === wrap && screen.answer === 'go');
   assert.ok(searchFor >= 0, 'the scissors are asked for, with the reason the story first gave');
-  assert.ok(searchFor < wrapped, 'and that comes before the paper is wrapped');
+  assert.ok(putAway >= 0 && searchFor > putAway && searchFor < wrapped, 'after the put-away and before the paper is wrapped');
 });
 
-test('whatever the player puts away on their own, a step that uses a thing never goes on without it: the next screen is the search', () => {
+test('a step that uses a thing that was put away is shown twice, not three times: when the player put it away and when it really happens', () => {
   const screens = playSession(newApp().app, { putsAwayBeforeUse: true });
-  const tapped = screens.flatMap((screen, at) => (screen.answer === 'go' && USING_STEPS.some((use) => sentenceOfStep(use) === screen.command) ? [at] : []));
-  assert.ok(tapped.length > 0);
-  for (const at of tapped) {
-    const use = USING_STEPS.find((candidate) => sentenceOfStep(candidate) === screens[at].command);
-    if (!screens[at].inHand.includes(use.thing)) assert.match(screens[at + 1].command, /^Where do you look for your/, `${screens[at].command} went on without ${use.thing}`);
+  const showings = (sentence) => screens.filter((screen) => screen.command === sentence).map((screen) => screen.answer);
+  assert.deepEqual(showings('You cut the paper and wrap the present.'), ['else', 'go']);
+  assert.deepEqual(showings('You cut the pack open.'), ['else', 'go']);
+});
+
+test('whatever the player puts away on their own, a step that uses a thing is only gone on from with that thing in hand', () => {
+  const screens = playSession(newApp().app, { putsAwayBeforeUse: true });
+  const goneOn = screens.filter((screen) => screen.answer === 'go' && USING_STEPS.some((use) => sentenceOfStep(use) === screen.command));
+  assert.ok(goneOn.length > 0);
+  for (const screen of goneOn) {
+    const use = USING_STEPS.find((candidate) => sentenceOfStep(candidate) === screen.command);
+    assert.ok(screen.inHand.includes(use.thing), `${screen.command} without ${use.thing}`);
   }
   assert.ok(screens.some((screen) => screen.answer === 'else'), 'the player did put something away on their own');
 });
