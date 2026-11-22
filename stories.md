@@ -608,6 +608,95 @@ Written 2026-11-17 after the user played the sessions version: "after a few step
 
 ---
 
+## Story 3d: stories that make sense to a human
+
+Written 2026-11-22 by the planning model after replaying three sessions by script with the current rules (no put-back is ever told). Build it after 3c; it changes the engine in one place and the stories in several.
+
+### What does not make sense now (from the transcript)
+
+1. **No moment to put a thing away.** In `come-home` the keys are found at the front door and the story moves straight inside: the let-go comes *before* the move, so the keys lie on the console table before the player ever sees a screen with the keys in hand. Same in `call`: the phone is laid on the garden table before the first screen in the garden. Since nothing is told any more, the player must get at least one screen, holding the thing, in the place where it was used; otherwise forgetting is not their mistake but the game's.
+2. **The same opener every session.** `come-home` needs the keys on the person; after session 1 they lie on the console table, so every later session opens with `go-out` (seen three sessions in a row).
+3. **Searching a ringing phone.** "Somewhere your phone rings" is found by ear in real life, not by memory: a poor test of the habit.
+4. **Shopping without the wallet.** `go-out` only needs the keys; nobody goes shopping without a wallet.
+5. **A pizza that nobody ordered.** The doorbell rings for a pizza that was never ordered.
+6. **The tin.** "Take the tin from the worktop" … "put the tin back in the cupboard": two different places for one object.
+
+### Rules
+
+**R1 Let go when you walk away, not before.** A `letGo` is placed *after* a `goTo` (when the player has walked out of the room where the thing was used) and at the end of a chain, never before a `move`: a story move takes the player along with what they hold (you carry the keys inside). Contract test over every chain, with the default rules (every put-back silent): between the `find` of a chosen thing and the `letGo` that names it there is at least one event with a screen (`tell`, `goTo` or `check`) while the player stands in the room where the thing was used or later rooms of the story. The thing still lands on its `leftAt` spot.
+
+**R2 Openers take turns.** The opener is picked from the openers whose need is met, preferring one that was not played yesterday (`yesterdayChains` already holds it); the very first session still opens with `come-home`.
+
+**R3 A new opener `morning`** (needs nothing), so a session can start at home in the morning:
+
+| Step | Kind | Data | Sentence |
+|---|---|---|---|
+| `wake` | move | bedroom | "You wake up in your bedroom." |
+| `phone` | take | phone, leftAt bedroom `nightstand` | "You want to know the time and read your messages." |
+| `read` | tell | at bedroom | "You read your messages in bed." |
+| `phone-back` | putBack | phone | |
+| `dress` | tell | at bedroom | "You get dressed." |
+| `breakfast` | goTo | kitchen | "Breakfast is waiting." |
+| `eat` | tell | at kitchen | "You have breakfast." |
+
+### Stories that change
+
+`go-out` (also needs the wallet):
+
+| Step | Kind | Data | Sentence |
+|---|---|---|---|
+| `start` | move | hall | "You are in the hallway." |
+| `plan` | tell | | "You are going out for some shopping." |
+| `keys` | take | keys, leftAt hall `console` | "You cannot leave without your keys." |
+| `wallet` | take | wallet, leftAt hall `console` | "You will have to pay in the shop." |
+| `away` | tell | | "You lock the door and walk to the shop." |
+| `pay` | tell | | "You pay at the till." |
+| `back` | tell | | "An hour later you are back with a full bag." |
+| `inside` | move | hall | "You open the door. You are inside." |
+| `bag` | tell | at hall | "You put the shopping bag down." |
+| `keys-back` | putBack | keys | |
+| `wallet-back` | putBack | wallet | |
+| `unpack` | goTo | kitchen | "The shopping belongs in the kitchen." |
+| `done` | tell | at kitchen | "Everything is unpacked." |
+
+`pizza` (ordered first, with the phone):
+
+| Step | Kind | Data | Sentence |
+|---|---|---|---|
+| `hungry` | goTo | living | "You are hungry and want to order a pizza from the sofa." |
+| `phone` | take | phone, leftAt living `coffee-table` | "You order it with your phone." |
+| `ordered` | tell | at living | "The pizza is ordered. It will be here in half an hour." |
+| `phone-back` | putBack | phone | |
+| `bell` | tell | | "The doorbell rings: your pizza is here." |
+| `go` | goTo | hall | "Someone has to open the front door." |
+| `wallet` | take | wallet, leftAt hall `console` | "The pizza has to be paid." |
+| `pay` | tell | at hall | "You pay and take the pizza." |
+| `wallet-back` | putBack | wallet | |
+| `table` | goTo | dining | "The pizza goes on the dining table." |
+| `eat` | tell | at dining | "The pizza is on the table." |
+
+`call` (the player wants to call, nothing rings): `ring` becomes "You want to call your sister."; `phone` becomes "You need your phone for that."; the rest stays.
+
+`coffee`: `tin` becomes "Take the tin with the flowers from the cupboard."
+
+`come-home` and `present` keep their steps; R1 alone gives `come-home` its missing moment ("You take off your shoes." with the keys still in hand).
+
+### Not in this story (noted for later)
+
+The player wears the coat all day, also in bed. Coming home should take the coat off and hang it, going out should put it on (and find it). That needs the coat as something that can be searched for: a story of its own.
+
+### Tests (red first; one behaviour each)
+
+- day-plan: R1 for a hand-made chain (take, move, putBack, tell → the let-go comes after the tell, not before the move); after a `goTo` the let-go comes after it; at the end of a chain as before; the contract of R1 over every real chain with the default rules.
+- day-plan: R2 (yesterday's opener is not picked when another opener can open; it is picked when it is the only one; the first session still opens with `come-home`).
+- chains: `morning` is an opener that needs nothing and starts with a move; `go-out` takes keys and wallet; `pizza` starts with a `goTo` (allowed after the opener) and takes the phone before the wallet; the changed sentences; every step of the tables above.
+- app-flow (real chains, fixed random, the play bot): in `come-home` there is a screen holding the keys inside the hallway before they are let go ("You take off your shoes." is shown and the keys are still in hand at that moment, checked through the day's state); three sessions in a row do not all open with `go-out`.
+- texts: the new and changed sentences; `call.ring` no longer mentions ringing.
+- Mutation checks: put the let-go before a `move` again (the R1 contract fails); ignore yesterday for openers (R2 fails).
+- Read a scripted transcript of three sessions after the change (`flowstudy/play.mjs` in the scratchpad, or the play bot) and report any screen that still does not make sense to a human, quoting it.
+
+---
+
 ## Story 4: progress in the player's own numbers (revisit)
 
 **Screen**, reached from the start screen with ( My progress ):
