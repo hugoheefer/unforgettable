@@ -37,6 +37,11 @@ export const letGo = (thingIds = [], chain = 'coffee') => ({ kind: 'letGo', chai
 export const find = (thingId, leftAt = LEFT_AT[thingId], chain = 'coffee', step = 'scissors') => ({ kind: 'find', chain, step, thingId, leftAt });
 export const putAway = (thingId, chain = 'coffee', step = 'scissors-back') => ({ kind: 'putAway', chain, step, thingId });
 
+/** The question of a choose step; `options` are the ids of the options whose events follow it. */
+export const choose = (roomId, chain = 'coffee', step = 'open-how', options = ['cut', 'tear']) => ({ kind: 'choose', chain, step, options, roomId });
+/** An event of one option of a choose step; `option` is '<step>/<option>'. */
+export const inOption = (option, event) => ({ ...event, option });
+
 /** The saved state of a day that stands at `index`, in the hallway, with empty hands. */
 export const dayState = (events, overrides = {}) => ({
   number: 2, events, index: 0, roomId: 'hall', inHand: [], steps: 0, startedIn: 'hall', opened: [], arrival: null, leftAt: {}, ...overrides,
@@ -93,6 +98,7 @@ export function playOut(day) {
     if (state.returnTo) day.walkTo(state.returnTo);
     else if (event.kind === 'pause' || event.kind === 'tell') day.continue();
     else if (event.kind === 'goTo') day.walkTo(event.roomId);
+    else if (event.kind === 'choose') day.chooseOption(event.options[0]);
     else if (event.kind === 'check') day.answerCheck(true);
     else if (event.kind === 'putAway') {
       if (roomId !== 'living') day.walkTo('living');

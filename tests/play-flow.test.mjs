@@ -8,7 +8,7 @@ import { TEXTS } from './texts-helper.mjs';
 import { LAYOUT } from '../app/js/layout.js';
 import { THINGS, defaultPlan } from '../app/js/things.js';
 import { World } from '../app/js/world.js';
-import { check, dayState, find, findDay, goTo, letGo, makeDay, moveTo, pause, pocket, putAway, putAwayDay, spot, tell, worldWith } from './day-helper.mjs';
+import { check, choose, dayState, find, inOption, findDay, goTo, letGo, makeDay, moveTo, pause, pocket, putAway, putAwayDay, spot, tell, worldWith } from './day-helper.mjs';
 
 const flowFor = (day, options = {}) => new PlayFlow(day, { texts: TEXTS, ...options });
 const putFlow = (thingId = 'keys', options = {}) => flowFor(putAwayDay(thingId, options));
@@ -319,7 +319,7 @@ const scissorsFind = (options = {}) => makeDay([find('scissors'), tell('kitchen'
 
 test('finding a thing: the sentence of the step is the lead, the command asks for the thing, three ways to answer', () => {
   assert.deepEqual(flowFor(scissorsFind()).step(), {
-    lead: ['The pack has to be cut open.'],
+    lead: ['You want a clean cut.'],
     command: 'Where do you look for your ✂️ scissors? You are in the kitchen.',
     choices: [
       { id: 'spots', label: 'Look here, in the kitchen' },
@@ -863,3 +863,62 @@ test('letting go says nothing on the next screen', () => {
   pick(flow, 'go');
   assert.deepEqual(flow.step().lead, []);
 });
+
+// ---- a choice: the player picks one of two real actions (story 3f) ----
+
+const choiceDay = (options = {}) => makeDay([
+  choose('kitchen'),
+  inOption('open-how/cut', find('scissors', undefined, 'coffee', 'scissors')),
+  inOption('open-how/cut', tell('kitchen', 'coffee', 'open', 'scissors')),
+  inOption('open-how/tear', tell('kitchen', 'coffee', 'tear')),
+  tell('kitchen', 'coffee', 'fill'),
+], { ...options, state: { ...KITCHEN, ...options.state } });
+const choiceFlow = (options) => flowFor(choiceDay(options));
+
+test('a question shows its sentence as the command, the options in chain order, then Something else first, and nothing is selected', () => {
+  assert.deepEqual(choiceFlow().step(), {
+    lead: [],
+    command: 'The pack of coffee has to be opened.',
+    choices: [
+      { id: 'option:cut', label: 'Cut it open with your scissors' },
+      { id: 'option:tear', label: 'Tear it open' },
+      ELSE,
+    ],
+    selected: null,
+    canLeave: true,
+  });
+});
+
+test('taking an option goes on with that option: the story shows its next sentence', () => {
+  const flow = choiceFlow();
+  pick(flow, 'option:tear');
+  assert.equal(flow.step().command, 'You tear the pack open. Some coffee spills on the worktop.');
+});
+
+test('taking an option that holds a find goes on with the search for that thing', () => {
+  const flow = choiceFlow({ world: worldWith({ scissors: spot('study', 'desk-drawer') }) });
+  pick(flow, 'option:cut');
+  assert.equal(flow.step().command.startsWith('Where do you look for your ✂️ scissors'), true);
+});
+
+test('the other option is no longer offered once an option is taken, and the next story screen has Go on selected', () => {
+  const flow = choiceFlow();
+  pick(flow, 'option:tear');
+  assert.deepEqual(ids(flow.step()), ['go', 'else']);
+  assert.equal(flow.step().selected, 'go');
+});
+
+test('Something else first on a question leads to the same list as on any story screen, and Go on returns to the question', () => {
+  const flow = choiceFlow();
+  pick(flow, 'else');
+  assert.equal(flow.step().command, TEXTS.elseCommand);
+  pick(flow, 'back');
+  assert.deepEqual(ids(flow.step()), ['option:cut', 'option:tear', 'else']);
+  assert.equal(flow.step().selected, null);
+});
+
+test('an option that is not on the question is refused', () => {
+  assert.throws(() => choiceFlow().choose('option:boil'), /not offered/i);
+});
+
+checkFlowContract('the question screen', () => choiceFlow());

@@ -10,7 +10,7 @@
 
 import { isPocket, locationKey, sameLocation } from './world.js';
 import { recordPlacement, streakOf } from './habit.js';
-import { RefusedMove, unknownRoom, unknownThing } from './errors.js';
+import { RefusedMove, optionNotOffered, unknownRoom, unknownThing } from './errors.js';
 import { buildDay } from './day-plan.js';
 import { CHAINS } from './chains.js';
 import { EVENT_KINDS, canContinue } from './event-kinds.js';
@@ -182,6 +182,27 @@ export class Day {
     this.events.splice(this.index, 0, { kind: 'find', chain: current.chain, step: earlier?.step ?? current.step, thingId, leftAt });
     this.index -= 1;
     this.advance();
+  }
+
+  // ---- a choice ----
+
+  /**
+   * The player takes an option of the question that is asked. The events of the other options are removed, so the
+   * stored day holds only the chosen path and a reload goes on with it.
+   */
+  chooseOption(optionId) {
+    const event = this.begin('choose');
+    this.assertPresent();
+    if (!event.options.includes(optionId)) throw optionNotOffered(optionId);
+    const prefix = `${event.step}/`;
+    this.events = this.events.filter((other) => !(other.chain === event.chain && other.option?.startsWith(prefix) && other.option !== `${prefix}${optionId}`));
+    this.acknowledged = true;
+    this.settle();
+  }
+
+  /** Whether an event before the running one found this thing: an evening find of an unused thing is skipped. */
+  foundEarlier(thingId) {
+    return this.events.slice(0, this.index).some((event) => event.kind === 'find' && event.thingId === thingId);
   }
 
   // ---- the check ----

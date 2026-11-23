@@ -149,8 +149,10 @@ const CHAIN_SENTENCES = {
   },
   morning: {
     wake: 'You wake up in your bedroom.',
+    first: 'What do you do first?',
     phone: 'You want to know the time and read your messages.',
     read: 'You read your messages in bed.',
+    up: 'You get up at once and open the curtains.',
     dress: 'You get dressed.',
     breakfast: 'Breakfast is waiting.',
     eat: 'You have breakfast.',
@@ -158,8 +160,10 @@ const CHAIN_SENTENCES = {
   coffee: {
     go: 'You feel like coffee.',
     pack: 'You take a new pack of coffee from the top right cupboard.',
-    scissors: 'The pack has to be cut open.',
+    'open-how': 'The pack of coffee has to be opened.',
+    scissors: 'You want a clean cut.',
     open: 'You cut the pack open.',
+    tear: 'You tear the pack open. Some coffee spills on the worktop.',
     tin: 'You take the tin with the flowers from the cupboard.',
     fill: 'You pour the coffee into the tin and make a pot of filter coffee.',
     'tin-back': 'You put the lid on the tin and put the tin back in the cupboard.',
@@ -169,10 +173,14 @@ const CHAIN_SENTENCES = {
   present: {
     go: 'A birthday present has to be wrapped at the dining table.',
     paper: 'You take the wrapping paper from the sideboard.',
-    scissors: 'The paper has to be cut.',
+    'wrap-how': 'The paper has to be cut to size.',
+    scissors: 'The edges of the paper should be straight.',
     wrap: 'You cut the paper and wrap the present.',
-    phone: 'You want to ask what time the party starts.',
+    tear: 'You fold the paper and tear it. The edge is a bit ragged, but the present is wrapped.',
+    party: 'You want to know what time the party starts.',
+    phone: 'Your friend will know.',
     call: 'The party starts at eight.',
+    invitation: 'The invitation on the sideboard says eight o\'clock.',
     'paper-back': 'You put the rest of the paper back in the sideboard.',
     hall: 'The present has to stand ready in the hallway.',
     ready: 'The present stands ready by the door.',
@@ -183,8 +191,11 @@ const CHAIN_SENTENCES = {
     ordered: 'The pizza is ordered. It will be here in half an hour.',
     bell: 'The doorbell rings: your pizza is here.',
     go: 'Someone has to open the front door.',
-    wallet: 'The pizza has to be paid.',
+    'pay-how': 'The pizza has to be paid.',
+    wallet: 'You keep your cash in your wallet.',
     pay: 'You pay and take the pizza.',
+    'phone-pay': 'Your phone can pay at the door.',
+    'pay-phone': 'You hold your phone to the card reader and take the pizza.',
     table: 'The pizza goes on the dining table.',
     eat: 'The pizza is on the table.',
   },
@@ -351,4 +362,25 @@ test('finding a thing at once on its home spot has its own praise', () => {
 test('trying to put away a thing that is not in hand has its sentence, and nothing says what the player holds', () => {
   assert.equal(TEXTS.notHolding({ thing: { icon: '🔑', name: 'keys' } }), 'You are not holding your 🔑 keys.');
   assert.equal('holdNothing' in TEXTS, false);
+});
+
+// ---- the labels of the options of a choice (story 3f) ----
+
+const CHOOSE_STEPS = CHAINS.flatMap((chain) => chain.steps.filter((step) => step.kind === 'choose').map((step) => ({ chain: chain.id, step })));
+const LABELS = Object.values(TEXTS.options ?? {}).flatMap((steps) => Object.values(steps).flatMap((options) => Object.values(options)));
+
+test('the story has five questions: morning, coffee, the paper and the party of the present, and the way to pay the pizza', () => {
+  assert.deepEqual(CHOOSE_STEPS.map(({ chain, step }) => `${chain}/${step.id}`), ['morning/first', 'coffee/open-how', 'present/wrap-how', 'present/party', 'pizza/pay-how']);
+});
+
+test('every option of every question has a label, in a table of its own by chain, question and option', () => {
+  for (const { chain, step } of CHOOSE_STEPS) {
+    for (const option of step.options) assert.equal(typeof TEXTS.options?.[chain]?.[step.id]?.[option.id], 'string', `${chain}/${step.id}/${option.id}`);
+  }
+  assert.deepEqual(Object.keys(TEXTS.options ?? {}).sort(), ['coffee', 'morning', 'pizza', 'present']);
+});
+
+test('an option label is what the player does, never a narration that starts with "You"', () => {
+  assert.equal(LABELS.length, 10);
+  for (const label of LABELS) assert.doesNotMatch(label, /^You\b/, label);
 });

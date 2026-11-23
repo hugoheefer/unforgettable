@@ -5,7 +5,7 @@ import { RefusedMove } from '../app/js/errors.js';
 import { LAYOUT } from '../app/js/layout.js';
 import { THINGS, defaultPlan } from '../app/js/things.js';
 import { World } from '../app/js/world.js';
-import { LEFT_AT, PLAN, check, dayState, find, findDay, goTo, letGo, makeDay, moveTo, pause, playOut, pocket, putAway, putAwayDay, rand, refusalOf, spot, tell, worldWith } from './day-helper.mjs';
+import { LEFT_AT, PLAN, check, choose, dayState, find, inOption, findDay, goTo, letGo, makeDay, moveTo, pause, playOut, pocket, putAway, putAwayDay, rand, refusalOf, spot, tell, worldWith } from './day-helper.mjs';
 
 const coatHooks = spot('hall', 'coat-hooks');
 const start = (world, options = {}) => Day.start({ layout: LAYOUT, things: THINGS, world, plan: defaultPlan(), progress: { streaks: {} }, random: rand(), number: 2, ...options });
@@ -1058,4 +1058,178 @@ test('a day saved on the inserted find survives saving and goes on exactly like 
   again.look('sideboard');
   again.continue();
   assert.equal(again.state().event.step, 'call');
+});
+
+// ---- choices: the player picks one of two real actions (story 3f) ----
+
+const CUT = 'open-how/cut';
+const TEAR = 'open-how/tear';
+const AT_THE_COUNTER = { roomId: 'kitchen', startedIn: 'kitchen' };
+const COFFEE_CHOICE = {
+  id: 'coffee',
+  time: 'day',
+  steps: [
+    { id: 'go', kind: 'goTo', roomId: 'kitchen' },
+    {
+      id: 'open-how',
+      kind: 'choose',
+      at: 'kitchen',
+      options: [
+        { id: 'cut', steps: [{ id: 'scissors', kind: 'take', object: 'scissors', leftAt: LEFT_AT.scissors }, { id: 'open', kind: 'tell', at: 'kitchen', uses: 'scissors' }, { id: 'scissors-back', kind: 'putBack', object: 'scissors' }] },
+        { id: 'tear', steps: [{ id: 'tear', kind: 'tell', at: 'kitchen' }] },
+      ],
+    },
+    { id: 'fill', kind: 'tell', at: 'kitchen' },
+  ],
+};
+const ASKED = () => [
+  choose('kitchen'),
+  inOption(CUT, find('scissors', LEFT_AT.scissors, 'coffee', 'scissors')),
+  inOption(CUT, tell('kitchen', 'coffee', 'open', 'scissors')),
+  inOption(CUT, putAway('scissors', 'coffee', 'scissors-back')),
+  inOption(TEAR, tell('kitchen', 'coffee', 'tear')),
+  tell('kitchen', 'coffee', 'fill'),
+];
+const choosingDay = (events = ASKED(), { state = {}, world = worldWith({ scissors: spot('study', 'desk-drawer') }) } = {}) =>
+  makeDay(events, { world, state: { ...AT_THE_COUNTER, ...state } });
+const stepsLeft = (day) => day.snapshot().events.map((event) => event.step);
+const canContinueWith = (day) => canContinue(day.snapshot(), { layout: LAYOUT, things: THINGS, chains: [COFFEE_CHOICE] });
+
+test('choosing an option removes the events of the other options, and the story goes on with the chosen one', () => {
+  const day = choosingDay();
+  day.chooseOption('tear');
+  assert.deepEqual(stepsLeft(day), ['open-how', 'tear', 'fill']);
+  assert.equal(day.state().event.step, 'tear');
+});
+
+test('choosing the other option leaves its events and removes the first option', () => {
+  const day = choosingDay();
+  day.chooseOption('cut');
+  assert.deepEqual(stepsLeft(day), ['open-how', 'scissors', 'open', 'scissors-back', 'fill']);
+  assert.equal(day.state().event.kind, 'find');
+  assert.equal(day.state().event.thingId, 'scissors');
+});
+
+test('events of a chain that is not the choosing one, and events without an option, are never removed', () => {
+  const day = choosingDay([tell('kitchen', 'coffee', 'go'), ...ASKED(), tell('kitchen', 'pizza', 'bell')], { state: { index: 1 } });
+  day.chooseOption('tear');
+  assert.deepEqual(stepsLeft(day), ['go', 'open-how', 'tear', 'fill', 'bell']);
+});
+
+test('an id that is not an option of the question is not accepted, and nothing changes', () => {
+  const day = choosingDay();
+  assert.throws(() => day.chooseOption('boil'), /boil/);
+  assert.equal(stepsLeft(day).length, 6);
+  assert.equal(day.state().event.kind, 'choose');
+});
+
+test('the story waits for the player to be back in the room of the question before an option is taken', () => {
+  const day = choosingDay(ASKED(), { state: { roomId: 'hall', startedIn: 'hall' } });
+  assert.equal(refusalOf(() => day.chooseOption('tear')), 'come-back');
+  assert.equal(stepsLeft(day).length, 6);
+});
+
+test('an option can only be taken while a question is asked', () => {
+  const day = makeDay([tell('kitchen', 'coffee', 'fill')], { state: AT_THE_COUNTER });
+  assert.equal(refusalOf(() => day.chooseOption('tear')), 'not-now');
+});
+
+test('while the question is asked the player can still walk away and put something away on their own', () => {
+  const day = choosingDay(ASKED(), { state: { inHand: ['keys'] } });
+  day.walkTo('hall');
+  day.putDown('hook', 'keys');
+  assert.equal(day.state().event.kind, 'choose');
+});
+
+test('a day saved after the choice continues on the chosen path after a reload', () => {
+  const day = choosingDay();
+  day.chooseOption('tear');
+  assert.equal(canContinueWith(day), true);
+  const reloaded = makeDay(day.snapshot().events, { state: day.snapshot() });
+  assert.equal(reloaded.state().event.step, 'tear');
+  assert.deepEqual(stepsLeft(reloaded), ['open-how', 'tear', 'fill']);
+});
+
+test('a day saved while the question is asked can be continued and still holds every option', () => {
+  const day = choosingDay();
+  assert.equal(canContinueWith(day), true);
+  assert.equal(stepsLeft(day).length, 6);
+});
+
+test('a saved choose with options that the chain does not have is not continued', () => {
+  const events = ASKED();
+  events[0] = choose('kitchen', 'coffee', 'open-how', ['cut', 'boil']);
+  assert.equal(canContinueWith(choosingDay(events)), false);
+});
+
+test('a saved choose of a step that is not a question of the chain is not continued', () => {
+  const events = ASKED();
+  events[0] = choose('kitchen', 'coffee', 'fill', ['cut', 'tear']);
+  assert.equal(canContinueWith(choosingDay(events)), false);
+});
+
+test('a saved option event of a step that the chain does not have in any option is not continued', () => {
+  const events = ASKED();
+  events[4] = inOption(TEAR, tell('kitchen', 'coffee', 'rip'));
+  assert.equal(canContinueWith(choosingDay(events)), false);
+});
+
+test('a thing of the option that was not taken is never laid down by the let-go that follows', () => {
+  const events = [...ASKED().slice(0, 5), letGo(['scissors'], 'coffee')];
+  const day = choosingDay(events);
+  day.chooseOption('tear');
+  day.continue();
+  assert.equal(day.state().finished, true);
+  assert.deepEqual(day.world.whereIs('scissors'), spot('study', 'desk-drawer'));
+  assert.deepEqual(day.takeLeftBehind(), []);
+});
+
+test('a thing of the option that was taken is laid down by the same let-go', () => {
+  const events = [...ASKED().slice(0, 3), letGo(['scissors'], 'coffee')];
+  const day = choosingDay(events, { world: worldWith({ scissors: spot('kitchen', 'drawer') }) });
+  day.chooseOption('cut');
+  day.look('drawer');
+  day.continue();
+  assert.equal(day.state().finished, true);
+  assert.deepEqual(day.world.whereIs('scissors'), LEFT_AT.scissors);
+  assert.deepEqual(day.takeLeftBehind(), ['scissors']);
+});
+
+// ---- the evening asks only for what was really used (story 3f, R4) ----
+
+const NEED_AGAIN = (thingId = 'scissors') => ({ ...find(thingId, LEFT_AT[thingId], 'evening', 'need'), ifUsed: true });
+const EVENING_STATE = { roomId: 'hall', startedIn: 'hall' };
+
+test('a find that is only asked when the thing was used is done at once when nothing found it earlier in the day', () => {
+  const day = makeDay([tell(null, 'evening', 'dusk'), NEED_AGAIN(), tell(null, 'evening', 'bed')], { state: EVENING_STATE, world: worldWith({ scissors: spot('study', 'desk-drawer') }) });
+  day.continue();
+  assert.equal(day.state().event.step, 'bed');
+  assert.deepEqual(day.state().inHand, []);
+  assert.equal(day.state().steps, 0);
+});
+
+test('a find that is only asked when the thing was used is asked when the thing was found earlier in the day', () => {
+  const earlier = find('scissors', LEFT_AT.scissors, 'coffee', 'scissors');
+  const day = makeDay([earlier, tell(null, 'evening', 'dusk'), NEED_AGAIN(), tell(null, 'evening', 'bed')], { state: { ...EVENING_STATE, index: 1 }, world: worldWith({ scissors: spot('kitchen', 'counter') }) });
+  day.continue();
+  assert.equal(day.state().event.kind, 'find');
+  assert.equal(day.state().event.thingId, 'scissors');
+});
+
+test('a find without the mark is always asked, also when nothing found the thing earlier', () => {
+  const day = makeDay([tell(null, 'evening', 'dusk'), { ...NEED_AGAIN(), ifUsed: undefined }, tell(null, 'evening', 'bed')], { state: EVENING_STATE, world: worldWith({ scissors: spot('study', 'desk-drawer') }) });
+  day.continue();
+  assert.equal(day.state().event.kind, 'find');
+});
+
+test('the scissors are not asked for in the evening when the pack was torn open, and the day goes on to the next thing', () => {
+  const events = [find('keys', LEFT_AT.keys, 'come-home', 'keys'), ...ASKED(), tell(null, 'evening', 'dusk'), NEED_AGAIN('scissors'), NEED_AGAIN('keys'), tell(null, 'evening', 'bed')];
+  const day = choosingDay(events, { state: { index: 1 }, world: worldWith({ scissors: spot('study', 'desk-drawer'), keys: spot('hall', 'hook') }) });
+  day.chooseOption('tear');
+  for (const step of ['tear', 'fill', 'dusk']) {
+    assert.equal(day.state().event.step, step);
+    day.continue();
+  }
+  assert.equal(day.state().event.kind, 'find');
+  assert.equal(day.state().event.thingId, 'keys');
 });

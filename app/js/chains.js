@@ -3,7 +3,9 @@
 // CHAINS. Pure: no DOM, no randomness.
 //
 // A step's object is a *thing* when it is one of the chosen things, and a *prop* otherwise: a prop's take and
-// put-back are only told. `leftAt` is where a thing stays when nobody puts it back.
+// put-back are only told. `leftAt` is where a thing stays when nobody puts it back. A `choose` step holds options of
+// ordinary steps (story 3f); `expandGroups` gives every step as groups of events, a choose as its question and then each
+// option step apart, so the day plan can work on one step at a time.
 
 import { comeHome } from './chains/come-home.js';
 import { goOut } from './chains/go-out.js';
@@ -69,7 +71,25 @@ export const STEP_KINDS = Object.freeze({
   needAgain: {
     isValid: () => true,
     needsSentence: () => false,
-    expand: (step, context) => context.used.map((thingId) => eventOf('find', step, context, { thingId, leftAt: context.nightSpots[thingId] })),
+    // `ifUsed`: the day asks only when the thing was really found earlier, since the options not taken used nothing
+    expand: (step, context) => context.used.map((thingId) => eventOf('find', step, context, { thingId, leftAt: context.nightSpots[thingId], ifUsed: true })),
+  },
+  // A question with two or three options, each a short list of ordinary steps. The question's sentence is
+  // `texts.chains.<chain>.<step>`, the labels are `texts.options.<chain>.<step>.<option>`. The events of every option
+  // follow the choose event, tagged `option: '<step>/<option>'`; the day removes the options not taken when the player chooses.
+  choose: {
+    isValid: (step, context) => atExists(step, context) && Array.isArray(step.options) && step.options.length > 0
+      && step.options.every((option) => Array.isArray(option.steps) && option.steps.length > 0
+        && option.steps.every((sub) => OPTION_KINDS.includes(sub.kind) && STEP_KINDS[sub.kind].isValid(sub, context))),
+    needsSentence: () => true,
+    expand: (step, context) => STEP_KINDS.choose.groups(step, context).flatMap((group) => group.events),
+    groups: (step, context) => [
+      { step, events: [eventOf('choose', step, context, { options: step.options.map((option) => option.id), roomId: step.at ?? null })] },
+      ...step.options.flatMap((option) => option.steps.map((sub) => ({
+        step: sub,
+        events: STEP_KINDS[sub.kind].expand(sub, context).map((event) => ({ ...event, option: `${step.id}/${option.id}` })),
+      }))),
+    ],
   },
   check: {
     isValid: () => true,
@@ -78,6 +98,19 @@ export const STEP_KINDS = Object.freeze({
   },
 });
 
-/** Whether a chain has a step with this id (a saved event is checked against this). */
+// the kinds of step that may stand inside an option: no move, no check, no nested choose
+const OPTION_KINDS = ['take', 'tell', 'putBack', 'goTo'];
+
+/** A step's events as groups, one per step: a choose gives its question and then every option step apart. */
+export const expandGroups = (step, context) =>
+  STEP_KINDS[step.kind].groups?.(step, context) ?? [{ step, events: STEP_KINDS[step.kind].expand(step, context) }];
+
+const stepsInside = (chain) => chain.steps.flatMap((step) => [step, ...(step.options ?? []).flatMap((option) => option.steps)]);
+
+/** Whether a chain has a step with this id, also inside an option (a saved event is checked against this). */
 export const hasStep = (chainId, stepId, chains = CHAINS) =>
-  chains.some((chain) => chain.id === chainId && chain.steps.some((step) => step.id === stepId));
+  chains.some((chain) => chain.id === chainId && stepsInside(chain).some((step) => step.id === stepId));
+
+/** The ids of the options of a choose step of a chain, or null when there is no such question. */
+export const optionIdsOf = (chainId, stepId, chains = CHAINS) =>
+  chains.find((chain) => chain.id === chainId)?.steps.find((step) => step.id === stepId && step.kind === 'choose')?.options.map((option) => option.id) ?? null;

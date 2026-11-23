@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { CHAINS, STEP_KINDS } from '../app/js/chains.js';
+import { CHAINS, STEP_KINDS, hasStep } from '../app/js/chains.js';
 import { LAYOUT } from '../app/js/layout.js';
 import { THINGS } from '../app/js/things.js';
 import { World } from '../app/js/world.js';
@@ -17,17 +17,22 @@ const counter = { placeId: 'kitchen', spotId: 'counter' };
 const STORY = {
   'come-home': ['door:move:garden', 'keys:take:keys', 'inside:move:hall', 'keys-back:putBack:keys', 'shoes:tell@hall'],
   'go-out': ['start:move:hall', 'keys:take:keys', 'wallet:take:wallet', 'away:tell', 'pay:tell', 'back:tell', 'inside:move:hall', 'bag:tell@hall', 'keys-back:putBack:keys', 'wallet-back:putBack:wallet', 'unpack:goTo:kitchen', 'done:tell@kitchen'],
-  morning: ['wake:move:bedroom', 'phone:take:phone', 'read:tell@bedroom', 'phone-back:putBack:phone', 'dress:tell@bedroom', 'breakfast:goTo:kitchen', 'eat:tell@kitchen'],
-  coffee: ['go:goTo:kitchen', 'pack:take:coffee-pack@kitchen', 'scissors:take:scissors', 'open:tell@kitchen', 'scissors-back:putBack:scissors', 'tin:take:coffee-tin@kitchen', 'fill:tell@kitchen', 'tin-back:putBack:coffee-tin@kitchen', 'sit:goTo:living', 'drink:tell@living'],
-  present: ['go:goTo:dining', 'paper:take:wrapping-paper@dining', 'scissors:take:scissors', 'wrap:tell@dining', 'scissors-back:putBack:scissors', 'phone:take:phone', 'call:tell', 'phone-back:putBack:phone', 'paper-back:putBack:wrapping-paper@dining', 'hall:goTo:hall', 'ready:tell@hall'],
-  pizza: ['hungry:goTo:living', 'phone:take:phone', 'ordered:tell@living', 'phone-back:putBack:phone', 'bell:tell', 'go:goTo:hall', 'wallet:take:wallet', 'pay:tell@hall', 'wallet-back:putBack:wallet', 'table:goTo:dining', 'eat:tell@dining'],
+  morning: ['wake:move:bedroom', 'first:choose[phone=phone:take:phone,read:tell@bedroom,phone-back:putBack:phone|up=up:tell@bedroom]', 'dress:tell@bedroom', 'breakfast:goTo:kitchen', 'eat:tell@kitchen'],
+  coffee: ['go:goTo:kitchen', 'pack:take:coffee-pack@kitchen', 'open-how:choose@kitchen[cut=scissors:take:scissors,open:tell@kitchen,scissors-back:putBack:scissors|tear=tear:tell@kitchen]', 'tin:take:coffee-tin@kitchen', 'fill:tell@kitchen', 'tin-back:putBack:coffee-tin@kitchen', 'sit:goTo:living', 'drink:tell@living'],
+  present: ['go:goTo:dining', 'paper:take:wrapping-paper@dining', 'wrap-how:choose@dining[cut=scissors:take:scissors,wrap:tell@dining,scissors-back:putBack:scissors|fold=tear:tell@dining]', 'party:choose[call=phone:take:phone,call:tell,phone-back:putBack:phone|card=invitation:tell@dining]', 'paper-back:putBack:wrapping-paper@dining', 'hall:goTo:hall', 'ready:tell@hall'],
+  pizza: ['hungry:goTo:living', 'phone:take:phone', 'ordered:tell@living', 'phone-back:putBack:phone', 'bell:tell', 'go:goTo:hall', 'pay-how:choose@hall[cash=wallet:take:wallet,pay:tell@hall,wallet-back:putBack:wallet|phone=phone-pay:take:phone,pay-phone:tell@hall,phone-pay-back:putBack:phone]', 'table:goTo:dining', 'eat:tell@dining'],
   call: ['phone:take:phone', 'walk:move:garden', 'phone-back:putBack:phone', 'in:goTo:living', 'sit:tell@living'],
   evening: ['dusk:tell', 'look:check', 'need:needAgain', 'bed:tell'],
 };
 
-const signature = (step) => `${[step.id, step.kind, step.roomId ?? step.object].filter((part) => part !== undefined).join(':')}${step.at === undefined ? '' : `@${step.at}`}`;
+const signature = (step) => {
+  const base = `${[step.id, step.kind, step.roomId ?? step.object].filter((part) => part !== undefined).join(':')}${step.at === undefined ? '' : `@${step.at}`}`;
+  return step.kind === 'choose' ? `${base}[${step.options.map((option) => `${option.id}=${option.steps.map(signature).join(',')}`).join('|')}]` : base;
+};
+/** Every step of a chain, the steps inside the options of a choose included. */
+const allSteps = (chain) => chain.steps.flatMap((step) => [step, ...(step.options ?? []).flatMap((option) => option.steps)]);
 const chainNamed = (id) => CHAINS.find((chain) => chain.id === id);
-const contextFor = (sentences) => ({ rooms, catalogueIds, hasLocation, kinds: STEP_KINDS, sentences });
+const contextFor = (sentences, labels = {}) => ({ rooms, catalogueIds, hasLocation, kinds: STEP_KINDS, sentences, labels });
 
 // ---- the list of chains ----
 
@@ -54,9 +59,10 @@ test('going out takes the keys and then the wallet: nobody goes shopping without
   assert.deepEqual(taken, ['keys', 'wallet']);
 });
 
-test('the pizza is ordered with the phone before the wallet is needed at the door', () => {
-  const taken = chainNamed('pizza')?.steps.filter((step) => step.kind === 'take').map((step) => step.object);
-  assert.deepEqual(taken, ['phone', 'wallet']);
+test('the pizza is ordered with the phone before the player chooses how to pay at the door', () => {
+  const steps = chainNamed('pizza')?.steps ?? [];
+  assert.equal(steps.find((step) => step.kind === 'take')?.object, 'phone');
+  assert.ok(steps.findIndex((step) => step.kind === 'take') < steps.findIndex((step) => step.kind === 'choose'));
 });
 
 test('exactly one chain closes a session: evening', () => {
@@ -86,16 +92,16 @@ test('the steps that only announced the next step are gone: call.ring and go-out
 /** chain:step -> the thing the step uses, as the story's table has it. */
 const USES = {
   'go-out:away': 'keys', 'go-out:pay': 'wallet', 'coffee:open': 'scissors', 'present:wrap': 'scissors',
-  'present:call': 'phone', 'pizza:ordered': 'phone', 'pizza:pay': 'wallet', 'morning:read': 'phone',
+  'present:call': 'phone', 'pizza:ordered': 'phone', 'pizza:pay': 'wallet', 'pizza:pay-phone': 'phone', 'morning:read': 'phone',
 };
 
 test('exactly the steps of the story say which thing they use', () => {
-  const found = Object.fromEntries(CHAINS.flatMap((chain) => chain.steps.filter((step) => step.uses !== undefined).map((step) => [`${chain.id}:${step.id}`, step.uses])));
+  const found = Object.fromEntries(CHAINS.flatMap((chain) => allSteps(chain).filter((step) => step.uses !== undefined).map((step) => [`${chain.id}:${step.id}`, step.uses])));
   assert.deepEqual(found, USES);
 });
 
 test('only a tell uses a thing', () => {
-  assert.deepEqual(CHAINS.flatMap((chain) => chain.steps.filter((step) => step.uses !== undefined && step.kind !== 'tell')), []);
+  assert.deepEqual(CHAINS.flatMap((chain) => allSteps(chain).filter((step) => step.uses !== undefined && step.kind !== 'tell')), []);
 });
 
 test('a tell that uses a thing becomes a tell event that carries it; a tell without carries nothing', () => {
@@ -127,7 +133,7 @@ for (const [id, signatures] of Object.entries(STORY)) {
   test(`the chain ${id} keeps the contract in every language`, () => {
     assert.ok(chainNamed(id), `${id} is in the list`);
     for (const language of LANGUAGES) {
-      assert.deepEqual(problemsOf(chainNamed(id), contextFor(language.texts.chains)), [], language.code);
+      assert.deepEqual(problemsOf(chainNamed(id), contextFor(language.texts.chains, language.texts.options)), [], language.code);
     }
   });
 }
@@ -135,12 +141,12 @@ for (const [id, signatures] of Object.entries(STORY)) {
 test('every chain in the list keeps the contract in every language, also one that is added later', () => {
   assert.ok(CHAINS.length > 0);
   for (const chain of CHAINS) {
-    for (const language of LANGUAGES) assert.deepEqual(problemsOf(chain, contextFor(language.texts.chains)), [], `${chain.id} ${language.code}`);
+    for (const language of LANGUAGES) assert.deepEqual(problemsOf(chain, contextFor(language.texts.chains, language.texts.options)), [], `${chain.id} ${language.code}`);
   }
 });
 
 test('where the scissors stay in the coffee chain is the worktop', () => {
-  assert.deepEqual(chainNamed('coffee')?.steps.find((step) => step.id === 'scissors').leftAt, counter);
+  assert.deepEqual(allSteps(chainNamed('coffee')).find((step) => step.id === 'scissors').leftAt, counter);
 });
 
 test('a prop that could become a thing already says where it stays, so the chain does not change then', () => {
@@ -150,8 +156,8 @@ test('a prop that could become a thing already says where it stays, so the chain
 
 // ---- the table of step kinds ----
 
-test('the table of step kinds has exactly the seven kinds of the story', () => {
-  assert.deepEqual(Object.keys(STEP_KINDS).sort(), ['check', 'goTo', 'move', 'needAgain', 'putBack', 'take', 'tell']);
+test('the table of step kinds has exactly the eight kinds of the story', () => {
+  assert.deepEqual(Object.keys(STEP_KINDS).sort(), ['check', 'choose', 'goTo', 'move', 'needAgain', 'putBack', 'take', 'tell']);
 });
 
 test('every step kind can say whether its fields are right, whether it needs a sentence, and how it becomes events', () => {
@@ -267,7 +273,7 @@ test('a tell, a take and a put-back may name a room with `at`, and it must exist
 
 const TEXTS_OF = { good: { a: 'Go.', b: 'Cut.', c: 'Done?' } };
 const GOOD = { id: 'good', time: 'day', steps: [{ id: 'a', kind: 'goTo', roomId: 'kitchen' }, { id: 'b', kind: 'take', object: 'scissors', leftAt: counter }, { id: 'c', kind: 'tell' }] };
-const problems = (chain, sentences = TEXTS_OF) => problemsOf(chain, contextFor(sentences));
+const problems = (chain, sentences = TEXTS_OF, labels = {}) => problemsOf(chain, contextFor(sentences, labels));
 const withSteps = (steps) => ({ ...GOOD, steps });
 
 test('a good chain has no problems', () => {
@@ -359,4 +365,137 @@ test('a step that uses a thing before the chain takes it is a problem', () => {
 
 test('an opener that needs a thing that does not exist is a problem', () => {
   assert.deepEqual(problems({ ...GOOD, opener: true, needsOnPerson: ['ghost'] }), ['ghost: needed on the person but not in the catalogue']);
+});
+
+// ---- a choice: the player picks one of two or three real actions (story 3f) ----
+
+const tearStep = { id: 'ripped', kind: 'tell' };
+const cutOption = { id: 'cut', steps: [{ id: 'sc', kind: 'take', object: 'scissors', leftAt: counter }, { id: 'cutit', kind: 'tell', uses: 'scissors' }, { id: 'sc-back', kind: 'putBack', object: 'scissors' }] };
+const tearOption = { id: 'tear', steps: [tearStep] };
+const howStep = (overrides = {}) => ({ id: 'how', kind: 'choose', at: 'kitchen', options: [cutOption, tearOption], ...overrides });
+const choosing = (overrides = {}) => ({ id: 'good', time: 'day', steps: [{ id: 'a', kind: 'goTo', roomId: 'kitchen' }, howStep(overrides), { id: 'c', kind: 'tell' }] });
+const CHOOSING_TEXTS = { good: { a: 'Go.', how: 'How?', sc: 'You want a clean cut.', cutit: 'Cut.', ripped: 'Rip.', c: 'Done?' } };
+const LABELS = { good: { how: { cut: 'Cut it', tear: 'Tear it' } } };
+const withoutKey = (table, key) => Object.fromEntries(Object.entries(table).filter(([name]) => name !== key));
+
+test('a choose becomes a choose event with its option ids, followed by the events of every option tagged with that option', () => {
+  assert.deepEqual(expand(howStep(), ['scissors']), [
+    { kind: 'choose', chain: 'x', step: 'how', options: ['cut', 'tear'], roomId: 'kitchen' },
+    { kind: 'find', chain: 'x', step: 'sc', thingId: 'scissors', leftAt: counter, option: 'how/cut' },
+    { kind: 'tell', chain: 'x', step: 'cutit', roomId: null, uses: 'scissors', option: 'how/cut' },
+    { kind: 'putAway', chain: 'x', step: 'sc-back', thingId: 'scissors', option: 'how/cut' },
+    { kind: 'tell', chain: 'x', step: 'ripped', roomId: null, option: 'how/tear' },
+  ]);
+});
+
+test('a choose that is not tied to a room asks its question wherever the player is', () => {
+  assert.equal(expand(howStep({ at: undefined }), ['scissors'])[0].roomId, null);
+});
+
+test('the option steps of things that are not chosen are only told', () => {
+  assert.deepEqual(expand(howStep(), []).map((event) => event.kind), ['choose', 'tell', 'tell', 'tell', 'tell']);
+});
+
+test('a choose needs a sentence for its question', () => {
+  assert.equal(STEP_KINDS.choose?.needsSentence(howStep(), context), true);
+});
+
+test('a choose with two or three options of ordinary steps is valid', () => {
+  assert.equal(STEP_KINDS.choose?.isValid(howStep(), context), true);
+  assert.equal(STEP_KINDS.choose?.isValid(howStep({ options: [cutOption, tearOption, { id: 'skip', steps: [{ id: 'sk', kind: 'tell' }] }] }), context), true);
+});
+
+test('a choose with no options array, an option without steps, or a room that does not exist is not valid', () => {
+  assert.equal(STEP_KINDS.choose?.isValid(howStep({ options: undefined }), context), false);
+  assert.equal(STEP_KINDS.choose?.isValid(howStep({ options: [cutOption, { id: 'tear', steps: [] }] }), context), false);
+  assert.equal(STEP_KINDS.choose?.isValid(howStep({ at: 'moon' }), context), false);
+});
+
+test('an option may hold a take, a tell, a put-back and a walk-to, and nothing else', () => {
+  const only = (step) => howStep({ options: [cutOption, { id: 'tear', steps: [step] }] });
+  assert.equal(STEP_KINDS.choose?.isValid(only({ id: 'g', kind: 'goTo', roomId: 'living' }), context), true);
+  for (const step of [{ id: 'm', kind: 'move', roomId: 'living' }, { id: 'k', kind: 'check' }, { id: 'n', kind: 'needAgain' }, { id: 'o', kind: 'choose', options: [cutOption, tearOption] }]) {
+    assert.equal(STEP_KINDS.choose?.isValid(only(step), context), false, step.kind);
+  }
+});
+
+test('a step inside an option is held to the rules of its own kind', () => {
+  const only = (step) => howStep({ options: [cutOption, { id: 'tear', steps: [step] }] });
+  assert.equal(STEP_KINDS.choose?.isValid(only({ id: 'g', kind: 'goTo', roomId: 'moon' }), context), false);
+  assert.equal(STEP_KINDS.choose?.isValid(only({ id: 't', kind: 'take', object: 'scissors' }), context), false);
+});
+
+test('a step id is found by hasStep also when the step lies inside an option', () => {
+  const chains = [choosing()];
+  for (const id of ['a', 'how', 'sc', 'cutit', 'sc-back', 'ripped', 'c']) assert.equal(hasStep('good', id, chains), true, id);
+  assert.equal(hasStep('good', 'nope', chains), false);
+  assert.equal(hasStep('other', 'sc', chains), false);
+});
+
+test('a good chain with a choice keeps the contract', () => {
+  assert.deepEqual(problems(choosing(), CHOOSING_TEXTS, LABELS), []);
+});
+
+test('a choose with one option, or with four, is a problem', () => {
+  const four = [cutOption, tearOption, { id: 'x', steps: [{ id: 'x1', kind: 'tell' }] }, { id: 'y', steps: [{ id: 'y1', kind: 'tell' }] }];
+  const texts = { good: { ...CHOOSING_TEXTS.good, x1: 'x', y1: 'y' } };
+  const labels = { good: { how: { cut: 'Cut it', tear: 'Tear it', x: 'X', y: 'Y' } } };
+  assert.ok(problems(choosing({ options: [tearOption] }), { good: { a: 'Go.', how: 'How?', ripped: 'Rip.', c: 'Done?' } }, LABELS).includes('how: a choose has two or three options'));
+  assert.ok(problems(choosing({ options: four }), texts, labels).includes('how: a choose has two or three options'));
+});
+
+test('two options with the same id are a problem', () => {
+  const twins = choosing({ options: [cutOption, { ...tearOption, id: 'cut' }] });
+  assert.ok(problems(twins, CHOOSING_TEXTS, LABELS).includes('how: two options have the same id'));
+});
+
+test('an option without a label is a problem', () => {
+  assert.deepEqual(problems(choosing(), CHOOSING_TEXTS, { good: { how: { cut: 'Cut it' } } }), ['how/tear: no label']);
+  assert.deepEqual(problems(choosing(), CHOOSING_TEXTS, {}), ['how/cut: no label', 'how/tear: no label']);
+});
+
+test('a step inside an option that has no sentence is a problem, and so is a choose without its question', () => {
+  assert.deepEqual(problems(choosing(), { good: withoutKey(CHOOSING_TEXTS.good, 'cutit') }, LABELS), ['cutit: no sentence']);
+  assert.deepEqual(problems(choosing(), { good: withoutKey(CHOOSING_TEXTS.good, 'how') }, LABELS), ['how: no sentence']);
+});
+
+test('the sentence of a step inside an option is not a sentence without a step', () => {
+  assert.equal(problems(choosing(), CHOOSING_TEXTS, LABELS).some((problem) => problem.includes('without a step')), false);
+});
+
+test('a step id inside an option that another step of the chain has too is a problem', () => {
+  const twin = choosing({ options: [cutOption, { id: 'tear', steps: [{ id: 'c', kind: 'tell' }] }] });
+  assert.ok(problems(twin, { good: withoutKey(CHOOSING_TEXTS.good, 'ripped') }, LABELS).includes('two steps have the same id'));
+});
+
+test('a step that uses a thing which only one option takes is a problem on the path of the other option', () => {
+  const chain = choosing();
+  chain.steps[2] = { id: 'c', kind: 'tell', uses: 'scissors' };
+  assert.deepEqual(problems(chain, CHOOSING_TEXTS, LABELS), ['c: uses scissors, which the chain does not take earlier']);
+});
+
+test('a put-back of a thing that only one option takes is a problem on the path of the other option', () => {
+  const chain = choosing();
+  chain.steps[2] = { id: 'c', kind: 'putBack', object: 'scissors' };
+  assert.deepEqual(problems(chain, { good: withoutKey(CHOOSING_TEXTS.good, 'c') }, LABELS), ['c: scissors is put back before it is taken']);
+});
+
+test('a thing that every option takes may be used after the choice', () => {
+  const both = choosing({ options: [cutOption, { id: 'tear', steps: [{ id: 'sc2', kind: 'take', object: 'scissors', leftAt: counter }] }] });
+  both.steps[2] = { id: 'c', kind: 'tell', uses: 'scissors' };
+  assert.deepEqual(problems(both, { good: { ...withoutKey(CHOOSING_TEXTS.good, 'ripped'), sc2: 'again' } }, LABELS), []);
+});
+
+test('a choose inside an option is a problem', () => {
+  const nested = choosing({ options: [cutOption, { id: 'tear', steps: [{ id: 'inner', kind: 'choose', options: [cutOption, tearOption] }] }] });
+  assert.ok(problems(nested, CHOOSING_TEXTS, LABELS).includes('how: the fields of a choose are wrong'));
+});
+
+test('a choose is checked on every path: a chain with two choices has four paths and a fault on one of them is found', () => {
+  const second = { id: 'again', kind: 'choose', options: [{ id: 'one', steps: [{ id: 'u', kind: 'tell', uses: 'scissors' }] }, { id: 'two', steps: [{ id: 'w', kind: 'tell' }] }] };
+  const chain = choosing();
+  chain.steps.splice(2, 0, second);
+  const texts = { good: { ...CHOOSING_TEXTS.good, again: 'Again?', u: 'u', w: 'w' } };
+  const labels = { good: { ...LABELS.good, again: { one: 'One', two: 'Two' } } };
+  assert.deepEqual(problems(chain, texts, labels), ['u: uses scissors, which the chain does not take earlier']);
 });

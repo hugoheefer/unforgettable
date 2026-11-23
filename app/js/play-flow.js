@@ -6,7 +6,7 @@
 // canLeave: true }. Which screen a day shows is its *mode*: the kind of the running event, or 'putting' (the
 // player puts a thing away on their own) or 'back' (the story waits in another room). Choice ids:
 // 'go' | 'yes' | 'no' | 'else' | 'spots' | 'pockets' | 'doors' | 'hang:<garment>' | 'puton:<garment>' |
-// 'putaway:<thing>' | 'forgot:<thing>' open a list or act; inside a list 'spot:<id>' | 'pocket:<garment>/<pocket>' |
+// 'putaway:<thing>' | 'forgot:<thing>' open a list or act; 'option:<id>' takes an option of a question; inside a list 'spot:<id>' | 'pocket:<garment>/<pocket>' |
 // 'door:<room>' act; 'back' returns.
 //
 // The lead is, in time order: what the last action did, the sentence of the move that ended in this room (that
@@ -62,6 +62,17 @@ const MODES = {
     root: (flow, state) => ({
       command: sentenceOf(flow.texts, state.event.chain, state.event.step),
       choices: [flow.walkStraightTo(state.event.roomId, flow.texts.walkToOption), flow.elseChoice()],
+    }),
+  },
+  // the question is the command and the options are the choices, in chain order; nothing is preselected
+  choose: {
+    context: () => [],
+    root: (flow, state) => ({
+      command: sentenceOf(flow.texts, state.event.chain, state.event.step),
+      choices: [
+        ...state.event.options.map((id) => ({ id: `option:${id}`, label: flow.texts.options[state.event.chain][state.event.step][id] })),
+        flow.elseChoice(),
+      ],
     }),
   },
   check: {
@@ -341,6 +352,7 @@ export class PlayFlow {
         return [texts.putOnDone({ garment: named(texts.garments, day.garmentOf(rest)) })];
       },
       door: () => { day.walkTo(rest); return []; },
+      option: () => { day.chooseOption(rest); return []; },
     };
     if (actions[kind]) return actions[kind]();
     if (menu.type === 'hang') return this.hang(menu.garmentId, rest);

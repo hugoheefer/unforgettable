@@ -530,3 +530,37 @@ test('a session in which nothing was found asks for nothing in the evening', () 
   const events = session([PLAIN]);
   assert.deepEqual(eveningOf(events).map((event) => event.kind), ['tell', 'check', 'tell']);
 });
+
+// ---- choices: the options follow the choose (story 3f) ----
+
+const SCISSORS_OPTION = { id: 'cut', steps: [take('sc', 'scissors'), { id: 'cutit', kind: 'tell', uses: 'scissors' }, putBack('scb', 'scissors')] };
+const TEAR_OPTION = { id: 'tear', steps: [tell('rip')] };
+const CHOOSING = { id: 'choosing', steps: [goTo('g', 'kitchen'), { id: 'how', kind: 'choose', at: 'kitchen', options: [SCISSORS_OPTION, TEAR_OPTION] }, tell('after')] };
+const choosingEvents = (rules = SOMETIMES_SILENT) => ofChain(plan({ chains: [OPEN, CHOOSING, PLAIN], rules }), 'choosing');
+const SILENT = { ...SOMETIMES_SILENT, silentChance: 1 };
+
+test('the options of a choose follow it in chain order, each event tagged with its option and the rest of the chain after them', () => {
+  const events = choosingEvents();
+  assert.deepEqual(kinds(events), ['goTo', 'choose', 'find', 'tell', 'putAway', 'tell', 'tell']);
+  assert.deepEqual(events.map((event) => event.option), [undefined, undefined, 'how/cut', 'how/cut', 'how/cut', 'how/tear', undefined]);
+  assert.deepEqual(events[1].options, ['cut', 'tear']);
+});
+
+test('a silent chain leaves out the put-back inside an option, and keeps the choose and every option', () => {
+  assert.deepEqual(sequence(choosingEvents(SILENT), 'choosing'), ['goTo', 'choose', 'find', 'tell', 'tell', 'tell', 'letGo:scissors']);
+});
+
+test('a guided chain keeps the put-back inside an option', () => {
+  assert.equal(choosingEvents().some((event) => event.kind === 'putAway' && event.option === 'how/cut'), true);
+});
+
+test('a thing found only inside an option is still asked for in the evening: the day does not know yet which option the player takes', () => {
+  const asked = needs(session([CHOOSING], SILENT)).map((event) => event.thingId);
+  assert.deepEqual(asked, ['scissors']);
+});
+
+test('every find the evening asks again for is marked to be asked only when the thing was really used', () => {
+  const asked = needs(session([TWO]));
+  assert.ok(asked.length > 0);
+  assert.ok(asked.every((event) => event.ifUsed === true));
+});

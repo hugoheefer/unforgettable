@@ -7,11 +7,12 @@ import { isPocket } from '../app/js/world.js';
  * Plays one session from the start screen to its summary and returns every screen it showed:
  * { lead, command, room, inHand, answer } (`answer` is the choice id tapped, or 'next' on a pause).
  * @param {import('../app/js/app-flow.js').AppFlow} app standing on a start screen that offers 'play' or 'next'
- * @param {{ putsAwayBeforeUse?: boolean, putsAwayWhenDone?: boolean }} options `putsAwayBeforeUse`: like a careful
+ * @param {{ putsAwayBeforeUse?: boolean, putsAwayWhenDone?: boolean, chooses?: 'first' | 'last' }} options `chooses`: which
+ *   option the player takes at every question, the first one offered or the last; `putsAwayBeforeUse`: like a careful
  *   human, the player puts a thing back on its home spot, on their own, the first time a story step is about to use it;
  *   `putsAwayWhenDone`: the player puts a thing in hand on its home spot as soon as the rest of its chain no longer needs it
  */
-export function playSession(app, { putsAwayBeforeUse = false, putsAwayWhenDone = false } = {}) {
+export function playSession(app, { putsAwayBeforeUse = false, putsAwayWhenDone = false, chooses = 'first' } = {}) {
   const screens = [];
   const ids = () => app.step().choices.map((entry) => entry.id);
   const tap = (answer) => {
@@ -56,6 +57,7 @@ export function playSession(app, { putsAwayBeforeUse = false, putsAwayWhenDone =
     const offered = ids();
     if (offered.length === 0) { screens.push({ lead: app.step().lead, command: app.step().command, praise: app.step().praise, room: state.roomId, inHand: state.inHand, answer: 'next' }); app.next(); }
     else if (putting) placeAtHome(state);
+    else if (offered.some((id) => id.startsWith('option:'))) tap(offered.filter((id) => id.startsWith('option:'))[chooses === 'first' ? 0 : offered.filter((id) => id.startsWith('option:')).length - 1]);
     else if (offered.includes('go') && aboutToUseInHand(state)) {
       warned.add(`${state.event.chain}/${state.event.step}`);
       putting = state.event.uses;

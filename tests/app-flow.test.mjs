@@ -499,6 +499,8 @@ function answer(app) {
   const state = app.day.state();
   const offered = ids(app);
   if (offered.length === 0) return app.next();
+  const option = offered.find((id) => id.startsWith('option:'));
+  if (option !== undefined) return pick(app, option);
   if (offered.includes('go')) return pick(app, 'go');
   if (offered.includes('yes')) return pick(app, 'yes');
   if (state.returnTo) return walkTo(app, state.returnTo);
@@ -1099,14 +1101,14 @@ test('a whole session through the real chains never tells the player to put a th
 
 // ---- a step that uses a thing (story 3e, U1): the player who puts a thing away on their own before it is used ----
 
-const USING_STEPS = CHAINS.flatMap((chain) => chain.steps.filter((step) => step.uses !== undefined).map((step) => ({ chain: chain.id, step: step.id, thing: step.uses })));
+const USING_STEPS = CHAINS.flatMap((chain) => chain.steps.flatMap((step) => [step, ...(step.options ?? []).flatMap((option) => option.steps)]).filter((step) => step.uses !== undefined).map((step) => ({ chain: chain.id, step: step.id, thing: step.uses })));
 const sentenceOfStep = ({ chain, step }) => TEXTS.chains[chain][step];
 
 test('a player who puts the scissors away before they are used is asked for them again before the paper is wrapped', () => {
   const screens = playSession(newApp().app, { putsAwayBeforeUse: true });
   const wrap = 'You cut the paper and wrap the present.';
   const putAway = screens.findIndex((screen) => screen.command === wrap && screen.answer === 'else');
-  const searchFor = screens.findIndex((screen, at) => at > putAway && screen.lead.includes('The paper has to be cut.') && screen.command.startsWith('Where do you look for your ✂️ scissors'));
+  const searchFor = screens.findIndex((screen, at) => at > putAway && screen.lead.includes('The edges of the paper should be straight.') && screen.command.startsWith('Where do you look for your ✂️ scissors'));
   const wrapped = screens.findIndex((screen) => screen.command === wrap && screen.answer === 'go');
   assert.ok(searchFor >= 0, 'the scissors are asked for, with the reason the story first gave');
   assert.ok(putAway >= 0 && searchFor > putAway && searchFor < wrapped, 'after the put-away and before the paper is wrapped');
@@ -1128,4 +1130,69 @@ test('whatever the player puts away on their own, a step that uses a thing is on
     assert.ok(screen.inHand.includes(use.thing), `${screen.command} without ${use.thing}`);
   }
   assert.ok(screens.some((screen) => screen.answer === 'else'), 'the player did put something away on their own');
+});
+
+// ---- choices: the player picks one of two real actions (story 3f) ----
+
+const chooseScreens = (screens) => screens.filter((screen) => screen.answer.startsWith('option:'));
+const COFFEE_QUESTION = 'The pack of coffee has to be opened.';
+// the day of the story with a choice in every chain: come-home, coffee, present, evening
+test('a session in which the player always takes the first option finishes, and every question is answered with its first option', () => {
+  const { app } = newApp();
+  const screens = playSession(app, { chooses: 'first' });
+  const answered = chooseScreens(screens);
+  assert.deepEqual(answered.map((screen) => [screen.command, screen.answer]), [
+    [COFFEE_QUESTION, 'option:cut'],
+    ['The paper has to be cut to size.', 'option:cut'],
+    ['You want to know what time the party starts.', 'option:call'],
+  ]);
+  assert.match(app.step().command, /is done/);
+});
+
+test('a session in which the player always takes the last option finishes, and every question is answered with its last option', () => {
+  const { app } = newApp();
+  const screens = playSession(app, { chooses: 'last' });
+  assert.deepEqual(chooseScreens(screens).map((screen) => screen.answer), ['option:tear', 'option:fold', 'option:card']);
+  assert.match(app.step().command, /is done/);
+});
+
+test('a player who tears the pack open and folds the paper is not asked for the scissors or the phone in the evening', () => {
+  const evening = afterCheck(playSession(newApp().app, { chooses: 'last' }));
+  for (const id of ['scissors', 'phone']) {
+    assert.equal(evening.some((screen) => saidOf(screen).includes(TEXTS.chains.evening.need[id])), false, id);
+    assert.equal(evening.some((screen) => screen.command.startsWith(`Where do you look for your ${THINGS.find((thing) => thing.id === id).icon}`)), false, id);
+  }
+  assert.equal(evening.some((screen) => saidOf(screen).includes(TEXTS.chains.evening.need.keys)), true, 'the keys were used');
+});
+
+test('a player who cuts the pack open with the scissors is asked for them in the evening', () => {
+  const evening = afterCheck(playSession(newApp().app, { chooses: 'first' }));
+  assert.equal(evening.some((screen) => saidOf(screen).includes(TEXTS.chains.evening.need.scissors)), true);
+});
+
+test('after tearing the pack open the story does not search for the scissors and does not hold them', () => {
+  const screens = playSession(newApp().app, { chooses: 'last' });
+  const torn = screens.findIndex((screen) => screen.command === 'You tear the pack open. Some coffee spills on the worktop.');
+  assert.ok(torn > 0);
+  assert.equal(screens[torn].inHand.includes('scissors'), false);
+  assert.equal(screens.slice(0, screens.findIndex((screen) => screen.command === 'Is everything back in its place?')).some((screen) => screen.command.startsWith('Where do you look for your ✂️ scissors')), false);
+});
+
+/** A game that stands at the question of the coffee story, with one tap on. */
+function atTheCoffeeQuestion() {
+  const day = Day.start({ layout: LAYOUT, things: THINGS, world: new World(LAYOUT), plan: defaultPlan(), progress: { streaks: {} }, random: rand(), number: 1, chains: CHAINS.filter((chain) => chain.id === 'coffee' || chain.closer === true) });
+  const { app } = newApp({ saved: { day: day.snapshot(), dayCount: 0 } });
+  app.tap('play');
+  app.next();
+  app.tap('door:kitchen');
+  app.tap('go');
+  return app;
+}
+
+test('with one tap a choice of the question acts at once: the story goes on with it', () => {
+  const app = atTheCoffeeQuestion();
+  assert.equal(app.step().command, COFFEE_QUESTION);
+  assert.equal(app.step().showNext, false);
+  assert.equal(app.tap('option:tear'), true);
+  assert.equal(app.step().command, 'You tear the pack open. Some coffee spills on the worktop.');
 });

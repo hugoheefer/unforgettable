@@ -24,6 +24,7 @@ export class RefusedMove extends Error {
 }
 
 export const choiceNotOffered = (choiceId) => new Error(`Choice not offered: ${choiceId}`);
+export const optionNotOffered = (optionId) => new Error(`Option not offered: ${optionId}`);
 export const unknownLocation = (key) => new Error(`Unknown spot or pocket: ${key}`);
 export const unknownRoom = (roomId) => new Error(`Unknown room: ${roomId}`);
 export const unknownThing = (thingId) => new Error(`Unknown thing: ${thingId}`);

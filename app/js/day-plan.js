@@ -3,9 +3,10 @@
 //
 // A day is a pause, one opener chain, a few other chains and the closing chain. Each step of a chain becomes events through its
 // kind in STEP_KINDS. The events are plain data: { kind, chain, step, ... } (the shapes are in chains.js and
-// day.js). `chain` and `step` are keys into the texts of the language, never sentences.
+// day.js). `chain` and `step` are keys into the texts of the language, never sentences. A choose step puts the events of
+// all its options after the question (tagged `option`); the Day removes the options not taken when the player chooses.
 
-import { CHAINS, STEP_KINDS } from './chains.js';
+import { CHAINS, STEP_KINDS, expandGroups } from './chains.js';
 
 const FIRST_DAY = 1;
 
@@ -48,7 +49,7 @@ const usedIn = (events) => [...new Set(events.filter((event) => event.kind === '
 
 /** The steps of a chain as groups of events. `used` and `nightSpots` serve the closer, which needs the used things again. */
 const expandSteps = (chain, chosen, { used, nightSpots }) =>
-  chain.steps.map((step) => ({ step, events: STEP_KINDS[step.kind].expand(step, { chainId: chain.id, chosen, used, nightSpots }) }));
+  chain.steps.flatMap((step) => expandGroups(step, { chainId: chain.id, chosen, used, nightSpots }));
 
 /**
  * Lays the groups out as events and adds a `letGo` where things that nobody puts back are laid down: after

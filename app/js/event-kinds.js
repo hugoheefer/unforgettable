@@ -3,7 +3,7 @@
 
 import { World, isPocket, sameLocation } from './world.js';
 import { recordPlacement } from './habit.js';
-import { CHAINS, hasStep } from './chains.js';
+import { CHAINS, hasStep, optionIdsOf } from './chains.js';
 
 /** Looking where a thing lies is one step, however near. */
 const LOOK_STEPS = 1;
@@ -70,7 +70,8 @@ export const EVENT_KINDS = {
       const where = day.world.whereIs(event.thingId);
       day.findStart = where && { shortest: day.roomDistanceTo(where) + LOOK_STEPS, wasHome: sameLocation(where, day.plan[event.thingId]) };
     },
-    isDone: (day, event) => day.inHand.includes(event.thingId),
+    // `ifUsed`: the thing is asked for only when an earlier find in this day's events really took it
+    isDone: (day, event) => day.inHand.includes(event.thingId) || (event.ifUsed === true && !day.foundEarlier(event.thingId)),
     isValid: (event, context) => context.things.has(event.thingId) && context.hasLocation(event.leftAt) && isStepOrNone(event, context),
   },
   putAway: {
@@ -80,6 +81,16 @@ export const EVENT_KINDS = {
     // a thing the player already put away on their own is not asked for again
     isDone: (day, event) => !day.inHand.includes(event.thingId),
     isValid: (event, context) => context.things.has(event.thingId) && isStepOrNone(event, context),
+  },
+  // A question: done when the player has taken an option (`Day.chooseOption`), which also removes the other options' events.
+  choose: {
+    canWalk: true,
+    canHandle: true,
+    room: (event) => event.roomId,
+    enter() {},
+    isDone: (day) => day.acknowledged,
+    isValid: (event, context) => isRoomOrNone(event, context) && Array.isArray(event.options)
+      && JSON.stringify(event.options) === JSON.stringify(optionIdsOf(event.chain, event.step, context.chains)),
   },
   check: {
     canWalk: true,

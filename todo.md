@@ -2,6 +2,7 @@
 
 ## Done
 
+- Story 3f, the player chooses real actions (2026-11-23): a new step kind `choose` with two or three options, each a short list of ordinary steps; five questions in the chains (morning: read messages or get up; coffee and present: scissors or tear/fold; present: call or invitation; pizza: cash or phone). The day removes the options not taken when the player chooses, so a reload goes on with the chosen path; the evening asks again only for what was really found (`ifUsed`). The labels are the new `options` table in the texts. Chain contract walks every path. Known limit: with a silent chance below 1 (a guided level) a let-go can skip a thing whose put-back sits in an option not taken. 879 tests.
 - The evening confronts the player in the same session (2026-11-23): after the check the closer needs again every thing found earlier in the session (`needAgain`), with a reason per thing and a night spot where it lies if nobody puts it away. A last story screen ("Time to go to bed.") lets the player put away what the evening needed. Contract: `needAgain` in the closing chain only. 817 tests.
 - Idea, research and decisions agreed (2026-11-16): see CLAUDE.md.
 
