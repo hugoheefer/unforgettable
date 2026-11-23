@@ -48,6 +48,7 @@ Written out in `stories.md` (screens, rules, texts, tests, the catalogue of sixt
 | 3b | Chains of events: everything starts in its place, small stories with several objects, sometimes silent about one thing, "Is everything back in its place?" with no answer from the app. Replaces the events of story 2 (user findings 2026-11-17) |
 | 3d | Stories that make sense to a human: a moment to put a thing away before it is let go, openers take turns, a morning opener, shopping with the wallet, an ordered pizza, a call you make instead of a ringing phone (2026-11-22) |
 | 3e | No step that a human would find strange: a step that uses a thing needs it in hand, stories follow the time of day, one narrating voice, no double "need", one screen per intention (2026-11-22) |
+| 3f | The player chooses real actions: 2 or 3 options at the moments where a thing can be used or not (2026-11-23) |
 | 4 | My progress |
 | 5 | Introduction, choosing things, suggested home spots, start again |
 | 6 | If-then cards and the daily real-life question |

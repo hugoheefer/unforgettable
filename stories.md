@@ -750,6 +750,47 @@ Written 2026-11-22 by the planning model after the user showed "You feel like co
 
 ---
 
+## Story 3f: the player chooses real actions
+
+Written 2026-11-23 by the planning model. User finding: "a lot of the times the app just tells it: now you're doing this, and the user is just pushing the button. Nicer: the user can always choose between two or three possibilities, and the app executes that action." The user chose **real actions** (choices that change something, each leading to its own next sentence; no long separate story branches) over flavour choices (coffee or tea, same story) and over full branching.
+
+### Rules
+
+**R1 A choice step.** A new step kind `choose`: `{ id, kind: 'choose', at?, options: [{ id, steps: [...] }, ...] }` with 2 or 3 options. Each option holds a short list of ordinary steps (take, tell, putBack, goTo; no move, no check, no nested choose). The question is the step's sentence (`texts.chains.<chain>.<step>`, a string); the label of each option is `texts.options.<chain>.<step>.<option>` (a new top-level table, so a per-thing table under `chains` keeps its one meaning). After the option's steps the chain goes on with the next step after the `choose`.
+
+**R2 The screen.** Command: the question. Choices: the option labels in chain order, then "Something else first". Nothing preselected; with one tap a choice acts at once. Look back shows the label that was chosen (it does already for any choice).
+
+**R3 Expansion at build time, pruning at run time.** `buildDay` expands every option's steps into events right after a `choose` event `{ kind: 'choose', chain, step, options: [ids], roomId }`; each option event carries `option: '<step>/<option>'`. Silent put-backs and `letGo`s are computed over the expanded list as now (a `letGo` only lays down what is in hand, so a thing of an option not taken is never laid anywhere: keep a test that proves it). When the player chooses, `Day` removes the events of the other options from its event list and goes on; the stored day then holds only the chosen path, so a reload continues it. `canContinue` accepts a `choose` event whose options match the chain, and option events whose step ids exist inside that chain's options (`hasStep` looks inside options).
+
+**R4 The evening asks only for what was really used.** `needAgain` events get `ifUsed: true`; such a find is done at once (no screen) when no `find` of that thing comes earlier in the day's (pruned) event list. So tearing the coffee pack open means no evening search for the scissors.
+
+**R5 The chain contract holds on every path.** The contract tests walk each chain once per combination of options (every path) and apply all existing rules (uses after a take, let-go after a screen in the room where the thing was used, only openers start with a move, ...). New rules: a `choose` has 2 or 3 options with unique ids; option steps have ids unique in the chain; every option label and every option step sentence exists in the English texts.
+
+### The choices (content, decided)
+
+| Chain | Replaces | Question (`chains.<chain>.<step>`) | Options (label → steps) |
+|---|---|---|---|
+| morning | `phone`, `read`, `phone-back` | `first`: "What do you do first?" (after the wake move; the wake sentence stays as the arrival line) | `phone` "Read your messages" → take phone (`phone`: "You want to know the time and read your messages.", leftAt bedroom nightstand), tell `read` at bedroom uses phone, putBack `phone-back` · `up` "Get up at once" → tell `up` at bedroom: "You get up at once and open the curtains." |
+| coffee | `scissors`, `open`, `scissors-back` | `open-how` at kitchen: "The pack of coffee has to be opened." | `cut` "Cut it open with your scissors" → take scissors (`scissors`: "You want a clean cut.", leftAt kitchen counter), tell `open` at kitchen uses scissors, putBack `scissors-back` · `tear` "Tear it open" → tell `tear` at kitchen: "You tear the pack open. Some coffee spills on the worktop." |
+| present | `scissors`, `wrap`, `scissors-back` | `wrap-how` at dining: "The paper has to be cut to size." | `cut` "Cut it with your scissors" → take scissors (leftAt dining table), tell `wrap` uses scissors, putBack `scissors-back` · `fold` "Fold it and tear along the fold" → tell `tear` at dining: "You fold the paper and tear it. The edge is a bit ragged, but the present is wrapped." |
+| present | `phone`, `call`, `phone-back` | `party`: "You want to know what time the party starts." | `call` "Call your friend" → take phone (`phone`: "Your friend will know.", leftAt dining table), tell `call` uses phone, putBack `phone-back` · `card` "Look at the invitation" → tell `invitation` at dining: "The invitation on the sideboard says eight o'clock." |
+| pizza | `wallet`, `pay`, `wallet-back` | `pay-how` at hall: "The pizza has to be paid." | `cash` "Pay with cash from your wallet" → take wallet (`wallet`: "You keep your cash in your wallet.", leftAt hall console), tell `pay` at hall uses wallet, putBack `wallet-back` · `phone` "Pay with your phone" → take phone as step `phone-pay` ("Your phone can pay at the door.", leftAt hall console), tell `pay-phone` at hall uses phone: "You hold your phone to the card reader and take the pizza.", putBack `phone-pay-back` |
+
+Not in this story, on purpose: `come-home` and `go-out` (their point is the keys and the wallet; no real alternative that keeps the story true), `call` (an option would have to change where the phone is left, which is set by the take before the choice), `evening`. Plain facts ("The doorbell rings.", "It is getting late.") stay a tell with "Go on": a choice there would be a flavour choice, which the user did not pick. The step sentences that move into an option keep their wording unless the table gives a new one; each reason before a find still does not say "need" (U5).
+
+### Tests (red first; one behaviour each)
+
+- chains: `STEP_KINDS.choose` expands to the choose event and every option's events tagged with `option`; the contract on every path (R5), with a deliberately broken fixture per new rule; the STORY table shows the new steps.
+- day-plan: the options of a choose follow it in chain order; a silent chain drops put-backs inside options too; the evening's `needAgain` events carry `ifUsed`.
+- day: choosing an option removes the other options' events and the story goes on with the chosen one; choosing is refused for an id that is not an option (a `RefusedMove` or the flow's `choiceNotOffered`, whichever fits the existing pattern); a reload after choosing continues on the chosen path (snapshot, `canContinue`, restore); a saved choose event with unknown options fails `canContinue`; a thing of an option that was not chosen is never laid down by a let-go; an `ifUsed` evening find for a thing not found earlier is done at once, one for a thing found earlier is asked.
+- play-flow: the choose screen (command, labels in order, "Something else first", nothing preselected); with one tap a choice acts at once.
+- app-flow with the bot: a session where the player always takes the first option and one where they always take the last option both finish; tearing the coffee pack open means the evening does not ask for the scissors.
+- texts: every option label and new sentence exists; no option label is a narration ("You ..."): labels are the player's own actions.
+- Mutation checks: do not prune the other options (a day test fails); drop `ifUsed` (the evening test fails).
+- At the end: read one transcript per bot variant (first option, last option) and report every screen a human would still find strange, quoting it.
+
+---
+
 ## Story 4: progress in the player's own numbers (revisit)
 
 **Screen**, reached from the start screen with ( My progress ):
