@@ -43,9 +43,12 @@ function dropPutBacks(groups, count, random) {
   return remaining;
 }
 
-/** The steps of a chain as groups of events. */
-const expandSteps = (chain, chosen) =>
-  chain.steps.map((step) => ({ step, events: STEP_KINDS[step.kind].expand(step, { chainId: chain.id, chosen }) }));
+/** The ids of the things found so far, each once, in the order they were first found. */
+const usedIn = (events) => [...new Set(events.filter((event) => event.kind === 'find').map((event) => event.thingId))];
+
+/** The steps of a chain as groups of events. `used` and `nightSpots` serve the closer, which needs the used things again. */
+const expandSteps = (chain, chosen, { used, nightSpots }) =>
+  chain.steps.map((step) => ({ step, events: STEP_KINDS[step.kind].expand(step, { chainId: chain.id, chosen, used, nightSpots }) }));
 
 /**
  * Lays the groups out as events and adds a `letGo` where things that nobody puts back are laid down: after
@@ -74,8 +77,8 @@ function withLetGos(groups, chainId) {
   return events;
 }
 
-function eventsOfChain(chain, { chosen, silentAllowed, random, rules }) {
-  let groups = expandSteps(chain, chosen);
+function eventsOfChain(chain, { chosen, silentAllowed, random, rules, used, nightSpots }) {
+  let groups = expandSteps(chain, chosen, { used, nightSpots });
   const hasPutBack = groups.some((group) => hasEventOfKind(group.events, 'putAway'));
   // a chance of one needs no luck: the app is then silent every time
   const silent = hasPutBack && silentAllowed && (rules.silentChance >= 1 || random.chance(rules.silentChance));
@@ -106,11 +109,12 @@ export function buildDay({ dayNumber, chains = CHAINS, things, onPerson = [], ye
   const stale = rest.filter((chain) => yesterday.includes(chain.id));
   const others = [...random.shuffle(fresh), ...random.shuffle(stale)].slice(0, rules.otherChains).sort((a, b) => timeRank(a) - timeRank(b));
 
+  const nightSpots = Object.fromEntries(things.map((thing) => [thing.id, thing.nightSpot]));
   const events = [{ kind: 'pause', text: 'day' }];
   // the closer ends every session; it has no put-back, so it can never be silent
   for (const chain of [...(opener ? [opener] : []), ...others, ...(closer ? [closer] : [])]) {
     const firstDayOpener = rules.guideFirstOpener && dayNumber === FIRST_DAY && chain === opener;
-    events.push(...eventsOfChain(chain, { chosen, silentAllowed: !firstDayOpener, random, rules }));
+    events.push(...eventsOfChain(chain, { chosen, silentAllowed: !firstDayOpener, random, rules, used: usedIn(events), nightSpots }));
   }
   return events;
 }

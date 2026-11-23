@@ -191,6 +191,14 @@ export const en = {
     evening: {
       dusk: 'It is getting late.',
       look: 'Before you go to bed, you look around once more.',
+      // why each thing is needed once more in the evening, by thing id
+      need: {
+        keys: 'You lock the front door for the night.',
+        wallet: 'You check that your bank card is in your wallet.',
+        phone: 'You set the alarm for tomorrow.',
+        scissors: 'A label in your new jumper itches. You cut it off.',
+      },
+      bed: 'Time to go to bed.',
     },
   },
   goBackCommand: ({ room }) => `Go back ${room.to}.`,

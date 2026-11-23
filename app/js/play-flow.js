@@ -31,9 +31,10 @@ const askingFor = (texts) => ({
   },
 });
 
-/** The sentence a chain has for a step: a string, or a function of the names of the things. */
-function sentenceOf(texts, chain, step) {
+/** The sentence a chain has for a step: a string, a function of the names of the things, or a table by thing id. */
+function sentenceOf(texts, chain, step, thingId) {
   const sentence = texts.chains[chain]?.[step];
+  if (typeof sentence === 'object' && sentence !== null) return sentence[thingId];
   return typeof sentence === 'function' ? sentence({ things: texts.things }) : sentence;
 }
 
@@ -71,7 +72,7 @@ const MODES = {
     }),
   },
   find: {
-    context: (flow, state) => (state.event.step === null ? [] : [sentenceOf(flow.texts, state.event.chain, state.event.step)]),
+    context: (flow, state) => (state.event.step === null ? [] : [sentenceOf(flow.texts, state.event.chain, state.event.step, state.event.thingId)]),
     root: (flow, state, view) => ({
       command: flow.texts.findCommand({ room: view.room, thing: flow.thingOf(state.event.thingId) }),
       choices: flow.placeChoices('find', view),

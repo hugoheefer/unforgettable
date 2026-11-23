@@ -2,6 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { DEFAULT_RULES, buildDay, chainIdsOf } from '../app/js/day-plan.js';
 import { CHAINS } from '../app/js/chains.js';
+import { evening } from '../app/js/chains/evening.js';
 import { THINGS } from '../app/js/things.js';
 import { pause, rand } from './day-helper.mjs';
 
@@ -80,7 +81,9 @@ test('a session of the real chains holds exactly one check, whatever the luck', 
     for (const onPerson of [[], ['keys']]) {
       const events = buildDay({ dayNumber: 2, chains: CHAINS, things: THINGS, onPerson, yesterday: [], random });
       assert.equal(events.filter((event) => event.kind === 'check').length, 1);
-      assert.equal(events.at(-1).kind, 'check');
+      // after the check only the evening's own finds, its last story screen and the let-go of what they leave in hand may follow
+      const afterCheck = events.slice(events.findIndex((event) => event.kind === 'check') + 1);
+      assert.ok(afterCheck.every((event) => event.chain === 'evening' && ['find', 'tell', 'letGo'].includes(event.kind)));
     }
   }
 });
@@ -479,4 +482,51 @@ test('with the default rules every thing that is taken is laid down by a let-go,
   const laidDown = events.filter((event) => event.kind === 'letGo').flatMap((event) => event.thingIds);
   assert.ok(taken.length > 0);
   for (const thingId of taken) assert.ok(laidDown.includes(thingId), thingId);
+});
+
+// ---- the evening asks again for what the session used (user finding 2026-11-23) ----
+
+const SCISSORS_FIRST = { id: 'scissors-first', steps: [move('m', 'kitchen'), take('s', 'scissors'), take('k', 'keys', hall), putBack('sb', 'scissors'), putBack('kb', 'keys')] };
+const eveningOf = (events) => events.filter((event) => event.chain === 'evening');
+const needs = (events) => eveningOf(events).filter((event) => event.step === 'need');
+const nightSpotOf = (id) => THINGS.find((thing) => thing.id === id)?.nightSpot;
+const session = (chains, rules = SOMETIMES_SILENT) => buildDay({ dayNumber: 2, chains: [OPEN, ...chains, evening], things: THINGS, onPerson: [], yesterday: [], random: rand(), rules });
+
+test('the evening asks again for every thing found earlier in the session, after the check, in the order first found', () => {
+  const events = eveningOf(session([SCISSORS_FIRST, TWO])).filter((event) => event.kind !== 'letGo');
+  assert.deepEqual(events.map((event) => event.step), ['dusk', 'look', 'need', 'need', 'bed']);
+  assert.deepEqual(events.slice(2, 4).map((event) => [event.kind, event.thingId]), [['find', 'scissors'], ['find', 'keys']]);
+});
+
+test('a thing that was not used during the session is not asked for in the evening', () => {
+  const asked = needs(session([TWO])).map((event) => event.thingId);
+  assert.deepEqual(asked, ['keys', 'scissors']);
+  assert.equal(asked.includes('wallet') || asked.includes('phone'), false);
+});
+
+test('a thing that was found twice in the session is asked for once in the evening', () => {
+  assert.deepEqual(needs(session([TWO, SCISSORS_FIRST])).map((event) => event.thingId), ['keys', 'scissors']);
+});
+
+test('a thing put back during the session is asked for in the evening all the same', () => {
+  const events = session([TWO], { ...DEFAULT_RULES, silentChance: 0 });
+  assert.ok(events.some((event) => event.kind === 'putAway' && event.thingId === 'keys'), 'the keys are put back in this session');
+  assert.deepEqual(needs(events).map((event) => event.thingId), ['keys', 'scissors']);
+});
+
+test('a thing asked for in the evening and not put back is laid on its night spot at the end of the session', () => {
+  const events = session([TWO]);
+  assert.deepEqual(lastOf(events), { kind: 'letGo', chain: 'evening', thingIds: ['keys', 'scissors'] });
+  for (const event of needs(events)) assert.deepEqual(event.leftAt, nightSpotOf(event.thingId), event.thingId);
+});
+
+test('after the evening finds the player gets one more story screen before things are laid down, so a found thing can still be put away', () => {
+  const events = eveningOf(session([TWO]));
+  const afterNeeds = events.slice(events.findLastIndex((event) => event.step === 'need') + 1);
+  assert.deepEqual(afterNeeds.map((event) => [event.kind, event.step ?? null]), [['tell', 'bed'], ['letGo', null]]);
+});
+
+test('a session in which nothing was found asks for nothing in the evening', () => {
+  const events = session([PLAIN]);
+  assert.deepEqual(eveningOf(events).map((event) => event.kind), ['tell', 'check', 'tell']);
 });

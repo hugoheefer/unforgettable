@@ -22,7 +22,7 @@ const STORY = {
   present: ['go:goTo:dining', 'paper:take:wrapping-paper@dining', 'scissors:take:scissors', 'wrap:tell@dining', 'scissors-back:putBack:scissors', 'phone:take:phone', 'call:tell', 'phone-back:putBack:phone', 'paper-back:putBack:wrapping-paper@dining', 'hall:goTo:hall', 'ready:tell@hall'],
   pizza: ['hungry:goTo:living', 'phone:take:phone', 'ordered:tell@living', 'phone-back:putBack:phone', 'bell:tell', 'go:goTo:hall', 'wallet:take:wallet', 'pay:tell@hall', 'wallet-back:putBack:wallet', 'table:goTo:dining', 'eat:tell@dining'],
   call: ['phone:take:phone', 'walk:move:garden', 'phone-back:putBack:phone', 'in:goTo:living', 'sit:tell@living'],
-  evening: ['dusk:tell', 'look:check'],
+  evening: ['dusk:tell', 'look:check', 'need:needAgain', 'bed:tell'],
 };
 
 const signature = (step) => `${[step.id, step.kind, step.roomId ?? step.object].filter((part) => part !== undefined).join(':')}${step.at === undefined ? '' : `@${step.at}`}`;
@@ -150,8 +150,8 @@ test('a prop that could become a thing already says where it stays, so the chain
 
 // ---- the table of step kinds ----
 
-test('the table of step kinds has exactly the six kinds of the story', () => {
-  assert.deepEqual(Object.keys(STEP_KINDS).sort(), ['check', 'goTo', 'move', 'putBack', 'take', 'tell']);
+test('the table of step kinds has exactly the seven kinds of the story', () => {
+  assert.deepEqual(Object.keys(STEP_KINDS).sort(), ['check', 'goTo', 'move', 'needAgain', 'putBack', 'take', 'tell']);
 });
 
 test('every step kind can say whether its fields are right, whether it needs a sentence, and how it becomes events', () => {
@@ -323,6 +323,12 @@ test('a check outside the closing chain is a problem', () => {
 test('a closing chain may hold a check', () => {
   const chain = { id: 'good', closer: true, time: 'evening', steps: [{ id: 'a', kind: 'tell' }, { id: 'c', kind: 'check' }] };
   assert.deepEqual(problems(chain, { good: { a: 'Dusk.', c: 'Done?' } }), []);
+});
+
+test('a closing chain may ask again for what the session used, and no other chain may', () => {
+  const needing = (closer) => ({ id: 'good', closer, time: 'evening', steps: [{ id: 'a', kind: 'tell' }, { id: 'n', kind: 'needAgain' }] });
+  assert.deepEqual(problems(needing(true), { good: { a: 'Dusk.' } }), []);
+  assert.deepEqual(problems(needing(false), { good: { a: 'Dusk.' } }), ['n: needAgain belongs to the closing chain only']);
 });
 
 test('a closing chain that takes or puts back something is a problem', () => {

@@ -32,6 +32,7 @@ export function problemsOf(chain, { rooms, catalogueIds, hasLocation, kinds, sen
     }
     if (!kind.isValid(step, context)) problems.push(`${step.id}: the fields of a ${step.kind} are wrong`);
     if (step.kind === 'check' && chain.closer !== true) problems.push(`${step.id}: a check belongs to the closing chain only`);
+    if (step.kind === 'needAgain' && chain.closer !== true) problems.push(`${step.id}: needAgain belongs to the closing chain only`);
     if (chain.closer === true && (step.kind === 'take' || step.kind === 'putBack')) problems.push(`${step.id}: the closing chain takes and puts back nothing`);
     if (step.uses !== undefined && !taken.has(step.uses)) problems.push(`${step.id}: uses ${step.uses}, which the chain does not take earlier`);
     if (step.kind === 'take') taken.add(step.object);

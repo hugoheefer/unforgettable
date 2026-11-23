@@ -7,15 +7,16 @@ import { isPocket } from '../app/js/world.js';
  * Plays one session from the start screen to its summary and returns every screen it showed:
  * { lead, command, room, inHand, answer } (`answer` is the choice id tapped, or 'next' on a pause).
  * @param {import('../app/js/app-flow.js').AppFlow} app standing on a start screen that offers 'play' or 'next'
- * @param {{ putsAwayBeforeUse?: boolean }} options `putsAwayBeforeUse`: like a careful human, the player puts a thing
- *   back on its home spot, on their own, the first time a story step is about to use it
+ * @param {{ putsAwayBeforeUse?: boolean, putsAwayWhenDone?: boolean }} options `putsAwayBeforeUse`: like a careful
+ *   human, the player puts a thing back on its home spot, on their own, the first time a story step is about to use it;
+ *   `putsAwayWhenDone`: the player puts a thing in hand on its home spot as soon as the rest of its chain no longer needs it
  */
-export function playSession(app, { putsAwayBeforeUse = false } = {}) {
+export function playSession(app, { putsAwayBeforeUse = false, putsAwayWhenDone = false } = {}) {
   const screens = [];
   const ids = () => app.step().choices.map((entry) => entry.id);
   const tap = (answer) => {
     const { lead, command } = app.step();
-    screens.push({ lead, command, room: app.day?.state().roomId, inHand: app.day?.state().inHand, answer });
+    screens.push({ lead, command, praise: app.step().praise, room: app.day?.state().roomId, inHand: app.day?.state().inHand, answer });
     app.choose(answer);
     app.next();
   };
@@ -42,16 +43,26 @@ export function playSession(app, { putsAwayBeforeUse = false } = {}) {
     return putsAwayBeforeUse && kind === 'tell' && uses !== undefined && state.inHand.includes(uses) && !warned.has(`${chain}/${step}`);
   };
 
+  // a thing in hand that no later event of the running chain names or uses is finished with
+  const finishedWith = (state) => {
+    const rest = app.day.events.slice(app.day.index).filter((event) => event.chain === state.event.chain && event.kind !== 'letGo');
+    return putsAwayWhenDone ? state.inHand.find((id) => !rest.some((event) => event.thingId === id || event.uses === id)) : undefined;
+  };
+
   tap(ids().includes('play') ? 'play' : 'next');
   for (let guard = 0; !/is done/.test(app.step().command); guard += 1) {
     if (guard > 300) throw new Error('the bot is stuck');
     const state = app.day.state();
     const offered = ids();
-    if (offered.length === 0) { screens.push({ lead: app.step().lead, command: app.step().command, room: state.roomId, inHand: state.inHand, answer: 'next' }); app.next(); }
+    if (offered.length === 0) { screens.push({ lead: app.step().lead, command: app.step().command, praise: app.step().praise, room: state.roomId, inHand: state.inHand, answer: 'next' }); app.next(); }
     else if (putting) placeAtHome(state);
     else if (offered.includes('go') && aboutToUseInHand(state)) {
       warned.add(`${state.event.chain}/${state.event.step}`);
       putting = state.event.uses;
+      tap('else');
+      tap(`putaway:${putting}`);
+    } else if (offered.includes('go') && finishedWith(state) !== undefined) {
+      putting = finishedWith(state);
       tap('else');
       tap(`putaway:${putting}`);
     } else if (offered.includes('go')) tap('go');

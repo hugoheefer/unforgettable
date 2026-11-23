@@ -2,6 +2,7 @@
 
 ## Done
 
+- The evening confronts the player in the same session (2026-11-23): after the check the closer needs again every thing found earlier in the session (`needAgain`), with a reason per thing and a night spot where it lies if nobody puts it away. A last story screen ("Time to go to bed.") lets the player put away what the evening needed. Contract: `needAgain` in the closing chain only. 817 tests.
 - Idea, research and decisions agreed (2026-11-16): see CLAUDE.md.
 
 ## Game concept (agreed)

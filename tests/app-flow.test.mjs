@@ -1050,13 +1050,41 @@ test('in the present story, the call is told in the kitchen where the phone was 
 test('a session ends with the evening and the check, and asks "Is everything back in its place?" only once', () => {
   const screens = session();
   const commands = commandsOf(screens);
-  assert.deepEqual(commands.slice(-2), ['It is getting late.', 'Is everything back in its place?']);
+  const dusk = commands.indexOf('It is getting late.');
+  assert.equal(commands[dusk + 1], 'Is everything back in its place?');
+  assert.equal(commands.slice(dusk + 2).some((command) => command.startsWith('Where do you look for your')), true, 'the evening asks again after the check');
   assert.equal(commands.filter((command) => command === 'Is everything back in its place?').length, 1);
 });
 
 test('a well-played session of come-home, coffee and present asks the player back at most twice', () => {
   const commands = commandsOf(session());
   assert.equal(commands.filter((command) => command.startsWith('Go back')).length <= 2, true);
+});
+
+// ---- the evening confronts the player in the same session (user finding 2026-11-23) ----
+
+const afterCheck = (screens) => screens.slice(screens.findIndex((screen) => screen.command === 'Is everything back in its place?') + 1);
+const saidOf = (screen) => [...screen.lead, screen.command].join(' ');
+
+test('a session in which nothing is put back ends with a search for each thing that was used, with its evening reason', () => {
+  const evening = afterCheck(session());
+  for (const id of ['keys', 'scissors', 'phone']) {
+    assert.ok(evening.some((screen) => saidOf(screen).includes(TEXTS.chains.evening.need[id]) && screen.command.startsWith('Where do you look for your')), id);
+  }
+  assert.equal(evening.some((screen) => saidOf(screen).includes(TEXTS.chains.evening.need.wallet)), false, 'the wallet was not used');
+});
+
+test('a player who put a thing back finds it at once in the evening and is praised', () => {
+  const evening = afterCheck(playSession(newApp().app, { putsAwayWhenDone: true }));
+  const praised = evening.filter((screen) => screen.praise !== undefined && screen.praise.startsWith('✨ Found your'));
+  assert.ok(praised.length > 0, 'at least one thing is found at once on its home spot');
+  assert.ok(praised.every((screen) => /at once, on the home spot/.test(screen.praise)));
+});
+
+test('a player who puts each thing away when done ends the session with every thing on its home spot, also what the evening needed', () => {
+  const { app } = newApp();
+  playSession(app, { putsAwayWhenDone: true });
+  for (const thing of THINGS) assert.deepEqual(app.world.whereIs(thing.id), app.plan[thing.id], thing.id);
 });
 
 // ---- no clues ----

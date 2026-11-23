@@ -24,6 +24,11 @@ test('the suggested home of every thing is a spot or pocket that exists', () => 
   for (const thing of THINGS) assert.ok(world.hasLocation(thing.home), thing.id);
 });
 
+test('every thing has a night spot that exists in the layout, where it lies when nobody puts it away in the evening', () => {
+  const world = new World(LAYOUT);
+  for (const thing of THINGS) assert.ok(thing.nightSpot !== undefined && world.hasLocation(thing.nightSpot), thing.id);
+});
+
 test('the catalogue has no uses any more: the chains say how a thing is used', () => {
   for (const thing of THINGS) assert.equal('uses' in thing, false, thing.id);
 });

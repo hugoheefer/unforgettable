@@ -197,6 +197,13 @@ const CHAIN_SENTENCES = {
   evening: {
     dusk: 'It is getting late.',
     look: 'Before you go to bed, you look around once more.',
+    need: {
+      keys: 'You lock the front door for the night.',
+      wallet: 'You check that your bank card is in your wallet.',
+      phone: 'You set the alarm for tomorrow.',
+      scissors: 'A label in your new jumper itches. You cut it off.',
+    },
+    bed: 'Time to go to bed.',
   },
 };
 
@@ -223,6 +230,11 @@ test('the sentence that brings the player back inside is true wherever they stan
 test('the story of the call and of going out have no step that only announces the next one', () => {
   assert.equal('ring' in TEXTS.chains.call, false);
   assert.equal('plan' in TEXTS.chains['go-out'], false);
+});
+
+test('every thing of the catalogue has a sentence for the evening, when the session needs it again', () => {
+  const missing = THINGS.filter((thing) => typeof TEXTS.chains?.evening?.need?.[thing.id] !== 'string' || TEXTS.chains.evening.need[thing.id].length === 0);
+  assert.deepEqual(missing.map((thing) => thing.id), []);
 });
 
 test('the chains in the texts are the eight chains of the list', () => {

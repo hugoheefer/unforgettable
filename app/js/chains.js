@@ -64,6 +64,13 @@ export const STEP_KINDS = Object.freeze({
       ? [eventOf('putAway', step, context, { thingId: step.object })]
       : [told(step, context)]),
   },
+  // The evening needs again every thing the session used: `context.used` holds their ids and `context.nightSpots`
+  // where each lies when nobody puts it away. The sentence of each thing is a table in the language file.
+  needAgain: {
+    isValid: () => true,
+    needsSentence: () => false,
+    expand: (step, context) => context.used.map((thingId) => eventOf('find', step, context, { thingId, leftAt: context.nightSpots[thingId] })),
+  },
   check: {
     isValid: () => true,
     needsSentence: () => true,
